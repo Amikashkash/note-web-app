@@ -6,6 +6,9 @@ import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
+import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
+import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
+import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 
 interface NoteViewProps {
   note: Note;
@@ -83,6 +86,12 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <h3 className="text-lg font-semibold text-gray-700 mb-3">תוכן:</h3>
           {note.templateType === 'accounting' ? (
             <AccountingTemplate value={note.content} onChange={() => {}} readOnly={true} />
+          ) : note.templateType === 'checklist' ? (
+            <ChecklistTemplate value={note.content} onChange={() => {}} readOnly={true} />
+          ) : note.templateType === 'recipe' ? (
+            <RecipeTemplate value={note.content} onChange={() => {}} readOnly={true} />
+          ) : note.templateType === 'shopping' ? (
+            <ShoppingTemplate value={note.content} onChange={() => {}} readOnly={true} />
           ) : (
             <div
               className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"

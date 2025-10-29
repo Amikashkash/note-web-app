@@ -9,6 +9,9 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { AVAILABLE_COLORS } from '@/utils/constants';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
+import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
+import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
+import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 
 interface NoteFormProps {
   categoryId: string;
@@ -126,6 +129,12 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           </label>
           {templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={setContent} />
+          ) : templateType === 'checklist' ? (
+            <ChecklistTemplate value={content} onChange={setContent} />
+          ) : templateType === 'recipe' ? (
+            <RecipeTemplate value={content} onChange={setContent} />
+          ) : templateType === 'shopping' ? (
+            <ShoppingTemplate value={content} onChange={setContent} />
           ) : (
             <textarea
               value={content}
