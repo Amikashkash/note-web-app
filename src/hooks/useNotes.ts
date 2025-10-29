@@ -5,7 +5,6 @@
 import { useEffect } from 'react';
 import { useNoteStore } from '@/store/noteStore';
 import { useAuthStore } from '@/store/authStore';
-import { NoteInput } from '@/types/note';
 
 export const useNotes = (categoryId?: string) => {
   const { user } = useAuthStore();

@@ -2,7 +2,7 @@
  * קומפוננטה לטופס יצירה/עריכה של פתק
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Note, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -31,7 +31,6 @@ const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] =
 ];
 
 export const NoteForm: React.FC<NoteFormProps> = ({
-  categoryId,
   note,
   onClose,
   onSubmit,

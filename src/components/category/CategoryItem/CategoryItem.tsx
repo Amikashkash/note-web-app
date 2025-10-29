@@ -177,7 +177,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-gray-100">
           <NotesList
-            categoryId={category.id}
             notes={categoryNotes}
             onView={handleViewNote}
             onDelete={handleDeleteNote}

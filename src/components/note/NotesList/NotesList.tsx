@@ -2,13 +2,11 @@
  * קומפוננטה המציגה רשימת פתקים בגלילה אופקית
  */
 
-import { useState } from 'react';
 import { Note } from '@/types/note';
 import { NoteCard } from '../NoteCard';
 import { Button } from '@/components/common/Button';
 
 interface NotesListProps {
-  categoryId: string;
   notes: Note[];
   onView: (note: Note) => void;
   onDelete: (noteId: string) => void;
@@ -17,7 +15,6 @@ interface NotesListProps {
 }
 
 export const NotesList: React.FC<NotesListProps> = ({
-  categoryId,
   notes,
   onView,
   onDelete,
