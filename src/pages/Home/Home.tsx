@@ -3,12 +3,14 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
 
 export const Home: React.FC = () => {
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
 
@@ -48,9 +50,14 @@ export const Home: React.FC = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">הקטגוריות שלי</h2>
-          <Button onClick={() => setShowCategoryForm(true)}>
-            + קטגוריה חדשה
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => navigate('/categories')} size="sm" variant="outline">
+              ⚙ ניהול קטגוריות
+            </Button>
+            <Button onClick={() => setShowCategoryForm(true)} size="sm">
+              + קטגוריה חדשה
+            </Button>
+          </div>
         </div>
 
         {/* Categories List */}

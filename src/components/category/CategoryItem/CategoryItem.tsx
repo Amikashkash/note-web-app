@@ -14,14 +14,10 @@ import type { Note } from '@/types/note';
 
 interface CategoryItemProps {
   category: Category;
-  onEdit: (category: Category) => void;
-  onDelete: (categoryId: string) => void;
 }
 
 export const CategoryItem: React.FC<CategoryItemProps> = ({
   category,
-  onEdit,
-  onDelete,
 }) => {
   const { user } = useAuthStore();
   const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
@@ -130,19 +126,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             onClick={handleAddNote}
             className="px-3 py-1.5 text-sm bg-primary text-white hover:bg-blue-600 rounded transition-colors font-medium"
           >
-            + פתק חדש
-          </button>
-          <button
-            onClick={() => onEdit(category)}
-            className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
-          >
-            ✎ ערוך
-          </button>
-          <button
-            onClick={() => onDelete(category.id)}
-            className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-          >
-            🗑 מחק
+            + פתק
           </button>
         </div>
       </div>
@@ -150,12 +134,12 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       {/* תצוגה מקדימה של כותרות פתקים כשהקטגוריה סגורה */}
       {!isExpanded && categoryNotes.length > 0 && (
         <div className="px-4 pb-3 border-t border-gray-100">
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 py-2">
-              {categoryNotes.slice(0, 5).map((note) => (
+          <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+            <div className="flex gap-2 py-2 min-w-max">
+              {categoryNotes.slice(0, 10).map((note) => (
                 <button
                   key={note.id}
-                  onClick={() => setIsExpanded(true)}
+                  onClick={() => handleViewNote(note)}
                   className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-md text-sm text-gray-700 whitespace-nowrap transition-colors border border-gray-200"
                   style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
                 >
@@ -163,10 +147,13 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
                   {note.title}
                 </button>
               ))}
-              {categoryNotes.length > 5 && (
-                <span className="px-3 py-1.5 text-sm text-gray-500 flex items-center">
-                  +{categoryNotes.length - 5} עוד
-                </span>
+              {categoryNotes.length > 10 && (
+                <button
+                  onClick={() => setIsExpanded(true)}
+                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 flex items-center whitespace-nowrap"
+                >
+                  +{categoryNotes.length - 10} עוד...
+                </button>
               )}
             </div>
           </div>

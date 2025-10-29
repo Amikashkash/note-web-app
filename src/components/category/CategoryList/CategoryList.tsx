@@ -7,32 +7,10 @@ import React, { useState } from 'react';
 import { useCategories } from '@/hooks/useCategories';
 import { CategoryItem } from '../CategoryItem/CategoryItem';
 import { CategoryForm } from '../CategoryForm/CategoryForm';
-import type { Category } from '@/types';
 
 export const CategoryList: React.FC = () => {
-  const { categories, isLoading, removeCategory } = useCategories();
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const { categories, isLoading } = useCategories();
   const [showForm, setShowForm] = useState(false);
-
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (categoryId: string) => {
-    if (confirm('האם אתה בטוח שברצונך למחוק קטגוריה זו?')) {
-      try {
-        await removeCategory(categoryId);
-      } catch (error) {
-        console.error('Error deleting category:', error);
-      }
-    }
-  };
-
-  const handleFormClose = () => {
-    setShowForm(false);
-    setEditingCategory(null);
-  };
 
   if (isLoading && categories.length === 0) {
     return (
@@ -54,10 +32,7 @@ export const CategoryList: React.FC = () => {
         </button>
 
         {showForm && (
-          <CategoryForm
-            onClose={handleFormClose}
-            editCategory={editingCategory}
-          />
+          <CategoryForm onClose={() => setShowForm(false)} />
         )}
       </div>
     );
@@ -69,17 +44,8 @@ export const CategoryList: React.FC = () => {
         <CategoryItem
           key={category.id}
           category={category}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
         />
       ))}
-
-      {showForm && (
-        <CategoryForm
-          onClose={handleFormClose}
-          editCategory={editingCategory}
-        />
-      )}
     </div>
   );
 };

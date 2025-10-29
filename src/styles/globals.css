@@ -54,3 +54,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* הסתרת scrollbar במובייל אבל שומרת על יכולת הגלילה */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* גלילה חלקה במובייל */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
