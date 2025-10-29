@@ -44,8 +44,8 @@ export const NotesList: React.FC<NotesListProps> = ({
   return (
     <div className="relative">
       {/* רשימת פתקים עם גלילה אופקית */}
-      <div className="overflow-x-auto pb-4 pt-2">
-        <div className="flex gap-4 rtl:flex-row-reverse">
+      <div className="overflow-x-auto scrollbar-hide pb-4 pt-2" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+        <div className="flex gap-4 rtl:flex-row-reverse min-w-max">
           {sortedNotes.map((note) => (
             <NoteCard
               key={note.id}
