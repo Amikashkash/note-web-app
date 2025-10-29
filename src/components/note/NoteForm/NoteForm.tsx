@@ -8,6 +8,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { AVAILABLE_COLORS } from '@/utils/constants';
+import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 
 interface NoteFormProps {
   categoryId: string;
@@ -28,6 +29,7 @@ const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] =
   { value: 'recipe', label: 'מתכון', icon: '🍳' },
   { value: 'shopping', label: 'רשימת קניות', icon: '🛒' },
   { value: 'idea', label: 'רעיון מהיר', icon: '💡' },
+  { value: 'accounting', label: 'חשבונאות', icon: '💰' },
 ];
 
 export const NoteForm: React.FC<NoteFormProps> = ({
@@ -98,7 +100,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">
             סוג פתק
           </label>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {TEMPLATE_OPTIONS.map((template) => (
               <button
                 key={template.value}
@@ -122,13 +124,17 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             תוכן
           </label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={`הזן ${TEMPLATE_OPTIONS.find(t => t.value === templateType)?.label.toLowerCase()}...`}
-            rows={8}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          />
+          {templateType === 'accounting' ? (
+            <AccountingTemplate value={content} onChange={setContent} />
+          ) : (
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={`הזן ${TEMPLATE_OPTIONS.find(t => t.value === templateType)?.label.toLowerCase()}...`}
+              rows={8}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+          )}
         </div>
 
         {/* תגיות */}

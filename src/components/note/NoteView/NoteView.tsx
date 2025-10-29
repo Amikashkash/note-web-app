@@ -5,6 +5,7 @@
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
+import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 
 interface NoteViewProps {
   note: Note;
@@ -52,6 +53,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 {note.templateType === 'recipe' && '🍳 מתכון'}
                 {note.templateType === 'shopping' && '🛒 קניות'}
                 {note.templateType === 'idea' && '💡 רעיון'}
+                {note.templateType === 'accounting' && '💰 חשבונאות'}
               </span>
               <span>•</span>
               <span>
@@ -79,12 +81,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* תוכן */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-3">תוכן:</h3>
-          <div
-            className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
-            style={{ borderRightColor: note.color || '#3B82F6', borderRightWidth: '4px' }}
-          >
-            {note.content || 'אין תוכן'}
-          </div>
+          {note.templateType === 'accounting' ? (
+            <AccountingTemplate value={note.content} onChange={() => {}} readOnly={true} />
+          ) : (
+            <div
+              className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
+              style={{ borderRightColor: note.color || '#3B82F6', borderRightWidth: '4px' }}
+            >
+              {note.content || 'אין תוכן'}
+            </div>
+          )}
         </div>
 
         {/* תגיות */}
