@@ -12,6 +12,7 @@ interface CategoryState {
   isLoading: boolean;
   error: string | null;
   unsubscribe: (() => void) | null;
+  currentUserId: string | null;
 
   // Actions
   setCategories: (categories: Category[]) => void;
@@ -37,6 +38,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   isLoading: false,
   error: null,
   unsubscribe: null,
+  currentUserId: null,
 
   /**
    * Set categories
@@ -108,13 +110,21 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
    * Subscribe to real-time categories updates
    */
   subscribeToCategories: (userId: string) => {
+    const { unsubscribe, currentUserId } = get();
+
+    // If already subscribed to this user, do nothing
+    if (currentUserId === userId && unsubscribe) {
+      console.log('Already subscribed to user:', userId);
+      return;
+    }
+
     // Unsubscribe from previous subscription if exists
-    const { unsubscribe } = get();
     if (unsubscribe) {
       unsubscribe();
     }
 
-    set({ isLoading: true });
+    console.log('Creating new subscription for user:', userId);
+    set({ isLoading: true, currentUserId: userId });
 
     // Set a timeout to stop loading state if subscription takes too long
     const loadingTimeout = setTimeout(() => {
@@ -136,7 +146,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const { unsubscribe } = get();
     if (unsubscribe) {
       unsubscribe();
-      set({ unsubscribe: null });
+      set({ unsubscribe: null, currentUserId: null });
     }
   },
 
@@ -153,6 +163,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       isLoading: false,
       error: null,
       unsubscribe: null,
+      currentUserId: null,
     });
   },
 }));
