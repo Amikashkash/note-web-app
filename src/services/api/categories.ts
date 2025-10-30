@@ -12,7 +12,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
   onSnapshot,
   Unsubscribe,
@@ -86,15 +85,16 @@ export const getUserCategories = async (userId: string): Promise<Category[]> => 
   try {
     const q = query(
       collection(db, CATEGORIES_COLLECTION),
-      where('userId', '==', userId),
-      orderBy('order', 'asc')
+      where('userId', '==', userId)
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Category));
+    return snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Category))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch (error: any) {
     console.error('Error getting categories:', error);
     throw new Error('Failed to get categories');
@@ -110,17 +110,18 @@ export const subscribeToCategories = (
 ): Unsubscribe => {
   const q = query(
     collection(db, CATEGORIES_COLLECTION),
-    where('userId', '==', userId),
-    orderBy('order', 'asc')
+    where('userId', '==', userId)
   );
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const categories = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Category));
+      const categories = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        } as Category))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
       callback(categories);
     },
     (error) => {

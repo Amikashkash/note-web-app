@@ -10,7 +10,6 @@ import {
   doc,
   query,
   where,
-  orderBy,
   onSnapshot,
   Timestamp,
   Unsubscribe,
@@ -79,15 +78,16 @@ export const getNotesByCategory = async (categoryId: string): Promise<Note[]> =>
   try {
     const q = query(
       collection(db, NOTES_COLLECTION),
-      where('categoryId', '==', categoryId),
-      orderBy('order', 'asc')
+      where('categoryId', '==', categoryId)
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Note));
+    return snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Note))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch (error) {
     console.error('Error getting notes by category:', error);
     throw error;
@@ -103,18 +103,24 @@ export const subscribeToNotes = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('userId', '==', userId),
-    orderBy('categoryId', 'asc'),
-    orderBy('order', 'asc')
+    where('userId', '==', userId)
   );
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const notes = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Note));
+      const notes = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        } as Note))
+        .sort((a, b) => {
+          // Sort by categoryId first, then by order
+          if (a.categoryId !== b.categoryId) {
+            return a.categoryId.localeCompare(b.categoryId);
+          }
+          return (a.order || 0) - (b.order || 0);
+        });
       callback(notes);
     },
     (error) => {
@@ -132,17 +138,18 @@ export const subscribeToNotesByCategory = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('categoryId', '==', categoryId),
-    orderBy('order', 'asc')
+    where('categoryId', '==', categoryId)
   );
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const notes = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Note));
+      const notes = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        } as Note))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
       callback(notes);
     },
     (error) => {
