@@ -14,7 +14,7 @@ import {
   sendEmailVerification,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './config';
 import { DEFAULT_USER_SETTINGS } from '@/utils/defaults';
 import type { User } from '@/types';
