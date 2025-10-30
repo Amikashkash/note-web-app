@@ -49,6 +49,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   const [selectedColor, setSelectedColor] = useState<string | null>(
     note?.color || null
   );
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const isEditMode = !!note;
 
@@ -79,7 +80,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
   return (
     <Modal onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 max-h-[85vh] overflow-y-auto">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           {isEditMode ? 'עריכת פתק' : 'פתק חדש'}
         </h2>
@@ -146,55 +147,71 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           )}
         </div>
 
-        {/* תגיות */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            תגיות (מופרדות בפסיקים)
-          </label>
-          <Input
-            type="text"
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="עבודה, חשוב, אישי..."
-          />
-        </div>
+        {/* אפשרויות מתקדמות - מתקפל */}
+        <div className="border-t pt-3">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+          >
+            <span>{showAdvanced ? '▼' : '◀'}</span>
+            <span>אפשרויות נוספות (תגיות וצבע)</span>
+          </button>
 
-        {/* בחירת צבע */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            צבע פתק (אופציונלי)
-          </label>
-          <div className="flex gap-2">
-            {/* אפשרות ללא צבע */}
-            <button
-              type="button"
-              onClick={() => setSelectedColor(null)}
-              className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center ${
-                selectedColor === null
-                  ? 'border-gray-800'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              title="ללא צבע"
-            >
-              ✕
-            </button>
+          {showAdvanced && (
+            <div className="mt-4 space-y-4">
+              {/* תגיות */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  תגיות (מופרדות בפסיקים)
+                </label>
+                <Input
+                  type="text"
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  placeholder="עבודה, חשוב, אישי..."
+                />
+              </div>
 
-            {/* אפשרויות צבע */}
-            {AVAILABLE_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setSelectedColor(color)}
-                className={`w-10 h-10 rounded-lg border-2 ${
-                  selectedColor === color
-                    ? 'border-gray-800 scale-110'
-                    : 'border-transparent hover:scale-105'
-                } transition-transform`}
-                style={{ backgroundColor: color }}
-                title={color}
-              />
-            ))}
-          </div>
+              {/* בחירת צבע */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  צבע פתק (אופציונלי)
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {/* אפשרות ללא צבע */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedColor(null)}
+                    className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center ${
+                      selectedColor === null
+                        ? 'border-gray-800'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                    title="ללא צבע"
+                  >
+                    ✕
+                  </button>
+
+                  {/* אפשרויות צבע */}
+                  {AVAILABLE_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-lg border-2 ${
+                        selectedColor === color
+                          ? 'border-gray-800 scale-110'
+                          : 'border-transparent hover:scale-105'
+                      } transition-transform`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* כפתורי פעולה */}

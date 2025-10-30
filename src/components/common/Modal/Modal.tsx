@@ -31,15 +31,19 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       ></div>
 
       {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full my-4 sm:my-0 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+        style={{
+          WebkitOverflowScrolling: 'touch'
+        } as React.CSSProperties}
+      >
         {/* Header - only show if title is provided */}
         {title && (
           <div className="flex items-center justify-between p-4 border-b">
@@ -56,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
         )}
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           {children}
         </div>
       </div>
