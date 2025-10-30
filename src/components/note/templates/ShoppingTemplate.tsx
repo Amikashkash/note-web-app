@@ -154,67 +154,73 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
           {items.map((item) => (
             <div
               key={item.id}
-              className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all ${
+              className={`flex flex-col gap-2 p-2 rounded-lg border-2 transition-all ${
                 item.checked
                   ? 'bg-green-50 border-green-200'
                   : 'bg-white border-gray-200 hover:border-gray-300'
               }`}
             >
-              {/* Checkbox */}
-              <button
-                type="button"
-                onClick={() => handleToggleItem(item.id)}
-                className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                  item.checked
-                    ? 'bg-green-500 border-green-500'
-                    : 'bg-white border-gray-300 hover:border-green-400'
-                }`}
-              >
-                {item.checked && <span className="text-white text-sm">✓</span>}
-              </button>
+              {/* שורה ראשונה: Checkbox, שם, כמות, מחיקה */}
+              <div className="flex items-center gap-2">
+                {/* Checkbox */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleItem(item.id)}
+                  className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                    item.checked
+                      ? 'bg-green-500 border-green-500'
+                      : 'bg-white border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  {item.checked && <span className="text-white text-sm">✓</span>}
+                </button>
 
-              {/* שם הפריט */}
-              <input
-                type="text"
-                value={item.name}
-                onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
-                placeholder="פריט..."
-                className={`flex-1 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
-                  item.checked ? 'line-through text-gray-500' : 'text-gray-700'
-                }`}
-              />
+                {/* שם הפריט */}
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
+                  placeholder="פריט..."
+                  className={`flex-1 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
+                    item.checked ? 'line-through text-gray-500' : 'text-gray-700'
+                  }`}
+                />
 
-              {/* כמות */}
-              <input
-                type="text"
-                value={item.quantity}
-                onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
-                placeholder="כמות"
-                className="w-20 px-2 py-1 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-              />
+                {/* כמות */}
+                <input
+                  type="text"
+                  value={item.quantity}
+                  onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
+                  placeholder="כמות"
+                  className="w-16 sm:w-20 px-2 py-1 text-xs sm:text-sm bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                />
 
-              {/* קטגוריה */}
-              <select
-                value={item.category}
-                onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)}
-                className="px-2 py-1 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+                {/* מחיקה */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
+                  title="מחק פריט"
+                >
+                  🗑
+                </button>
+              </div>
 
-              {/* מחיקה */}
-              <button
-                type="button"
-                onClick={() => handleDeleteItem(item.id)}
-                className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
-                title="מחק פריט"
-              >
-                🗑
-              </button>
+              {/* שורה שנייה: קטגוריה */}
+              <div className="flex items-center gap-2 mr-8">
+                <label className="text-xs text-gray-600 flex-shrink-0">קטגוריה:</label>
+                <select
+                  value={item.category}
+                  onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)}
+                  className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           ))}
         </div>
