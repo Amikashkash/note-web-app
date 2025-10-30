@@ -94,10 +94,10 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-3 py-2 text-right w-32">📅 תאריך</th>
-              <th className="border border-gray-300 px-3 py-2 text-right">תיאור</th>
-              <th className="border border-gray-300 px-3 py-2 text-center w-32">סכום (₪)</th>
-              {!readOnly && <th className="border border-gray-300 px-3 py-2 w-16"></th>}
+              <th className="border border-gray-300 px-2 py-1 text-right w-24 sm:w-28">📅 תאריך</th>
+              <th className="border border-gray-300 px-2 py-1 text-right">תיאור</th>
+              <th className="border border-gray-300 px-2 py-1 text-center w-20 sm:w-24">סכום</th>
+              {!readOnly && <th className="border border-gray-300 px-1 py-1 w-10"></th>}
             </tr>
           </thead>
           <tbody>
@@ -119,39 +119,39 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                   } hover:bg-gray-50`}
                 >
                   {/* תאריך */}
-                  <td className="border border-gray-300 px-2 py-1">
+                  <td className="border border-gray-300 px-1 py-0.5">
                     {readOnly ? (
-                      <span className="text-gray-700">{row.date}</span>
+                      <span className="text-xs sm:text-sm text-gray-700">{row.date}</span>
                     ) : (
                       <input
                         type="date"
                         value={row.date}
                         onChange={(e) => handleUpdateRow(row.id, 'date', e.target.value)}
-                        className="w-full px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
+                        className="w-full px-1 py-0.5 text-xs sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
                       />
                     )}
                   </td>
 
                   {/* תיאור */}
-                  <td className="border border-gray-300 px-2 py-1">
+                  <td className="border border-gray-300 px-2 py-0.5">
                     {readOnly ? (
-                      <span className="text-gray-700">{row.description}</span>
+                      <span className="text-sm text-gray-700">{row.description}</span>
                     ) : (
                       <input
                         type="text"
                         value={row.description}
                         onChange={(e) => handleUpdateRow(row.id, 'description', e.target.value)}
                         placeholder="הזן תיאור..."
-                        className="w-full px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
+                        className="w-full px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
                       />
                     )}
                   </td>
 
                   {/* סכום */}
-                  <td className="border border-gray-300 px-2 py-1">
+                  <td className="border border-gray-300 px-1 py-0.5">
                     {readOnly ? (
                       <span
-                        className={`font-medium ${
+                        className={`text-xs sm:text-sm font-medium ${
                           row.amount > 0
                             ? 'text-green-600'
                             : row.amount < 0
@@ -171,18 +171,18 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                           handleUpdateRow(row.id, 'amount', parseFloat(e.target.value) || 0)
                         }
                         placeholder="0"
-                        className="w-full px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded text-center"
+                        className="w-full px-1 py-0.5 text-xs sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded text-center"
                       />
                     )}
                   </td>
 
                   {/* כפתור מחיקה */}
                   {!readOnly && (
-                    <td className="border border-gray-300 px-2 py-1 text-center">
+                    <td className="border border-gray-300 px-0.5 py-0.5 text-center">
                       <button
                         type="button"
                         onClick={() => handleDeleteRow(row.id)}
-                        className="text-red-600 hover:text-red-800 text-lg"
+                        className="text-red-600 hover:text-red-800 text-base"
                         title="מחק שורה"
                       >
                         🗑

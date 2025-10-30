@@ -15,23 +15,23 @@ export const Home: React.FC = () => {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-primary">📝 אפליקציית פתקים</h1>
+        <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">📝 אפליקציית פתקים</h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             {user?.photoURL && (
               <img
                 src={user.photoURL}
                 alt={user.displayName}
-                className="w-10 h-10 rounded-full"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full"
               />
             )}
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="font-medium text-gray-800">{user?.displayName}</p>
               <p className="text-sm text-gray-500">{user?.email}</p>
             </div>
@@ -47,15 +47,15 @@ export const Home: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
-        <div className="flex items-center justify-between mb-3 sm:mb-6 px-2 sm:px-0">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">הקטגוריות שלי</h2>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button onClick={() => navigate('/categories')} size="sm" variant="outline">
-              ⚙ ניהול קטגוריות
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
+        <div className="flex items-center justify-between mb-3 sm:mb-6 gap-2">
+          <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 truncate">הקטגוריות שלי</h2>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button onClick={() => navigate('/categories')} size="sm" variant="outline" className="text-xs sm:text-sm whitespace-nowrap">
+              ⚙ ניהול
             </Button>
-            <Button onClick={() => setShowCategoryForm(true)} size="sm">
-              + קטגוריה חדשה
+            <Button onClick={() => setShowCategoryForm(true)} size="sm" className="text-xs sm:text-sm whitespace-nowrap">
+              + חדש
             </Button>
           </div>
         </div>
