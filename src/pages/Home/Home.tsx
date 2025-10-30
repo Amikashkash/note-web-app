@@ -18,17 +18,17 @@ export const Home: React.FC = () => {
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">📝 אפליקציית פתקים</h1>
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-shrink">
+            <h1 className="text-base sm:text-2xl font-bold text-primary truncate">📝 פתקים</h1>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-4 flex-shrink-0">
             {user?.photoURL && (
               <img
                 src={user.photoURL}
                 alt={user.displayName}
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full"
+                className="w-7 h-7 sm:w-10 sm:h-10 rounded-full"
               />
             )}
             <div className="text-right hidden sm:block">
@@ -39,6 +39,7 @@ export const Home: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={signOut}
+              className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4"
             >
               התנתק
             </Button>

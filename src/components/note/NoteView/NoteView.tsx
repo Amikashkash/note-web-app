@@ -2,6 +2,7 @@
  * קומפוננטה להצגת פתק מלא במודאל
  */
 
+import { useState } from 'react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -9,6 +10,7 @@ import { AccountingTemplate } from '@/components/note/templates/AccountingTempla
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
+import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 
 interface NoteViewProps {
   note: Note;
@@ -27,6 +29,9 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onTogglePin,
   onUpdate,
 }) => {
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
   const handleEdit = () => {
     onEdit(note);
   };
@@ -47,6 +52,25 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const handleContentChange = (newContent: string) => {
     if (onUpdate) {
       onUpdate(note.id, newContent);
+    }
+  };
+
+  const handleShare = async () => {
+    // ניסיון להשתמש ב-Web Share API במובייל
+    const nativeShareSuccess = await shareViaNative(note);
+    if (nativeShareSuccess) {
+      return;
+    }
+
+    // אם לא עבד, הצג תפריט שיתוף
+    setShowShareMenu(!showShareMenu);
+  };
+
+  const handleCopy = async () => {
+    const success = await copyToClipboard(note);
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
     }
   };
 
@@ -127,17 +151,66 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
+        {/* כפתורי שיתוף */}
+        {showShareMenu && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">שתף פתק:</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  shareViaWhatsApp(note);
+                  setShowShareMenu(false);
+                }}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <span className="text-green-600">📱</span>
+                WhatsApp
+              </Button>
+              <Button
+                onClick={() => {
+                  shareViaEmail(note);
+                  setShowShareMenu(false);
+                }}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <span>📧</span>
+                אימייל
+              </Button>
+              <Button
+                onClick={handleCopy}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <span>{copySuccess ? '✓' : '📋'}</span>
+                {copySuccess ? 'הועתק!' : 'העתק'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* כפתורי פעולה */}
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <Button onClick={handleEdit} className="flex-1">
-            ✎ ערוך פתק
-          </Button>
-          <Button variant="danger" onClick={handleDelete} className="flex-1">
-            🗑 מחק פתק
-          </Button>
-          <Button variant="secondary" onClick={onClose} className="flex-1">
-            ✕ סגור
-          </Button>
+        <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+          <div className="flex gap-2">
+            <Button onClick={handleEdit} className="flex-1">
+              ✎ ערוך
+            </Button>
+            <Button onClick={handleShare} variant="outline" className="flex-1">
+              🔗 שתף
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="danger" onClick={handleDelete} className="flex-1">
+              🗑 מחק
+            </Button>
+            <Button variant="secondary" onClick={onClose} className="flex-1">
+              ✕ סגור
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>
