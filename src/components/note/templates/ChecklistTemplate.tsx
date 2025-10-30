@@ -107,7 +107,6 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     ? 'bg-green-500 border-green-500'
                     : 'bg-white border-gray-300 hover:border-green-400'
                 }`}
-                disabled={readOnly}
               >
                 {item.completed && <span className="text-white text-sm">✓</span>}
               </button>

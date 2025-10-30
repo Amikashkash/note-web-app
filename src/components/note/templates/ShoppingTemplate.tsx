@@ -117,17 +117,31 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 {categoryItems.map((item) => (
                   <div
                     key={item.id}
-                    className={`flex items-center gap-3 px-3 py-2 rounded ${
-                      item.checked ? 'bg-green-50' : 'bg-gray-50'
+                    className={`flex items-center gap-3 px-3 py-2 rounded border-2 transition-all ${
+                      item.checked
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-white border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className={`flex-1 ${item.checked ? 'line-through text-gray-500' : ''}`}>
+                    {/* Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleItem(item.id)}
+                      className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                        item.checked
+                          ? 'bg-green-500 border-green-500'
+                          : 'bg-white border-gray-300 hover:border-green-400'
+                      }`}
+                    >
+                      {item.checked && <span className="text-white text-sm">✓</span>}
+                    </button>
+
+                    <span className={`flex-1 ${item.checked ? 'line-through text-gray-500' : 'text-gray-700'}`}>
                       {item.name}
                     </span>
                     {item.quantity && (
                       <span className="text-sm text-gray-600">({item.quantity})</span>
                     )}
-                    {item.checked && <span className="text-green-600">✓</span>}
                   </div>
                 ))}
               </div>
