@@ -14,7 +14,7 @@ export const CategoryList: React.FC = () => {
 
   if (isLoading && categories.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-4 sm:p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
@@ -22,11 +22,11 @@ export const CategoryList: React.FC = () => {
 
   if (categories.length === 0) {
     return (
-      <div className="text-center p-8 text-gray-500">
-        <p className="mb-4">עדיין אין קטגוריות</p>
+      <div className="text-center p-4 sm:p-8 text-gray-500">
+        <p className="mb-4 text-sm sm:text-base">עדיין אין קטגוריות</p>
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors"
+          className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
           צור קטגוריה ראשונה
         </button>
@@ -39,7 +39,7 @@ export const CategoryList: React.FC = () => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 sm:space-y-3">
       {categories.map((category) => (
         <CategoryItem
           key={category.id}

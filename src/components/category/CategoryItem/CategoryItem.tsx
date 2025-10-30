@@ -104,27 +104,27 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   };
 
   return (
-    <div className="mb-6 bg-white rounded-lg shadow-md border-r-4" style={{ borderRightColor: category.color }}>
+    <div className="mb-3 sm:mb-6 bg-white rounded-lg shadow-md border-r-4" style={{ borderRightColor: category.color }}>
       {/* כותרת הקטגוריה */}
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="flex items-center justify-between p-2 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-gray-500 hover:text-gray-700 transition-colors text-sm sm:text-base"
           >
             {isExpanded ? '▼' : '◀'}
           </button>
-          {category.icon && <span className="text-2xl">{category.icon}</span>}
+          {category.icon && <span className="text-xl sm:text-2xl">{category.icon}</span>}
           <div>
-            <h3 className="font-semibold text-gray-800">{category.name}</h3>
-            <p className="text-sm text-gray-500">{categoryNotes.length} פתקים</p>
+            <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{category.name}</h3>
+            <p className="text-xs sm:text-sm text-gray-500">{categoryNotes.length} פתקים</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <button
             onClick={handleAddNote}
-            className="px-3 py-1.5 text-sm bg-primary text-white hover:bg-blue-600 rounded transition-colors font-medium"
+            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-primary text-white hover:bg-blue-600 rounded transition-colors font-medium"
           >
             + פתק
           </button>
@@ -133,9 +133,9 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 
       {/* תצוגה מקדימה של כותרות פתקים כשהקטגוריה סגורה */}
       {!isExpanded && categoryNotes.length > 0 && (
-        <div className="px-4 pb-3 border-t border-gray-100">
+        <div className="px-2 sm:px-4 pb-2 sm:pb-3 border-t border-gray-100">
           <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-            <div className="flex gap-2 py-2 min-w-max">
+            <div className="flex gap-1.5 sm:gap-2 py-1.5 sm:py-2 min-w-max">
               {categoryNotes.slice(0, 10).map((note) => (
                 <button
                   key={note.id}
@@ -162,7 +162,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 
       {/* רשימת הפתקים (מתקפלת) */}
       {isExpanded && (
-        <div className="px-4 pb-4 border-t border-gray-100">
+        <div className="px-2 sm:px-4 pb-2 sm:pb-4 border-t border-gray-100">
           <NotesList
             notes={categoryNotes}
             onView={handleViewNote}

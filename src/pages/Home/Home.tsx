@@ -47,10 +47,10 @@ export const Home: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">הקטגוריות שלי</h2>
-          <div className="flex items-center gap-2">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="flex items-center justify-between mb-3 sm:mb-6 px-2 sm:px-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">הקטגוריות שלי</h2>
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button onClick={() => navigate('/categories')} size="sm" variant="outline">
               ⚙ ניהול קטגוריות
             </Button>
@@ -61,7 +61,7 @@ export const Home: React.FC = () => {
         </div>
 
         {/* Categories List */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-2 sm:p-6">
           <CategoryList />
         </div>
 
