@@ -21,7 +21,9 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(npm run build:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(start public/generate-icons.html)",
+      "Bash(del nul)"
     ],
     "deny": [],
     "ask": []

@@ -7,6 +7,7 @@ import { Note, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
+import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { AVAILABLE_COLORS } from '@/utils/constants';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
@@ -137,12 +138,11 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           ) : templateType === 'shopping' ? (
             <ShoppingTemplate value={content} onChange={setContent} />
           ) : (
-            <textarea
+            <EnhancedTextarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={setContent}
               placeholder={`הזן ${TEMPLATE_OPTIONS.find(t => t.value === templateType)?.label.toLowerCase()}...`}
               rows={8}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           )}
         </div>
