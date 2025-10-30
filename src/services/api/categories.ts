@@ -31,6 +31,7 @@ export const createCategory = async (
   color?: string
 ): Promise<string> => {
   try {
+    console.log('Creating category:', { userId, name, color });
     const categoryData = {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
@@ -38,7 +39,9 @@ export const createCategory = async (
       updatedAt: serverTimestamp(),
     };
 
+    console.log('Category data:', categoryData);
     const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), categoryData);
+    console.log('Category created with ID:', docRef.id);
     return docRef.id;
   } catch (error: any) {
     console.error('Error creating category:', error);
@@ -108,6 +111,7 @@ export const subscribeToCategories = (
   userId: string,
   callback: (categories: Category[]) => void
 ): Unsubscribe => {
+  console.log('Setting up categories subscription for user:', userId);
   const q = query(
     collection(db, CATEGORIES_COLLECTION),
     where('userId', '==', userId)
@@ -116,12 +120,14 @@ export const subscribeToCategories = (
   return onSnapshot(
     q,
     (snapshot) => {
+      console.log('Categories subscription fired, doc count:', snapshot.docs.length);
       const categories = snapshot.docs
         .map(doc => ({
           id: doc.id,
           ...doc.data(),
         } as Category))
         .sort((a, b) => (a.order || 0) - (b.order || 0));
+      console.log('Processed categories:', categories);
       callback(categories);
     },
     (error) => {

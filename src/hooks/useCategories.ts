@@ -31,7 +31,8 @@ export const useCategories = () => {
     return () => {
       unsubscribeFromCategories();
     };
-  }, [user?.uid, subscribeToCategories, unsubscribeFromCategories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   /**
    * Create a new category

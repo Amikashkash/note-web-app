@@ -116,7 +116,13 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
     set({ isLoading: true });
 
+    // Set a timeout to stop loading state if subscription takes too long
+    const loadingTimeout = setTimeout(() => {
+      set({ isLoading: false });
+    }, 3000); // 3 seconds timeout
+
     const newUnsubscribe = categoryAPI.subscribeToCategories(userId, (categories) => {
+      clearTimeout(loadingTimeout);
       set({ categories, isLoading: false, error: null });
     });
 
