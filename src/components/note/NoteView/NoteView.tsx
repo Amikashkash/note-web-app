@@ -11,6 +11,7 @@ import { AccountingTemplate } from '@/components/note/templates/AccountingTempla
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
+import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 
 interface NoteViewProps {
@@ -88,7 +89,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 {note.templateType === 'checklist' && '✅ משימות'}
                 {note.templateType === 'recipe' && '🍳 מתכון'}
                 {note.templateType === 'shopping' && '🛒 קניות'}
-                {note.templateType === 'idea' && '💡 רעיון'}
+                {note.templateType === 'workplan' && '📋 תכנית עבודה'}
                 {note.templateType === 'accounting' && '💰 חשבונאות'}
               </span>
               <span>•</span>
@@ -125,6 +126,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <RecipeTemplate value={note.content} onChange={() => {}} readOnly={true} />
           ) : note.templateType === 'shopping' ? (
             <ShoppingTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
+          ) : note.templateType === 'workplan' ? (
+            <WorkPlanTemplate value={note.content} onChange={() => {}} readOnly={true} />
           ) : (
             <div
               className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"

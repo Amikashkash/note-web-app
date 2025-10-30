@@ -26,7 +26,7 @@ export const TEMPLATE_TYPES = {
   CHECKLIST: 'checklist',
   RECIPE: 'recipe',
   SHOPPING: 'shopping',
-  IDEA: 'idea',
+  WORKPLAN: 'workplan',
 } as const;
 
 // שמות תבניות בעברית
@@ -35,7 +35,7 @@ export const TEMPLATE_NAMES_HE = {
   checklist: 'רשימת משימות',
   recipe: 'מתכון בישול',
   shopping: 'רשימת קניות',
-  idea: 'רעיון מהיר',
+  workplan: 'תכנית עבודה',
 } as const;
 
 // שמות תבניות באנגלית
@@ -44,5 +44,5 @@ export const TEMPLATE_NAMES_EN = {
   checklist: 'Checklist',
   recipe: 'Cooking Recipe',
   shopping: 'Shopping List',
-  idea: 'Quick Idea',
+  workplan: 'Work Plan',
 } as const;

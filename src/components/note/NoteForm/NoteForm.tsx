@@ -13,6 +13,7 @@ import { AccountingTemplate } from '@/components/note/templates/AccountingTempla
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
+import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 
 interface NoteFormProps {
   categoryId: string;
@@ -32,7 +33,7 @@ const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] =
   { value: 'checklist', label: 'רשימת משימות', icon: '✅' },
   { value: 'recipe', label: 'מתכון', icon: '🍳' },
   { value: 'shopping', label: 'רשימת קניות', icon: '🛒' },
-  { value: 'idea', label: 'רעיון מהיר', icon: '💡' },
+  { value: 'workplan', label: 'תכנית עבודה', icon: '📋' },
   { value: 'accounting', label: 'חשבונאות', icon: '💰' },
 ];
 
@@ -137,6 +138,8 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             <RecipeTemplate value={content} onChange={setContent} />
           ) : templateType === 'shopping' ? (
             <ShoppingTemplate value={content} onChange={setContent} />
+          ) : templateType === 'workplan' ? (
+            <WorkPlanTemplate value={content} onChange={setContent} />
           ) : (
             <EnhancedTextarea
               value={content}

@@ -3,6 +3,46 @@
  */
 
 import { Note } from '@/types/note';
+import { AccountingRow } from '@/components/note/templates/AccountingTemplate';
+
+/**
+ * המרת חשבונאות ל-JSON לטקסט טבלה קריא
+ */
+const formatAccountingContent = (content: string): string => {
+  try {
+    const rows: AccountingRow[] = JSON.parse(content);
+    if (!rows || rows.length === 0) {
+      return 'אין נתונים';
+    }
+
+    let text = '';
+    let balance = 0;
+
+    // כותרת טבלה
+    text += '📊 טבלת חשבונאות:\n';
+    text += '─'.repeat(50) + '\n';
+    text += 'תאריך       | תיאור                    | סכום      | יתרה\n';
+    text += '─'.repeat(50) + '\n';
+
+    // שורות
+    rows.forEach((row) => {
+      balance += row.amount;
+      const dateStr = row.date.padEnd(12);
+      const descStr = row.description.padEnd(25).substring(0, 25);
+      const amountStr = row.amount.toFixed(2).padStart(9);
+      const balanceStr = balance.toFixed(2).padStart(9);
+
+      text += `${dateStr}| ${descStr}| ${amountStr} | ${balanceStr}\n`;
+    });
+
+    text += '─'.repeat(50) + '\n';
+    text += `💵 יתרה סופית: ${balance.toFixed(2)} ₪\n`;
+
+    return text;
+  } catch (error) {
+    return content; // אם זה לא JSON תקין, החזר את התוכן כמו שהוא
+  }
+};
 
 /**
  * המרת תוכן הפתק לטקסט רגיל לצורך שיתוף
@@ -17,7 +57,7 @@ export const formatNoteForSharing = (note: Note): string => {
     checklist: '✅',
     recipe: '🍳',
     shopping: '🛒',
-    idea: '💡',
+    workplan: '📋',
     accounting: '💰',
   }[note.templateType] || '📝';
 
@@ -31,8 +71,12 @@ export const formatNoteForSharing = (note: Note): string => {
   });
   text += `📅 תאריך: ${date}\n\n`;
 
-  // תוכן
-  text += `${note.content}\n`;
+  // תוכן - טיפול מיוחד לחשבונאות
+  if (note.templateType === 'accounting') {
+    text += formatAccountingContent(note.content);
+  } else {
+    text += `${note.content}\n`;
+  }
 
   // תגיות
   if (note.tags.length > 0) {
@@ -51,7 +95,7 @@ const getTemplateLabel = (templateType: string): string => {
     checklist: 'רשימת משימות',
     recipe: 'מתכון',
     shopping: 'רשימת קניות',
-    idea: 'רעיון',
+    workplan: 'תכנית עבודה',
     accounting: 'חשבונאות',
   };
   return labels[templateType] || 'פתק';
