@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate PWA Icons</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            direction: rtl;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>יצירת אייקונים ל-PWA</h1>
+        <p>לחץ על הכפתורים להורדת האייקונים</p>
+
+        <canvas id="canvas192" width="192" height="192"></canvas>
+        <canvas id="canvas512" width="512" height="512"></canvas>
+
+        <div>
+            <button onclick="downloadIcon(192, false)">הורד 192x192</button>
+            <button onclick="downloadIcon(512, false)">הורד 512x512</button>
+            <button onclick="downloadIcon(192, true)">הורד 192x192 (maskable)</button>
+            <button onclick="downloadIcon(512, true)">הורד 512x512 (maskable)</button>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(canvas, size, isMaskable) {
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(1, '#2563eb');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            // Add safe zone for maskable icons (80% of size)
+            const padding = isMaskable ? size * 0.1 : 0;
+            const noteSize = size - (padding * 2);
+            const noteX = padding;
+            const noteY = padding;
+
+            // Draw note icon
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(noteX + noteSize * 0.2, noteY + noteSize * 0.15, noteSize * 0.6, noteSize * 0.7);
+
+            // Draw lines on note
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = size * 0.015;
+            const lineY = noteY + noteSize * 0.3;
+            const lineSpacing = noteSize * 0.1;
+
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(noteX + noteSize * 0.3, lineY + (i * lineSpacing));
+                ctx.lineTo(noteX + noteSize * 0.7, lineY + (i * lineSpacing));
+                ctx.stroke();
+            }
+
+            // Draw folded corner
+            ctx.fillStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(noteX + noteSize * 0.7, noteY + noteSize * 0.15);
+            ctx.lineTo(noteX + noteSize * 0.8, noteY + noteSize * 0.15);
+            ctx.lineTo(noteX + noteSize * 0.8, noteY + noteSize * 0.25);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#d1d5db';
+            ctx.lineWidth = size * 0.01;
+            ctx.beginPath();
+            ctx.moveTo(noteX + noteSize * 0.7, noteY + noteSize * 0.15);
+            ctx.lineTo(noteX + noteSize * 0.7, noteY + noteSize * 0.25);
+            ctx.lineTo(noteX + noteSize * 0.8, noteY + noteSize * 0.25);
+            ctx.stroke();
+        }
+
+        function downloadIcon(size, isMaskable) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            drawIcon(canvas, size, isMaskable);
+
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = isMaskable ? `pwa-maskable-${size}x${size}.png` : `pwa-${size}x${size}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Draw preview icons
+        window.onload = function() {
+            drawIcon(document.getElementById('canvas192'), 192, false);
+            drawIcon(document.getElementById('canvas512'), 512, false);
+        };
+    </script>
+</body>
+</html>
