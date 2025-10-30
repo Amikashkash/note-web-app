@@ -94,10 +94,9 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-3 py-2 text-right">תאריך</th>
+              <th className="border border-gray-300 px-3 py-2 text-right w-32">📅 תאריך</th>
               <th className="border border-gray-300 px-3 py-2 text-right">תיאור</th>
-              <th className="border border-gray-300 px-3 py-2 text-center w-28">סכום (₪)</th>
-              <th className="border border-gray-300 px-3 py-2 text-center w-28 bg-blue-50">יתרה (₪)</th>
+              <th className="border border-gray-300 px-3 py-2 text-center w-32">סכום (₪)</th>
               {!readOnly && <th className="border border-gray-300 px-3 py-2 w-16"></th>}
             </tr>
           </thead>
@@ -105,7 +104,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
             {displayedRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={readOnly ? 4 : 5}
+                  colSpan={readOnly ? 3 : 4}
                   className="border border-gray-300 px-3 py-8 text-center text-gray-500"
                 >
                   אין תנועות עדיין
@@ -167,27 +166,14 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                       <input
                         type="number"
                         step="0.01"
-                        value={row.amount}
+                        value={row.amount === 0 ? '' : row.amount}
                         onChange={(e) =>
                           handleUpdateRow(row.id, 'amount', parseFloat(e.target.value) || 0)
                         }
+                        placeholder="0"
                         className="w-full px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded text-center"
                       />
                     )}
-                  </td>
-
-                  {/* יתרה */}
-                  <td
-                    className={`border border-gray-300 px-2 py-1 text-center font-bold ${
-                      row.balance > 0
-                        ? 'text-green-700 bg-green-50'
-                        : row.balance < 0
-                        ? 'text-red-700 bg-red-50'
-                        : 'text-gray-700 bg-gray-50'
-                    }`}
-                  >
-                    {row.balance > 0 ? '+' : ''}
-                    {row.balance.toFixed(2)}
                   </td>
 
                   {/* כפתור מחיקה */}
@@ -210,7 +196,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
             {/* שורת סיכום */}
             {displayedRows.length > 0 && (
               <tr className="bg-blue-100 font-bold">
-                <td className="border border-gray-300 px-3 py-2" colSpan={3}>
+                <td className="border border-gray-300 px-3 py-2" colSpan={readOnly ? 2 : 3}>
                   יתרה סופית
                 </td>
                 <td
