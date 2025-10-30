@@ -4,9 +4,10 @@
 
 import { Note } from '@/types/note';
 import { AccountingRow } from '@/components/note/templates/AccountingTemplate';
+import { WorkPlanSection } from '@/components/note/templates/WorkPlanTemplate';
 
 /**
- * המרת חשבונאות ל-JSON לטקסט טבלה קריא
+ * המרת חשבונאות ל-JSON לטקסט טבלה קריא (ללא עמודת יתרה)
  */
 const formatAccountingContent = (content: string): string => {
   try {
@@ -16,27 +17,62 @@ const formatAccountingContent = (content: string): string => {
     }
 
     let text = '';
-    let balance = 0;
+    let total = 0;
 
     // כותרת טבלה
     text += '📊 טבלת חשבונאות:\n';
-    text += '─'.repeat(50) + '\n';
-    text += 'תאריך       | תיאור                    | סכום      | יתרה\n';
-    text += '─'.repeat(50) + '\n';
+    text += '─'.repeat(45) + '\n';
+    text += 'תאריך       | תיאור                    | סכום\n';
+    text += '─'.repeat(45) + '\n';
 
     // שורות
     rows.forEach((row) => {
-      balance += row.amount;
+      total += row.amount;
       const dateStr = row.date.padEnd(12);
       const descStr = row.description.padEnd(25).substring(0, 25);
       const amountStr = row.amount.toFixed(2).padStart(9);
-      const balanceStr = balance.toFixed(2).padStart(9);
 
-      text += `${dateStr}| ${descStr}| ${amountStr} | ${balanceStr}\n`;
+      text += `${dateStr}| ${descStr}| ${amountStr}\n`;
     });
 
-    text += '─'.repeat(50) + '\n';
-    text += `💵 יתרה סופית: ${balance.toFixed(2)} ₪\n`;
+    text += '─'.repeat(45) + '\n';
+    text += `💵 סה"כ: ${total.toFixed(2)} ₪\n`;
+
+    return text;
+  } catch (error) {
+    return content; // אם זה לא JSON תקין, החזר את התוכן כמו שהוא
+  }
+};
+
+/**
+ * המרת תכנית עבודה ל-JSON לטקסט מעוצב
+ */
+const formatWorkPlanContent = (content: string): string => {
+  try {
+    const sections: WorkPlanSection[] = JSON.parse(content);
+    if (!sections || sections.length === 0) {
+      return 'אין סעיפים בתכנית';
+    }
+
+    let text = '';
+
+    sections.forEach((section, index) => {
+      // כותרת הסעיף
+      text += `\n▸ ${section.header || 'ללא כותרת'}\n`;
+      text += '─'.repeat(Math.min(section.header?.length || 10, 40)) + '\n';
+
+      // תוכן הסעיף
+      if (section.content) {
+        text += `${section.content}\n`;
+      } else {
+        text += '(אין תוכן)\n';
+      }
+
+      // מפריד בין סעיפים (חוץ מהאחרון)
+      if (index < sections.length - 1) {
+        text += '\n';
+      }
+    });
 
     return text;
   } catch (error) {
@@ -71,9 +107,11 @@ export const formatNoteForSharing = (note: Note): string => {
   });
   text += `📅 תאריך: ${date}\n\n`;
 
-  // תוכן - טיפול מיוחד לחשבונאות
+  // תוכן - טיפול מיוחד לפי סוג תבנית
   if (note.templateType === 'accounting') {
     text += formatAccountingContent(note.content);
+  } else if (note.templateType === 'workplan') {
+    text += formatWorkPlanContent(note.content);
   } else {
     text += `${note.content}\n`;
   }
