@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import Login from '@/pages/Login/Login';
 import Home from '@/pages/Home/Home';
 import CategoriesManagement from '@/pages/CategoriesManagement/CategoriesManagement';
+import { Archive } from '@/pages/Archive';
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +27,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CategoriesManagement />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/archive',
+    element: (
+      <ProtectedRoute>
+        <Archive />
       </ProtectedRoute>
     ),
   },

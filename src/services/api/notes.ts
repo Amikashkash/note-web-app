@@ -27,6 +27,7 @@ export const createNote = async (noteInput: NoteInput): Promise<string> => {
   try {
     const noteData = {
       ...noteInput,
+      isArchived: false,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
@@ -95,7 +96,7 @@ export const getNotesByCategory = async (categoryId: string): Promise<Note[]> =>
 };
 
 /**
- * מנוי לשינויים בפתקים של משתמש ספציפי
+ * מנוי לשינויים בפתקים של משתמש ספציפי (ללא מאורכבים)
  */
 export const subscribeToNotes = (
   userId: string,
@@ -103,7 +104,8 @@ export const subscribeToNotes = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('userId', '==', userId)
+    where('userId', '==', userId),
+    where('isArchived', '==', false)
   );
 
   return onSnapshot(
@@ -130,7 +132,7 @@ export const subscribeToNotes = (
 };
 
 /**
- * מנוי לשינויים בפתקים של קטגוריה ספציפית
+ * מנוי לשינויים בפתקים של קטגוריה ספציפית (ללא מאורכבים)
  */
 export const subscribeToNotesByCategory = (
   categoryId: string,
@@ -138,7 +140,8 @@ export const subscribeToNotesByCategory = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('categoryId', '==', categoryId)
+    where('categoryId', '==', categoryId),
+    where('isArchived', '==', false)
   );
 
   return onSnapshot(
@@ -176,4 +179,80 @@ export const togglePinNote = async (
   isPinned: boolean
 ): Promise<void> => {
   return updateNote(noteId, { isPinned });
+};
+
+/**
+ * העברת פתק לארכיון (מחיקה רכה)
+ */
+export const archiveNote = async (noteId: string): Promise<void> => {
+  try {
+    const noteRef = doc(db, NOTES_COLLECTION, noteId);
+    await updateDoc(noteRef, {
+      isArchived: true,
+      archivedAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error archiving note:', error);
+    throw error;
+  }
+};
+
+/**
+ * שחזור פתק מהארכיון
+ */
+export const restoreNote = async (noteId: string): Promise<void> => {
+  try {
+    const noteRef = doc(db, NOTES_COLLECTION, noteId);
+    await updateDoc(noteRef, {
+      isArchived: false,
+      archivedAt: null,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error restoring note:', error);
+    throw error;
+  }
+};
+
+/**
+ * מחיקה סופית של פתק
+ */
+export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
+  return deleteNote(noteId);
+};
+
+/**
+ * מנוי לפתקים מאורכבים של משתמש
+ */
+export const subscribeToArchivedNotes = (
+  userId: string,
+  callback: (notes: Note[]) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, NOTES_COLLECTION),
+    where('userId', '==', userId),
+    where('isArchived', '==', true)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notes = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        } as Note))
+        .sort((a, b) => {
+          // Sort by archivedAt descending (newest first)
+          const aTime = a.archivedAt?.toMillis() || 0;
+          const bTime = b.archivedAt?.toMillis() || 0;
+          return bTime - aTime;
+        });
+      callback(notes);
+    },
+    (error) => {
+      console.error('Error in archived notes subscription:', error);
+    }
+  );
 };

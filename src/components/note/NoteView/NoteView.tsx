@@ -39,7 +39,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm('האם אתה בטוח שברצונך למחוק פתק זה?')) {
+    if (window.confirm('האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.')) {
       onDelete(note.id);
       onClose();
     }

@@ -112,14 +112,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   /**
-   * מחיקת פתק
+   * מחיקת פתק (העברה לארכיון)
    */
   deleteNote: async (noteId: string) => {
     try {
       set({ error: null });
-      await noteAPI.deleteNote(noteId);
+      await noteAPI.archiveNote(noteId);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete note';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to archive note';
       set({ error: errorMessage });
       throw error;
     }

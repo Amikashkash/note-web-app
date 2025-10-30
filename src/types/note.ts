@@ -20,6 +20,8 @@ export interface Note {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   isPinned: boolean;
+  isArchived: boolean;
+  archivedAt?: Timestamp;
 }
 
-export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt'>;
+export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;
