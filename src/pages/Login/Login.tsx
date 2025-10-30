@@ -23,13 +23,16 @@ export const Login: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // שגיאות ולידציה
   const [errors, setErrors] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     displayName: '',
   });
 
@@ -40,6 +43,7 @@ export const Login: React.FC = () => {
     const newErrors = {
       email: '',
       password: '',
+      confirmPassword: '',
       displayName: '',
     };
 
@@ -51,8 +55,14 @@ export const Login: React.FC = () => {
       newErrors.password = 'הסיסמה חייבת להכיל לפחות 6 תווים';
     }
 
-    if (mode === 'signup' && displayName.trim().length < 2) {
-      newErrors.displayName = 'השם חייב להכיל לפחות 2 תווים';
+    if (mode === 'signup') {
+      if (displayName.trim().length < 2) {
+        newErrors.displayName = 'השם חייב להכיל לפחות 2 תווים';
+      }
+
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = 'הסיסמאות לא תואמות';
+      }
     }
 
     setErrors(newErrors);
@@ -68,12 +78,14 @@ export const Login: React.FC = () => {
     if (!validate()) return;
 
     setIsLoading(true);
+    setSuccessMessage('');
 
     try {
       if (mode === 'signin') {
         await signIn(email, password);
       } else {
         await signUp(email, password, displayName);
+        setSuccessMessage('נשלח אימייל אימות לכתובת המייל שלך. אנא בדוק את תיבת הדואר שלך.');
       }
     } catch (error) {
       console.error('Authentication error:', error);
@@ -101,7 +113,9 @@ export const Login: React.FC = () => {
    */
   const toggleMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin');
-    setErrors({ email: '', password: '', displayName: '' });
+    setErrors({ email: '', password: '', confirmPassword: '', displayName: '' });
+    setSuccessMessage('');
+    setConfirmPassword('');
   };
 
   return (
@@ -116,6 +130,13 @@ export const Login: React.FC = () => {
             {mode === 'signin' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש'}
           </p>
         </div>
+
+        {/* הודעת הצלחה */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-600">{successMessage}</p>
+          </div>
+        )}
 
         {/* שגיאת אימות */}
         {authError && (
@@ -159,7 +180,22 @@ export const Login: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             error={errors.password}
             disabled={isLoading}
+            showPasswordToggle={true}
           />
+
+          {/* אישור סיסמה (רק בהרשמה) */}
+          {mode === 'signup' && (
+            <Input
+              label="אישור סיסמה"
+              type="password"
+              placeholder="הזן שוב את הסיסמה"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              error={errors.confirmPassword}
+              disabled={isLoading}
+              showPasswordToggle={true}
+            />
+          )}
 
           {/* כפתור שליחה */}
           <Button

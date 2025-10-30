@@ -11,6 +11,7 @@ import {
   onAuthStateChanged,
   updateProfile,
   sendPasswordResetEmail,
+  sendEmailVerification,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -32,6 +33,9 @@ export const signUpWithEmail = async (
 
     // עדכון שם המשתמש
     await updateProfile(user, { displayName });
+
+    // שליחת אימייל אימות
+    await sendEmailVerification(user);
 
     // יצירת מסמך משתמש ב-Firestore
     await createUserDocument(user);
