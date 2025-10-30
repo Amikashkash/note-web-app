@@ -16,6 +16,7 @@ interface NoteViewProps {
   onEdit: (note: Note) => void;
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
+  onUpdate?: (noteId: string, content: string) => void;
 }
 
 export const NoteView: React.FC<NoteViewProps> = ({
@@ -24,6 +25,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onEdit,
   onDelete,
   onTogglePin,
+  onUpdate,
 }) => {
   const handleEdit = () => {
     onEdit(note);
@@ -39,6 +41,12 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const handleTogglePin = () => {
     if (onTogglePin) {
       onTogglePin(note.id, !note.isPinned);
+    }
+  };
+
+  const handleContentChange = (newContent: string) => {
+    if (onUpdate) {
+      onUpdate(note.id, newContent);
     }
   };
 
@@ -87,11 +95,11 @@ export const NoteView: React.FC<NoteViewProps> = ({
           {note.templateType === 'accounting' ? (
             <AccountingTemplate value={note.content} onChange={() => {}} readOnly={true} />
           ) : note.templateType === 'checklist' ? (
-            <ChecklistTemplate value={note.content} onChange={() => {}} readOnly={true} />
+            <ChecklistTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
           ) : note.templateType === 'recipe' ? (
             <RecipeTemplate value={note.content} onChange={() => {}} readOnly={true} />
           ) : note.templateType === 'shopping' ? (
-            <ShoppingTemplate value={note.content} onChange={() => {}} readOnly={true} />
+            <ShoppingTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
           ) : (
             <div
               className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
