@@ -9,6 +9,9 @@ import { db, auth } from '@/services/firebase/config';
 import { onAuthChange } from '@/services/firebase/auth';
 import type { User, UserSettings } from '@/types';
 
+// Global flag to ensure redirect result is only processed once
+let redirectResultProcessed = false;
+
 interface AuthState {
   // State
   firebaseUser: FirebaseUser | null;
@@ -126,43 +129,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
    * מחזיר פונקציה לביטול המאזין
    */
   initialize: () => {
-    // Check for redirect result first (Google Sign In)
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          // User signed in via redirect
-          const userRef = doc(db, 'users', result.user.uid);
-          const userDoc = await getDoc(userRef);
+    // Check for redirect result first (Google Sign In) - only once globally
+    if (!redirectResultProcessed) {
+      redirectResultProcessed = true;
+      console.log('Checking for redirect result...');
 
-          if (!userDoc.exists()) {
-            // Create user document
-            const userData = {
-              uid: result.user.uid,
-              email: result.user.email || '',
-              displayName: result.user.displayName || '',
-              photoURL: result.user.photoURL,
-              settings: {
-                language: 'he',
-                defaultCategoryColor: '#3B82F6',
-                theme: 'light',
-                encryptionEnabled: false,
-                encryptionLevel: 'none',
-              },
-            };
+      getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            console.log('✅ Redirect result: User signed in via Google', result.user.email);
+            // User signed in via redirect - create user document if needed
+            try {
+              const userRef = doc(db, 'users', result.user.uid);
+              const userDoc = await getDoc(userRef);
 
-            await setDoc(userRef, {
-              ...userData,
-              createdAt: serverTimestamp(),
-            });
+              if (!userDoc.exists()) {
+                console.log('Creating new user document for Google user');
+                const userData = {
+                  uid: result.user.uid,
+                  email: result.user.email || '',
+                  displayName: result.user.displayName || '',
+                  photoURL: result.user.photoURL,
+                  settings: {
+                    language: 'he',
+                    defaultCategoryColor: '#3B82F6',
+                    theme: 'light',
+                    encryptionEnabled: false,
+                    encryptionLevel: 'none',
+                  },
+                };
+
+                await setDoc(userRef, {
+                  ...userData,
+                  createdAt: serverTimestamp(),
+                });
+                console.log('✅ User document created');
+              }
+            } catch (error) {
+              console.error('Error creating user document after redirect:', error);
+            }
+          } else {
+            console.log('No redirect result (user did not sign in via Google redirect)');
           }
-        }
-      })
-      .catch((error) => {
-        console.error('Error handling redirect result:', error);
-      });
+        })
+        .catch((error) => {
+          console.error('❌ Error handling redirect result:', error);
+          // Set error state so user knows something went wrong
+          set({ error: 'שגיאה בהתחברות עם Google. נסה שוב.', isLoading: false });
+        });
+    } else {
+      console.log('Redirect result already processed, skipping...');
+    }
 
     // Set up auth state listener
     const unsubscribe = onAuthChange(async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.email || 'signed out');
+
       if (firebaseUser) {
         // משתמש מחובר - טען את הנתונים
         try {
@@ -171,6 +193,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           if (!userDoc.exists()) {
             // User document doesn't exist - create it
+            console.log('Creating user document in onAuthChange');
             const userData = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
@@ -194,25 +217,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({
               firebaseUser,
               user: userData as any,
-              isLoading: false
+              isLoading: false,
+              error: null,
             });
           } else {
             // Load existing user data
+            console.log('Loading existing user data');
             const userData = userDoc.data() as User;
             // Batch state update to prevent re-renders
             set({
               firebaseUser,
               user: userData,
-              isLoading: false
+              isLoading: false,
+              error: null,
             });
           }
         } catch (error) {
-          console.error('Error in initialize:', error);
-          set({ firebaseUser, isLoading: false });
+          console.error('Error in onAuthChange:', error);
+          // Still set firebaseUser but mark as not loading
+          set({ firebaseUser, isLoading: false, error: 'שגיאה בטעינת נתוני משתמש' });
         }
       } else {
         // משתמש התנתק - batch update
-        set({ firebaseUser: null, user: null, isLoading: false });
+        console.log('User signed out');
+        set({ firebaseUser: null, user: null, isLoading: false, error: null });
       }
     });
 

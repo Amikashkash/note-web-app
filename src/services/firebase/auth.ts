@@ -14,7 +14,7 @@ import {
   sendEmailVerification,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './config';
 import { DEFAULT_USER_SETTINGS } from '@/utils/defaults';
 import type { User } from '@/types';
@@ -64,7 +64,7 @@ export const signInWithEmail = async (
 };
 
 /**
- * התחברות עם Google - using redirect (better for dev)
+ * התחברות עם Google - using popup (more reliable)
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
@@ -73,12 +73,23 @@ export const signInWithGoogle = async (): Promise<void> => {
       prompt: 'select_account',
     });
 
-    // Use redirect instead of popup - works better in development
-    const { signInWithRedirect } = await import('firebase/auth');
-    await signInWithRedirect(auth, provider);
-    // Note: The redirect will happen, and the result is handled by getRedirectResult
+    // Use popup instead of redirect - more reliable and easier to debug
+    const { signInWithPopup } = await import('firebase/auth');
+    const result = await signInWithPopup(auth, provider);
+
+    console.log('✅ Google sign-in successful:', result.user.email);
+
+    // Note: User document creation is handled by onAuthStateChanged in authStore
+    // No need to create it here to avoid race conditions
   } catch (error: any) {
-    console.error('Error signing in with Google:', error);
+    console.error('❌ Error signing in with Google:', error);
+
+    // Don't throw error if user closed the popup
+    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      console.log('User cancelled Google sign-in');
+      return;
+    }
+
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
