@@ -155,20 +155,22 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   return (
     <div className="w-full">
       {/* סרגל כלים */}
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200">
-        <FormatButton
-          label="מודגש"
-          onClick={() => insertFormatting('**', '**')}
-          title="Ctrl+B - טקסט מודגש"
-        />
-        <FormatButton
-          label="נטוי"
-          onClick={() => insertFormatting('*', '*')}
-          title="Ctrl+I - טקסט נטוי"
-        />
-        <div className="h-6 w-px bg-gray-300 mx-1"></div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-gray-200">
+        <div className="flex gap-2">
+          <FormatButton
+            label="מודגש"
+            onClick={() => insertFormatting('**', '**')}
+            title="טקסט מודגש"
+          />
+          <FormatButton
+            label="נטוי"
+            onClick={() => insertFormatting('*', '*')}
+            title="טקסט נטוי"
+          />
+        </div>
+        <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
         <span className="text-xs text-gray-500">
-          טיפים: 1. למספור | * לנקודות | Ctrl+B למודגש | Ctrl+I לנטוי
+          טיפים: 1. למספור | * לנקודות
         </span>
       </div>
 
@@ -197,7 +199,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       <div className="mt-2 text-xs text-gray-500 space-y-1">
         <p>💡 מספור אוטומטי: התחל שורה עם "1. " ולחץ Enter</p>
         <p>💡 נקודות: התחל שורה עם "* " ולחץ Enter</p>
-        <p>💡 הדגשה: סמן טקסט ולחץ Ctrl+B או לחץ על כפתור "מודגש"</p>
+        <p>💡 הדגשה: סמן טקסט ולחץ על כפתור "מודגש"</p>
       </div>
     </div>
   );

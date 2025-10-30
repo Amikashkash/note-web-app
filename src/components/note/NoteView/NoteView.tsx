@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
+import { FormattedText } from '@/components/common/FormattedText';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -126,10 +127,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <ShoppingTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
           ) : (
             <div
-              className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
+              className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
               style={{ borderRightColor: note.color || '#3B82F6', borderRightWidth: '4px' }}
             >
-              {note.content || 'אין תוכן'}
+              {note.content ? (
+                <FormattedText content={note.content} />
+              ) : (
+                'אין תוכן'
+              )}
             </div>
           )}
         </div>
