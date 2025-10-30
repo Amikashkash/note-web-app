@@ -9,6 +9,7 @@ export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
+  dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
 }
 
 interface ChecklistTemplateProps {
@@ -54,9 +55,34 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     onChange(JSON.stringify(updatedItems));
   };
 
+  const handleUpdateDueDate = (id: string, dueDate: string) => {
+    const updatedItems = items.map((item) =>
+      item.id === id ? { ...item, dueDate: dueDate || undefined } : item
+    );
+    onChange(JSON.stringify(updatedItems));
+  };
+
   const handleDeleteItem = (id: string) => {
     const updatedItems = items.filter((item) => item.id !== id);
     onChange(JSON.stringify(updatedItems));
+  };
+
+  // פונקציה לקבוע את מצב התאריך (עבר/קרוב/עתידי)
+  const getDateStatus = (dueDate?: string): 'overdue' | 'soon' | 'future' | null => {
+    if (!dueDate) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return 'overdue'; // עבר
+    if (diffDays <= 1) return 'soon'; // היום או מחר
+    return 'future'; // עתידי
   };
 
   const completedCount = items.filter((item) => item.completed).length;
@@ -89,62 +115,124 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             אין משימות עדיין
           </div>
         ) : (
-          items.map((item) => (
-            <div
-              key={item.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                item.completed
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-white border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              {/* Checkbox */}
-              <button
-                type="button"
-                onClick={() => handleToggleItem(item.id)}
-                className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+          items.map((item) => {
+            const dateStatus = getDateStatus(item.dueDate);
+            const borderColor = !item.completed && dateStatus === 'overdue'
+              ? 'border-red-300'
+              : !item.completed && dateStatus === 'soon'
+              ? 'border-yellow-300'
+              : item.completed
+              ? 'border-green-200'
+              : 'border-gray-200';
+
+            return (
+              <div
+                key={item.id}
+                className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-all ${
                   item.completed
-                    ? 'bg-green-500 border-green-500'
-                    : 'bg-white border-gray-300 hover:border-green-400'
+                    ? 'bg-green-50 ' + borderColor
+                    : 'bg-white ' + borderColor + ' hover:border-gray-300'
                 }`}
               >
-                {item.completed && <span className="text-white text-sm">✓</span>}
-              </button>
+                <div className="flex items-center gap-3">
+                  {/* Checkbox */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleItem(item.id)}
+                    className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                      item.completed
+                        ? 'bg-green-500 border-green-500'
+                        : 'bg-white border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {item.completed && <span className="text-white text-sm">✓</span>}
+                  </button>
 
-              {/* טקסט המשימה */}
-              {readOnly ? (
-                <span
-                  className={`flex-1 ${
-                    item.completed ? 'line-through text-gray-500' : 'text-gray-700'
-                  }`}
-                >
-                  {item.text}
-                </span>
-              ) : (
-                <input
-                  type="text"
-                  value={item.text}
-                  onChange={(e) => handleUpdateText(item.id, e.target.value)}
-                  placeholder="הזן משימה..."
-                  className={`flex-1 px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
-                    item.completed ? 'line-through text-gray-500' : 'text-gray-700'
-                  }`}
-                />
-              )}
+                  {/* טקסט המשימה */}
+                  <div className="flex-1">
+                    {readOnly ? (
+                      <span
+                        className={`${
+                          item.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                        }`}
+                      >
+                        {item.text}
+                      </span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) => handleUpdateText(item.id, e.target.value)}
+                        placeholder="הזן משימה..."
+                        className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
+                          item.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                        }`}
+                      />
+                    )}
+                  </div>
 
-              {/* כפתור מחיקה */}
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
-                  title="מחק משימה"
-                >
-                  🗑
-                </button>
-              )}
-            </div>
-          ))
+                  {/* כפתור מחיקה */}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
+                      title="מחק משימה"
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+
+                {/* תאריך יעד */}
+                <div className="flex items-center gap-2 mr-9">
+                  {readOnly ? (
+                    item.dueDate && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span
+                          className={`px-2 py-0.5 rounded-full ${
+                            dateStatus === 'overdue'
+                              ? 'bg-red-100 text-red-700'
+                              : dateStatus === 'soon'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {dateStatus === 'overdue' && '🔴 '}
+                          {dateStatus === 'soon' && '🟡 '}
+                          {dateStatus === 'future' && '📅 '}
+                          {new Date(item.dueDate).toLocaleDateString('he-IL', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                        </span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-600">תאריך יעד:</label>
+                      <input
+                        type="date"
+                        value={item.dueDate || ''}
+                        onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
+                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      />
+                      {item.dueDate && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateDueDate(item.id, '')}
+                          className="text-xs text-gray-500 hover:text-red-600"
+                          title="הסר תאריך"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
