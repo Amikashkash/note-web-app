@@ -62,7 +62,7 @@ export const Home: React.FC = () => {
 
         {/* Categories List */}
         <div className="bg-white rounded-lg shadow-md p-2 sm:p-6">
-          <CategoryList />
+          <CategoryList onCreateFirstCategory={() => setShowCategoryForm(true)} />
         </div>
 
         {/* Category Form Modal */}
