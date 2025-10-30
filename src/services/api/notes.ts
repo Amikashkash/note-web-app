@@ -104,8 +104,7 @@ export const subscribeToNotes = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('userId', '==', userId),
-    where('isArchived', '==', false)
+    where('userId', '==', userId)
   );
 
   return onSnapshot(
@@ -116,6 +115,7 @@ export const subscribeToNotes = (
           id: doc.id,
           ...doc.data(),
         } as Note))
+        .filter(note => !note.isArchived) // סינון בצד לקוח - תומך בפתקים ישנים
         .sort((a, b) => {
           // Sort by categoryId first, then by order
           if (a.categoryId !== b.categoryId) {
@@ -140,8 +140,7 @@ export const subscribeToNotesByCategory = (
 ): Unsubscribe => {
   const q = query(
     collection(db, NOTES_COLLECTION),
-    where('categoryId', '==', categoryId),
-    where('isArchived', '==', false)
+    where('categoryId', '==', categoryId)
   );
 
   return onSnapshot(
@@ -152,6 +151,7 @@ export const subscribeToNotesByCategory = (
           id: doc.id,
           ...doc.data(),
         } as Note))
+        .filter(note => !note.isArchived) // סינון בצד לקוח - תומך בפתקים ישנים
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       callback(notes);
     },
