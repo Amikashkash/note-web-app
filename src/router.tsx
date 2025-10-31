@@ -8,6 +8,7 @@ import Login from '@/pages/Login/Login';
 import Home from '@/pages/Home/Home';
 import CategoriesManagement from '@/pages/CategoriesManagement/CategoriesManagement';
 import { Archive } from '@/pages/Archive';
+import { Settings } from '@/pages/Settings';
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +36,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Archive />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/settings',
+    element: (
+      <ProtectedRoute>
+        <Settings />
       </ProtectedRoute>
     ),
   },

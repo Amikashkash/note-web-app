@@ -63,6 +63,9 @@ export const Home: React.FC = () => {
         <div className="flex items-center justify-between mb-3 sm:mb-6 gap-2">
           <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-200 truncate">הקטגוריות שלי</h2>
           <div className="flex items-center gap-1 flex-shrink-0">
+            <Button onClick={() => navigate('/settings')} size="sm" variant="outline" className="text-xs sm:text-sm whitespace-nowrap">
+              🤖 AI
+            </Button>
             <Button onClick={() => navigate('/archive')} size="sm" variant="outline" className="text-xs sm:text-sm whitespace-nowrap">
               🗄️ ארכיון
             </Button>
