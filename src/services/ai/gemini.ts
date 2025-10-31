@@ -20,6 +20,40 @@ const initGemini = (apiKey: string) => {
 };
 
 /**
+ * Fetch URL content using a CORS proxy
+ */
+const fetchUrlContent = async (url: string): Promise<string> => {
+  try {
+    // Use allorigins.win as CORS proxy (free service)
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+
+    if (!data.contents) {
+      throw new Error('Failed to fetch URL content');
+    }
+
+    // Clean HTML and extract text (simple approach)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, 'text/html');
+
+    // Remove script and style elements
+    const scripts = doc.querySelectorAll('script, style');
+    scripts.forEach(el => el.remove());
+
+    // Get text content
+    const text = doc.body.textContent || '';
+
+    // Limit to first 10000 characters to avoid token limits
+    return text.substring(0, 10000).trim();
+  } catch (error) {
+    console.error('URL Fetch Error:', error);
+    // Fallback: just use the URL itself
+    return `URL: ${url}`;
+  }
+};
+
+/**
  * Extract content from URL using Gemini AI
  */
 export const extractContentFromUrl = async (
@@ -32,12 +66,18 @@ export const extractContentFromUrl = async (
 
   const model = initGemini(apiKey);
 
+  // Fetch the actual content from the URL
+  const urlContent = await fetchUrlContent(url);
+
   const prompt = `
-You are a content extraction assistant. Analyze the following URL and extract structured information.
+You are a content extraction assistant. Analyze the following content from a URL and extract structured information.
 
 URL: ${url}
 
-Please analyze this URL and respond with a JSON object in this exact format:
+CONTENT:
+${urlContent}
+
+Please analyze this content and respond with a JSON object in this exact format:
 {
   "type": "recipe" | "shopping" | "article" | "stock" | "general",
   "title": "Title of the content",
@@ -54,10 +94,10 @@ Please analyze this URL and respond with a JSON object in this exact format:
 Important rules:
 1. Detect the content type accurately (recipe, shopping list, article, stock info, or general)
 2. Extract all relevant information
-3. For recipes: include ALL ingredients and steps in order
+3. For recipes: include ALL ingredients with quantities and ALL steps in order
 4. For shopping lists: categorize items if possible
 5. Return ONLY valid JSON, no markdown, no explanations
-6. If you cannot access the URL, analyze the URL pattern and make best effort extraction
+6. Use Hebrew for summaries when possible
 `;
 
   try {
@@ -65,10 +105,16 @@ Important rules:
     const response = result.response;
     const text = response.text();
 
-    // Parse JSON response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // Parse JSON response - handle both with and without markdown code blocks
+    let jsonText = text;
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1];
+    }
+
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('Failed to parse AI response');
+      throw new Error('Failed to parse AI response - no JSON found');
     }
 
     const extracted: AIExtractionResult = JSON.parse(jsonMatch[0]);
@@ -77,7 +123,8 @@ Important rules:
     return extracted;
   } catch (error) {
     console.error('Gemini AI Error:', error);
-    throw new Error('Failed to extract content from URL. Please try again.');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to extract content: ${errorMessage}`);
   }
 };
 
