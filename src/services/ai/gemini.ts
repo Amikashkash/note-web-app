@@ -54,17 +54,32 @@ const fetchUrlContent = async (url: string): Promise<string> => {
 };
 
 /**
+ * Get Gemini API key from environment or parameter
+ */
+const getApiKey = (providedKey?: string): string => {
+  // First try provided key (for backward compatibility)
+  if (providedKey) {
+    return providedKey;
+  }
+
+  // Then try environment variable
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (envKey) {
+    return envKey;
+  }
+
+  throw new Error('Gemini API key not configured');
+};
+
+/**
  * Extract content from URL using Gemini AI
  */
 export const extractContentFromUrl = async (
   url: string,
-  apiKey: string
+  apiKey?: string
 ): Promise<AIExtractionResult> => {
-  if (!apiKey) {
-    throw new Error('Gemini API key is required');
-  }
-
-  const model = initGemini(apiKey);
+  const key = getApiKey(apiKey);
+  const model = initGemini(key);
 
   // Fetch the actual content from the URL
   const urlContent = await fetchUrlContent(url);
@@ -131,12 +146,9 @@ Important rules:
 /**
  * Summarize text content
  */
-export const summarizeText = async (text: string, apiKey: string): Promise<string> => {
-  if (!apiKey) {
-    throw new Error('Gemini API key is required');
-  }
-
-  const model = initGemini(apiKey);
+export const summarizeText = async (text: string, apiKey?: string): Promise<string> => {
+  const key = getApiKey(apiKey);
+  const model = initGemini(key);
 
   const prompt = `
 Please provide a concise summary of the following text in Hebrew:

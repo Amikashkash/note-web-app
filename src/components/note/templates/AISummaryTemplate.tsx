@@ -38,16 +38,15 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
     setResult(null);
 
     try {
-      // Get API key
-      const apiKey = await getGeminiApiKey(user.uid);
-      if (!apiKey) {
-        alert('לא נמצא מפתח API. אנא הוסף מפתח Gemini בהגדרות (לחץ על כפתור 🤖 AI)');
-        onError?.('Missing API key');
-        setLoading(false);
-        return;
+      // Try to get user's API key (optional - will fallback to env variable)
+      let apiKey: string | undefined;
+      try {
+        apiKey = (await getGeminiApiKey(user.uid)) || undefined;
+      } catch (e) {
+        // Ignore - will use environment variable
       }
 
-      // Extract content
+      // Extract content (will use env variable if no user key)
       const extracted = await extractContentFromUrl(url, apiKey);
       setResult(extracted);
       onContentExtracted?.(extracted);
