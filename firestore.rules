@@ -45,7 +45,12 @@ service cloud.firestore {
       allow update, delete: if isOwner(resource.data.userId);
     }
 
-    // User settings collection (optional, for future use)
+    // User settings collection
+    match /userSettings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Legacy users collection (optional, for future use)
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
