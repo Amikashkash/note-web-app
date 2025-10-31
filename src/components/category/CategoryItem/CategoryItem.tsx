@@ -40,12 +40,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     setShowNoteView(true);
   };
 
-  const handleEditNote = (note: Note) => {
-    setShowNoteView(false);
-    setEditingNote(note);
-    setShowNoteForm(true);
-  };
-
   const handleDeleteNote = async (noteId: string) => {
     try {
       await deleteNote(noteId);
@@ -181,7 +175,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             setShowNoteView(false);
             setViewingNote(null);
           }}
-          onEdit={handleEditNote}
           onDelete={handleDeleteNote}
           onTogglePin={handleTogglePin}
           onUpdate={async (noteId, updates) => {

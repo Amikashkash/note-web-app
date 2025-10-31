@@ -19,7 +19,6 @@ import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from
 interface NoteViewProps {
   note: Note;
   onClose: () => void;
-  onEdit: (note: Note) => void;
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onUpdate?: (noteId: string, updates: { title?: string; content?: string }) => void;
@@ -28,7 +27,6 @@ interface NoteViewProps {
 export const NoteView: React.FC<NoteViewProps> = ({
   note,
   onClose,
-  onEdit,
   onDelete,
   onTogglePin,
   onUpdate,

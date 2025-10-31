@@ -23,7 +23,10 @@
       "Bash(npm run build:*)",
       "Bash(git commit:*)",
       "Bash(start public/generate-icons.html)",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Bash(gh run list:*)",
+      "Bash(curl:*)",
+      "Bash(https://api.github.com/repos/Amikashkash/note-web-app/actions/workflows/firebase-deploy.yml/dispatches )"
     ],
     "deny": [],
     "ask": []
