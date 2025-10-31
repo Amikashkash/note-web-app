@@ -10,6 +10,7 @@ export interface ChecklistItem {
   text: string;
   completed: boolean;
   dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
+  dueTime?: string; // שעת יעד בפורמט HH:MM
 }
 
 interface ChecklistTemplateProps {
@@ -58,6 +59,13 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const handleUpdateDueDate = (id: string, dueDate: string) => {
     const updatedItems = items.map((item) =>
       item.id === id ? { ...item, dueDate: dueDate || undefined } : item
+    );
+    onChange(JSON.stringify(updatedItems));
+  };
+
+  const handleUpdateDueTime = (id: string, dueTime: string) => {
+    const updatedItems = items.map((item) =>
+      item.id === id ? { ...item, dueTime: dueTime || undefined } : item
     );
     onChange(JSON.stringify(updatedItems));
   };
@@ -192,10 +200,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                         <span
                           className={`px-2 py-0.5 rounded-full ${
                             dateStatus === 'overdue'
-                              ? 'bg-red-100 text-red-700'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200'
                               : dateStatus === 'soon'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-blue-100 text-blue-700'
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
                           }`}
                         >
                           {dateStatus === 'overdue' && '🔴 '}
@@ -205,27 +213,54 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                             day: 'numeric',
                             month: 'short',
                           })}
+                          {item.dueTime && ` • ${item.dueTime}`}
                         </span>
                       </div>
                     )
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-600">תאריך יעד:</label>
-                      <input
-                        type="date"
-                        value={item.dueDate || ''}
-                        onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                      />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">תאריך:</label>
+                        <input
+                          type="date"
+                          value={item.dueDate || ''}
+                          onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
+                          className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        />
+                        {item.dueDate && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUpdateDueDate(item.id, '');
+                              handleUpdateDueTime(item.id, '');
+                            }}
+                            className="text-xs text-gray-500 hover:text-red-600"
+                            title="הסר תאריך"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                       {item.dueDate && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateDueDate(item.id, '')}
-                          className="text-xs text-gray-500 hover:text-red-600"
-                          title="הסר תאריך"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600">שעה:</label>
+                          <input
+                            type="time"
+                            value={item.dueTime || ''}
+                            onChange={(e) => handleUpdateDueTime(item.id, e.target.value)}
+                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          />
+                          {item.dueTime && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDueTime(item.id, '')}
+                              className="text-xs text-gray-500 hover:text-red-600"
+                              title="הסר שעה"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
