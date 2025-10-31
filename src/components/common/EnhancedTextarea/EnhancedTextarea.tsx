@@ -29,6 +29,49 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   /**
+   * נרמול מספור - מתקן את המספרים ברשימה ממוספרת
+   */
+  const normalizeNumbering = (text: string): string => {
+    const lines = text.split('\n');
+    let currentNumber = 0;
+    let inNumberedList = false;
+
+    const normalizedLines = lines.map((line) => {
+      const numberMatch = line.match(/^(\d+)\.\s(.*)$/);
+
+      if (numberMatch) {
+        // מצאנו שורה ממוספרת
+        inNumberedList = true;
+        currentNumber++;
+        return `${currentNumber}. ${numberMatch[2]}`;
+      } else if (line.trim() === '' && inNumberedList) {
+        // שורה רק אם סיימה רשימה ממוספרת
+        currentNumber = 0;
+        inNumberedList = false;
+        return line;
+      } else if (inNumberedList && !line.match(/^(\d+)\./)) {
+        // שורה שאינה ממוספרת סיימה את הרשימה
+        currentNumber = 0;
+        inNumberedList = false;
+        return line;
+      }
+
+      return line;
+    });
+
+    return normalizedLines.join('\n');
+  };
+
+  /**
+   * טיפול בשינוי טקסט - עם נרמול מספור
+   */
+  const handleChange = (newValue: string) => {
+    // נרמול המספור
+    const normalized = normalizeNumbering(newValue);
+    onChange(normalized);
+  };
+
+  /**
    * טיפול בלחיצה על Enter - המשך מספור או bullets
    */
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -178,7 +221,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}

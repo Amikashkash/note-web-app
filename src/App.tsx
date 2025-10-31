@@ -5,10 +5,15 @@
 import React from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './styles/globals.css';
 
 const App: React.FC = () => {
-  return <RouterProvider router={router} />;
+  return (
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  );
 };
 
 export default App;

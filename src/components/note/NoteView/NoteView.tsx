@@ -85,8 +85,19 @@ export const NoteView: React.FC<NoteViewProps> = ({
   return (
     <Modal onClose={onClose}>
       <div className="max-h-[80vh] overflow-y-auto">
+        {/* כפתור חזרה */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-gray-100 rounded-full"
+          title="חזרה"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+
         {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
+        <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200 pt-12">
           <div className="flex-1">
             <Input
               type="text"
