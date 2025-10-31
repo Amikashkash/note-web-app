@@ -184,13 +184,17 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
           onEdit={handleEditNote}
           onDelete={handleDeleteNote}
           onTogglePin={handleTogglePin}
-          onUpdate={async (noteId, newContent) => {
+          onUpdate={async (noteId, updates) => {
             try {
-              await updateNote(noteId, {
+              // עדכון מיידי של הפתק עם השינויים
+              const updatedNote = {
                 ...viewingNote,
-                content: newContent,
-              });
-              setViewingNote({ ...viewingNote, content: newContent });
+                ...(updates.title !== undefined && { title: updates.title }),
+                ...(updates.content !== undefined && { content: updates.content }),
+              };
+
+              await updateNote(noteId, updatedNote);
+              setViewingNote(updatedNote);
             } catch (error) {
               console.error('Error updating note:', error);
             }

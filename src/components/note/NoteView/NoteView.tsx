@@ -1,12 +1,14 @@
 /**
  * קומפוננטה להצגת פתק מלא במודאל
+ * תומכת בעריכה ישירה (inline editing) - כמו Google Keep
  */
 
 import { useState } from 'react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
-import { FormattedText } from '@/components/common/FormattedText';
+import { Input } from '@/components/common/Input';
+import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -20,7 +22,7 @@ interface NoteViewProps {
   onEdit: (note: Note) => void;
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
-  onUpdate?: (noteId: string, content: string) => void;
+  onUpdate?: (noteId: string, updates: { title?: string; content?: string }) => void;
 }
 
 export const NoteView: React.FC<NoteViewProps> = ({
@@ -33,10 +35,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-
-  const handleEdit = () => {
-    onEdit(note);
-  };
+  const [title, setTitle] = useState(note.title);
+  const [content, setContent] = useState(note.content);
 
   const handleDelete = () => {
     if (window.confirm('האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.')) {
@@ -51,9 +51,17 @@ export const NoteView: React.FC<NoteViewProps> = ({
     }
   };
 
-  const handleContentChange = (newContent: string) => {
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
     if (onUpdate) {
-      onUpdate(note.id, newContent);
+      onUpdate(note.id, { title: newTitle });
+    }
+  };
+
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+    if (onUpdate) {
+      onUpdate(note.id, { content: newContent });
     }
   };
 
@@ -82,8 +90,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* כותרת */}
         <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{note.title}</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Input
+              type="text"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              className="text-2xl font-bold text-gray-800 mb-2 border-none focus:ring-2 focus:ring-blue-300 rounded px-2"
+              placeholder="כותרת הפתק..."
+            />
+            <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
               <span>
                 {note.templateType === 'plain' && '📝 טקסט'}
                 {note.templateType === 'checklist' && '✅ משימות'}
@@ -119,26 +133,23 @@ export const NoteView: React.FC<NoteViewProps> = ({
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-3">תוכן:</h3>
           {note.templateType === 'accounting' ? (
-            <AccountingTemplate value={note.content} onChange={() => {}} readOnly={true} />
+            <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'checklist' ? (
-            <ChecklistTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
+            <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'recipe' ? (
-            <RecipeTemplate value={note.content} onChange={() => {}} readOnly={true} />
+            <RecipeTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'shopping' ? (
-            <ShoppingTemplate value={note.content} onChange={handleContentChange} readOnly={true} />
+            <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'workplan' ? (
-            <WorkPlanTemplate value={note.content} onChange={() => {}} readOnly={true} />
+            <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : (
-            <div
-              className="text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[200px]"
-              style={{ borderRightColor: note.color || '#3B82F6', borderRightWidth: '4px' }}
-            >
-              {note.content ? (
-                <FormattedText content={note.content} />
-              ) : (
-                'אין תוכן'
-              )}
-            </div>
+            <EnhancedTextarea
+              value={content}
+              onChange={handleContentChange}
+              placeholder="הזן תוכן..."
+              rows={8}
+              className="min-h-[200px]"
+            />
           )}
         </div>
 
@@ -202,23 +213,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
         )}
 
         {/* כפתורי פעולה */}
-        <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+        <div className="flex flex-col gap-2 pt-4 border-t border-gray-200">
           <div className="flex gap-2">
-            <Button onClick={handleEdit} className="flex-1">
-              ✎ ערוך
-            </Button>
             <Button onClick={handleShare} variant="outline" className="flex-1">
               🔗 שתף
             </Button>
-          </div>
-          <div className="flex gap-2">
             <Button variant="danger" onClick={handleDelete} className="flex-1">
               🗑 מחק
             </Button>
-            <Button variant="secondary" onClick={onClose} className="flex-1">
-              ✕ סגור
-            </Button>
           </div>
+          <Button variant="secondary" onClick={onClose} className="w-full">
+            ✕ סגור
+          </Button>
         </div>
       </div>
     </Modal>
