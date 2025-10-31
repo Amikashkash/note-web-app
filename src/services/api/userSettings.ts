@@ -16,7 +16,13 @@ export const getUserSettings = async (userId: string): Promise<UserSettings | nu
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as UserSettings;
+    const data = docSnap.data();
+    return {
+      userId: data.userId || userId,
+      geminiApiKey: data.geminiApiKey,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date(),
+    } as UserSettings;
   }
 
   return null;
