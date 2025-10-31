@@ -14,6 +14,8 @@ import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
+import { AISummaryTemplate } from '@/components/note/templates/AISummaryTemplate';
+import type { AIExtractionResult } from '@/services/ai/gemini';
 
 interface NoteFormProps {
   categoryId: string;
@@ -29,6 +31,7 @@ interface NoteFormProps {
 }
 
 const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] = [
+  { value: 'aisummary', label: 'סיכום AI', icon: '🤖' },
   { value: 'plain', label: 'טקסט חופשי', icon: '📝' },
   { value: 'checklist', label: 'רשימת משימות', icon: '✅' },
   { value: 'recipe', label: 'מתכון', icon: '🍳' },
@@ -52,8 +55,56 @@ export const NoteForm: React.FC<NoteFormProps> = ({
     note?.color || null
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [aiResult, setAiResult] = useState<AIExtractionResult | null>(null);
+  const [showConversionOptions, setShowConversionOptions] = useState(false);
 
   const isEditMode = !!note;
+
+  const handleAIContentExtracted = (result: AIExtractionResult) => {
+    setAiResult(result);
+    setTitle(result.title);
+    setShowConversionOptions(true);
+  };
+
+  const convertAIResultToTemplate = (targetTemplate: TemplateType) => {
+    if (!aiResult) return;
+
+    switch (targetTemplate) {
+      case 'recipe':
+        if (aiResult.type === 'recipe' && aiResult.content.ingredients && aiResult.content.steps) {
+          setContent(JSON.stringify({
+            servings: aiResult.content.servings || '',
+            prepTime: aiResult.content.prepTime || '',
+            cookTime: aiResult.content.cookTime || '',
+            ingredients: aiResult.content.ingredients,
+            steps: aiResult.content.steps,
+          }));
+        }
+        break;
+      case 'shopping':
+        if (aiResult.type === 'shopping' && aiResult.content.items) {
+          setContent(JSON.stringify(aiResult.content.items));
+        }
+        break;
+      case 'plain':
+      default:
+        // Convert to plain text
+        let plainText = '';
+        if (aiResult.type === 'recipe') {
+          plainText += `מרכיבים:\n${aiResult.content.ingredients?.join('\n') || ''}\n\n`;
+          plainText += `הוראות הכנה:\n${aiResult.content.steps?.join('\n') || ''}`;
+        } else if (aiResult.type === 'article') {
+          plainText = aiResult.content.summary || aiResult.rawText || '';
+        } else {
+          plainText = JSON.stringify(aiResult.content, null, 2);
+        }
+        setContent(plainText);
+        break;
+    }
+
+    setTemplateType(targetTemplate);
+    setShowConversionOptions(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,10 +178,15 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
         {/* תוכן */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             תוכן
           </label>
-          {templateType === 'accounting' ? (
+          {templateType === 'aisummary' ? (
+            <AISummaryTemplate
+              onContentExtracted={handleAIContentExtracted}
+              onError={(error) => console.error('AI Error:', error)}
+            />
+          ) : templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={setContent} />
           ) : templateType === 'checklist' ? (
             <ChecklistTemplate value={content} onChange={setContent} />
@@ -149,6 +205,43 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             />
           )}
         </div>
+
+        {/* Conversion Options Dialog */}
+        {showConversionOptions && aiResult && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-3">
+              איך לשמור את התוכן?
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {aiResult.type === 'recipe' && (
+                <Button
+                  type="button"
+                  onClick={() => convertAIResultToTemplate('recipe')}
+                  size="sm"
+                >
+                  🍳 שמור כמתכון
+                </Button>
+              )}
+              {aiResult.type === 'shopping' && (
+                <Button
+                  type="button"
+                  onClick={() => convertAIResultToTemplate('shopping')}
+                  size="sm"
+                >
+                  🛒 שמור כרשימת קניות
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={() => convertAIResultToTemplate('plain')}
+                size="sm"
+                variant="outline"
+              >
+                📝 שמור כטקסט חופשי
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* אפשרויות מתקדמות - מתקפל */}
         <div className="border-t pt-3">

@@ -95,6 +95,7 @@ export const formatNoteForSharing = (note: Note): string => {
     shopping: '🛒',
     workplan: '📋',
     accounting: '💰',
+    aisummary: '🤖',
   }[note.templateType] || '📝';
 
   text += `${typeEmoji} סוג: ${getTemplateLabel(note.templateType)}\n`;

@@ -4,7 +4,7 @@
 
 import { Timestamp } from 'firebase/firestore';
 
-export type TemplateType = 'plain' | 'checklist' | 'recipe' | 'shopping' | 'workplan' | 'accounting';
+export type TemplateType = 'plain' | 'checklist' | 'recipe' | 'shopping' | 'workplan' | 'accounting' | 'aisummary';
 
 export interface Note {
   id: string;
