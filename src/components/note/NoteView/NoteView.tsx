@@ -88,7 +88,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* כפתור חזרה */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-gray-100 rounded-full"
+          className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
           title="חזרה"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,16 +97,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
         </button>
 
         {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200 pt-12">
+        <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200 dark:border-gray-700 pt-12">
           <div className="flex-1">
             <Input
               type="text"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
-              className="text-2xl font-bold text-gray-800 mb-2 border-none focus:ring-2 focus:ring-blue-300 rounded px-2"
+              className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 border-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 rounded px-2 dark:bg-gray-800"
               placeholder="כותרת הפתק..."
             />
-            <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 px-2">
               <span>
                 {note.templateType === 'plain' && '📝 טקסט'}
                 {note.templateType === 'checklist' && '✅ משימות'}
@@ -140,7 +140,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
         {/* תוכן */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">תוכן:</h3>
+          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">תוכן:</h3>
           {note.templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'checklist' ? (
@@ -165,7 +165,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* תגיות */}
         {note.tags.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-3">תגיות:</h3>
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">תגיות:</h3>
             <div className="flex flex-wrap gap-2">
               {note.tags.map((tag, index) => (
                 <span
@@ -181,8 +181,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
         {/* כפתורי שיתוף */}
         {showShareMenu && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">שתף פתק:</h3>
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">שתף פתק:</h3>
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => {
@@ -222,7 +222,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         )}
 
         {/* כפתורי פעולה */}
-        <div className="flex flex-col gap-2 pt-4 border-t border-gray-200">
+        <div className="flex flex-col gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex gap-2">
             <Button onClick={handleShare} variant="outline" className="flex-1">
               🔗 שתף

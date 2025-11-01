@@ -134,13 +134,13 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   return (
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[85vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">
           {isEditMode ? 'עריכת פתק' : 'פתק חדש'}
         </h2>
 
         {/* כותרת */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             כותרת *
           </label>
           <Input
@@ -154,7 +154,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
         {/* בחירת תבנית */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             סוג פתק
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -165,12 +165,12 @@ export const NoteForm: React.FC<NoteFormProps> = ({
                 onClick={() => setTemplateType(template.value)}
                 className={`p-3 rounded-lg border-2 text-center transition-all ${
                   templateType === template.value
-                    ? 'border-primary bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 dark:bg-gray-800'
                 }`}
               >
                 <div className="text-2xl mb-1">{template.icon}</div>
-                <div className="text-xs">{template.label}</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300">{template.label}</div>
               </button>
             ))}
           </div>
@@ -248,7 +248,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
           >
             <span>{showAdvanced ? '▼' : '◀'}</span>
             <span>אפשרויות נוספות (תגיות וצבע)</span>
@@ -258,7 +258,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             <div className="mt-4 space-y-4">
               {/* תגיות */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   תגיות (מופרדות בפסיקים)
                 </label>
                 <Input
@@ -271,7 +271,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
               {/* בחירת צבע */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   צבע פתק (אופציונלי)
                 </label>
                 <div className="flex gap-2 flex-wrap">

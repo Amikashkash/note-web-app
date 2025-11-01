@@ -19,11 +19,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme) return savedTheme;
 
-    // אם אין, בדוק את העדפת המערכת
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-
+    // ברירת מחדל: מצב יום (light mode)
     return 'light';
   });
 
