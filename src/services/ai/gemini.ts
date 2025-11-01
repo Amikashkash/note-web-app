@@ -16,7 +16,9 @@ export interface AIExtractionResult {
  */
 const initGemini = (apiKey: string) => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  // Using gemini-1.5-flash-latest for faster, cost-effective responses
+  // Alternative: 'gemini-1.5-pro-latest' for more complex tasks
+  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 };
 
 /**
