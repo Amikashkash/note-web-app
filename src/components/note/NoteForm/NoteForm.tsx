@@ -34,7 +34,7 @@ const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] =
   { value: 'aisummary', label: 'סיכום AI', icon: '🤖' },
   { value: 'plain', label: 'טקסט חופשי', icon: '📝' },
   { value: 'checklist', label: 'רשימת משימות', icon: '✅' },
-  { value: 'recipe', label: 'מתכון', icon: '🍳' },
+  // { value: 'recipe', label: 'מתכון', icon: '🍳' }, // Removed - AI formats recipes well in plain text
   { value: 'shopping', label: 'רשימת קניות', icon: '🛒' },
   { value: 'workplan', label: 'תכנית עבודה', icon: '📋' },
   { value: 'accounting', label: 'חשבונאות', icon: '💰' },
@@ -212,36 +212,20 @@ export const NoteForm: React.FC<NoteFormProps> = ({
         {showConversionOptions && aiResult && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-3">
-              איך לשמור את התוכן?
+              התוכן מוכן! לחץ למטה כדי לשמור
             </h3>
             <div className="flex flex-wrap gap-2">
-              {aiResult.type === 'recipe' && (
-                <Button
-                  type="button"
-                  onClick={() => convertAIResultToTemplate('recipe')}
-                  size="sm"
-                >
-                  🍳 שמור כמתכון
-                </Button>
-              )}
-              {aiResult.type === 'shopping' && (
-                <Button
-                  type="button"
-                  onClick={() => convertAIResultToTemplate('shopping')}
-                  size="sm"
-                >
-                  🛒 שמור כרשימת קניות
-                </Button>
-              )}
               <Button
                 type="button"
                 onClick={() => convertAIResultToTemplate('plain')}
                 size="sm"
-                variant="outline"
               >
                 📝 שמור כטקסט חופשי
               </Button>
             </div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+              💡 הבינה המלאכותית כבר סידרה את התוכן בצורה יפה
+            </p>
           </div>
         )}
 
