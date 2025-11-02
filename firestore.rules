@@ -25,8 +25,16 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid;
 
-      // Allow update/delete only if user owns the category
-      allow update, delete: if isOwner(resource.data.userId);
+      // Allow update if user owns the category OR if updating sharedWith array (for sharing)
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        // Allow if only sharedWith is being updated and user is the owner
+        (resource.data.userId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sharedWith', 'updatedAt']))
+      );
+
+      // Allow delete only if user owns the category
+      allow delete: if isOwner(resource.data.userId);
     }
 
     // Notes collection
@@ -41,8 +49,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid;
 
-      // Allow update/delete only if user owns the note
-      allow update, delete: if isOwner(resource.data.userId);
+      // Allow update if user owns the note OR if shared with the user
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        request.auth.uid in resource.data.sharedWith
+      );
+
+      // Allow delete only if user owns the note
+      allow delete: if isOwner(resource.data.userId);
     }
 
     // User settings collection
@@ -50,9 +64,13 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
-    // Legacy users collection (optional, for future use)
+    // Users collection - needed for sharing functionality
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      // Allow authenticated users to read any user document (to look up by email for sharing)
+      allow read: if isAuthenticated();
+
+      // Only allow writing to own user document
+      allow write: if isOwner(userId);
     }
   }
 }
