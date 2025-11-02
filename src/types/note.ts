@@ -22,6 +22,8 @@ export interface Note {
   isPinned: boolean;
   isArchived: boolean;
   archivedAt?: Timestamp;
+  reminderTime?: Timestamp | null;
+  reminderEnabled?: boolean;
 }
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;

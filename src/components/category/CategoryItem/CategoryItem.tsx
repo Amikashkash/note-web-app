@@ -110,10 +110,15 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     templateType: any;
     tags: string[];
     color: string | null;
+    reminderTime?: Date | null;
+    reminderEnabled?: boolean;
   }) => {
     if (!user) return;
 
     try {
+      // Import Timestamp for reminder conversion
+      const { Timestamp } = await import('firebase/firestore');
+
       if (editingNote) {
         // עדכון פתק קיים
         await updateNote(editingNote.id, {
@@ -123,6 +128,8 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
           order: editingNote.order,
           sharedWith: editingNote.sharedWith,
           isPinned: editingNote.isPinned,
+          reminderTime: data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null,
+          reminderEnabled: data.reminderEnabled || false,
         });
       } else {
         // יצירת פתק חדש
@@ -134,6 +141,8 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
           order: newOrder,
           sharedWith: [],
           isPinned: false,
+          reminderTime: data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null,
+          reminderEnabled: data.reminderEnabled || false,
         });
       }
       setShowNoteForm(false);

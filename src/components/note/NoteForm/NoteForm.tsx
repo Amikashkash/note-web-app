@@ -8,6 +8,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+import { ReminderPicker } from '@/components/common/ReminderPicker';
 import { AVAILABLE_COLORS } from '@/utils/constants';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
@@ -27,6 +28,8 @@ interface NoteFormProps {
     templateType: TemplateType;
     tags: string[];
     color: string | null;
+    reminderTime?: Date | null;
+    reminderEnabled?: boolean;
   }) => void;
 }
 
@@ -54,6 +57,10 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   const [selectedColor, setSelectedColor] = useState<string | null>(
     note?.color || null
   );
+  const [reminderTime, setReminderTime] = useState<Date | null>(
+    note?.reminderTime ? note.reminderTime.toDate() : null
+  );
+  const [reminderEnabled, setReminderEnabled] = useState(note?.reminderEnabled || false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [aiResult, setAiResult] = useState<AIExtractionResult | null>(null);
 
@@ -132,6 +139,8 @@ export const NoteForm: React.FC<NoteFormProps> = ({
       templateType,
       tags,
       color: selectedColor,
+      reminderTime,
+      reminderEnabled,
     });
 
     onClose();
@@ -221,6 +230,16 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             </p>
           </div>
         )}
+
+        {/* תזכורת */}
+        <div className="border-t pt-3">
+          <ReminderPicker
+            value={reminderTime}
+            onChange={setReminderTime}
+            enabled={reminderEnabled}
+            onToggle={setReminderEnabled}
+          />
+        </div>
 
         {/* אפשרויות מתקדמות - מתקפל */}
         <div className="border-t pt-3">

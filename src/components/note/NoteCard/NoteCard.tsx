@@ -46,9 +46,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     >
       {/* כותרת ואייקון הצמדה */}
       <div className="flex items-start justify-between mb-1">
-        <h3 className="font-semibold text-gray-800 flex-1 line-clamp-1 text-sm">
-          {note.title}
-        </h3>
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-800 flex-1 line-clamp-1 text-sm">
+            {note.title}
+          </h3>
+          {note.reminderEnabled && note.reminderTime && (
+            <span className="text-xs" title={`תזכורת: ${new Date(note.reminderTime.toDate()).toLocaleString('he-IL')}`}>
+              ⏰
+            </span>
+          )}
+        </div>
         {onTogglePin && (
           <button
             onClick={handleTogglePin}

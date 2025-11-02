@@ -2,19 +2,40 @@
  * דף הבית - תצוגת הקטגוריות והפתקים
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNotes } from '@/hooks/useNotes';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
+import { requestNotificationPermission, startReminderChecker } from '@/services/notifications/notificationService';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { allNotes } = useNotes();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  // בקש הרשאת התראות ו אתחל מערכת תזכורות
+  useEffect(() => {
+    const init = async () => {
+      const granted = await requestNotificationPermission();
+      setNotificationsEnabled(granted);
+    };
+    init();
+  }, []);
+
+  // הפעל מערכת בדיקת תזכורות
+  useEffect(() => {
+    if (notificationsEnabled && allNotes.length > 0) {
+      const interval = startReminderChecker(allNotes);
+      return () => clearInterval(interval);
+    }
+  }, [notificationsEnabled, allNotes]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-x-hidden transition-colors">
