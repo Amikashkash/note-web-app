@@ -11,7 +11,9 @@ import { useCategoryStore } from '@/store/categoryStore';
 import { NotesList } from '@/components/note/NotesList';
 import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
+import { ShareManagement } from '@/components/common/ShareManagement';
 import type { Note } from '@/types/note';
+import * as categoryAPI from '@/services/api/categories';
 
 interface CategoryItemProps {
   category: Category;
@@ -26,6 +28,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showNoteView, setShowNoteView] = useState(false);
+  const [showShareManagement, setShowShareManagement] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
 
@@ -80,6 +83,26 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       alert('שגיאה בהעברת הפתק');
     }
   };
+
+  const handleShareCategory = async (email: string) => {
+    try {
+      await categoryAPI.shareCategoryWithUser(category.id, email);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleUnshareCategory = async (userId: string) => {
+    try {
+      await categoryAPI.unshareCategoryWithUser(category.id, userId);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  // Check if user is the owner of the category
+  const isOwner = user && category.userId === user.uid;
+  const isShared = category.sharedWith && category.sharedWith.length > 0;
 
   const handleSubmitNote = async (data: {
     title: string;
@@ -140,6 +163,24 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
+          {isOwner && (
+            <button
+              onClick={() => setShowShareManagement(true)}
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded transition-colors font-medium ${
+                isShared
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+              title={isShared ? `משותף עם ${category.sharedWith.length} משתמשים` : 'שתף קטגוריה'}
+            >
+              {isShared ? `🔗 ${category.sharedWith.length}` : '🔗'}
+            </button>
+          )}
+          {!isOwner && isShared && (
+            <span className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+              👥 משותף
+            </span>
+          )}
           <button
             onClick={handleAddNote}
             className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-primary dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 rounded transition-colors font-medium"
@@ -231,6 +272,19 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             setEditingNote(null);
           }}
           onSubmit={handleSubmitNote}
+        />
+      )}
+
+      {/* ניהול שיתוף */}
+      {showShareManagement && (
+        <ShareManagement
+          itemType="category"
+          itemId={category.id}
+          itemName={category.name}
+          currentSharedWith={category.sharedWith || []}
+          onShare={handleShareCategory}
+          onUnshare={handleUnshareCategory}
+          onClose={() => setShowShareManagement(false)}
         />
       )}
     </div>

@@ -15,7 +15,10 @@ import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
+import { ShareManagement } from '@/components/common/ShareManagement';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
+import { useAuthStore } from '@/store/authStore';
+import * as noteAPI from '@/services/api/notes';
 
 interface NoteViewProps {
   note: Note;
@@ -36,12 +39,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onMoveToCategory,
   categories = [],
 }) => {
+  const { user } = useAuthStore();
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showShareManagement, setShowShareManagement] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // Check if user is the owner of the note
+  const isOwner = user && note.userId === user.uid;
+  const isShared = note.sharedWith && note.sharedWith.length > 0;
 
   const handleDelete = () => {
     if (window.confirm('האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.')) {
@@ -94,6 +103,22 @@ export const NoteView: React.FC<NoteViewProps> = ({
       onMoveToCategory(note.id, newCategoryId);
       setShowMoveMenu(false);
       onClose();
+    }
+  };
+
+  const handleShareNote = async (email: string) => {
+    try {
+      await noteAPI.shareNoteWithUser(note.id, email);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleUnshareNote = async (userId: string) => {
+    try {
+      await noteAPI.unshareNoteWithUser(note.id, userId);
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -277,6 +302,22 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <Button onClick={handleShare} variant="outline" className="flex-1">
               🔗 שתף
             </Button>
+            {isOwner && (
+              <Button
+                onClick={() => setShowShareManagement(true)}
+                variant="outline"
+                className={`flex-1 ${
+                  isShared ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : ''
+                }`}
+              >
+                {isShared ? `👥 ${note.sharedWith.length}` : '👥 שיתוף'}
+              </Button>
+            )}
+            {!isOwner && isShared && (
+              <span className="flex-1 px-3 py-2 text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium flex items-center justify-center">
+                👥 משותף
+              </span>
+            )}
             {onMoveToCategory && categories.length > 1 && (
               <Button onClick={() => setShowMoveMenu(!showMoveMenu)} variant="outline" className="flex-1">
                 📁 העבר
@@ -291,6 +332,19 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* ניהול שיתוף */}
+      {showShareManagement && (
+        <ShareManagement
+          itemType="note"
+          itemId={note.id}
+          itemName={note.title}
+          currentSharedWith={note.sharedWith || []}
+          onShare={handleShareNote}
+          onUnshare={handleUnshareNote}
+          onClose={() => setShowShareManagement(false)}
+        />
+      )}
     </Modal>
   );
 };
