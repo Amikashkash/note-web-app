@@ -9,6 +9,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+import { FormattedText } from '@/components/common/FormattedText';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -35,6 +36,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [copySuccess, setCopySuccess] = useState(false);
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const handleDelete = () => {
     if (window.confirm('האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.')) {
@@ -140,7 +142,17 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
         {/* תוכן */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">תוכן:</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">תוכן:</h3>
+            {note.templateType === 'plain' && (
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className="text-sm px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+              >
+                {isEditMode ? '👁️ צפייה' : '✏️ עריכה'}
+              </button>
+            )}
+          </div>
           {note.templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'checklist' ? (
@@ -151,7 +163,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'workplan' ? (
             <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={false} />
-          ) : (
+          ) : isEditMode ? (
             <EnhancedTextarea
               value={content}
               onChange={handleContentChange}
@@ -159,6 +171,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
               rows={8}
               className="min-h-[200px]"
             />
+          ) : (
+            <FormattedText content={content} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[200px]" />
           )}
         </div>
 
