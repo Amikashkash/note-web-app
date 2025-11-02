@@ -26,7 +26,19 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
 }) => {
   const items = useMemo<ChecklistItem[]>(() => {
     try {
-      return value ? JSON.parse(value) : [];
+      const parsed = value ? JSON.parse(value) : [];
+      // Ensure it's an array
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      // Validate each item has required properties
+      return parsed.map((item, index) => ({
+        id: item.id || `item-${Date.now()}-${index}`,
+        text: item.text || '',
+        completed: item.completed || false,
+        dueDate: item.dueDate,
+        dueTime: item.dueTime,
+      }));
     } catch {
       return [];
     }

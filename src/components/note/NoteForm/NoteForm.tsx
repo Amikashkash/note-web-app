@@ -71,15 +71,17 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
     switch (targetTemplate) {
       case 'recipe':
-        if (aiResult.type === 'recipe' && aiResult.content.ingredients && aiResult.content.steps) {
-          setContent(JSON.stringify({
-            servings: aiResult.content.servings || '',
-            prepTime: aiResult.content.prepTime || '',
-            cookTime: aiResult.content.cookTime || '',
-            ingredients: aiResult.content.ingredients,
-            steps: aiResult.content.steps,
-          }));
-        }
+        // Support both 'steps' and 'instructions' from AI
+        const steps = aiResult.content.steps || aiResult.content.instructions || [];
+        const ingredients = aiResult.content.ingredients || [];
+
+        setContent(JSON.stringify({
+          servings: aiResult.content.servings || '',
+          prepTime: aiResult.content.prepTime || '',
+          cookTime: aiResult.content.cookTime || '',
+          ingredients: Array.isArray(ingredients) ? ingredients : [],
+          instructions: Array.isArray(steps) ? steps : [],
+        }));
         break;
       case 'shopping':
         if (aiResult.type === 'shopping' && aiResult.content.items) {

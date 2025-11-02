@@ -28,7 +28,19 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
 }) => {
   const items = useMemo<ShoppingItem[]>(() => {
     try {
-      return value ? JSON.parse(value) : [];
+      const parsed = value ? JSON.parse(value) : [];
+      // Ensure it's an array
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      // Validate each item has required properties
+      return parsed.map((item, index) => ({
+        id: item.id || `item-${Date.now()}-${index}`,
+        name: item.name || '',
+        quantity: item.quantity || '',
+        checked: item.checked || false,
+        category: item.category || 'אחר',
+      }));
     } catch {
       return [];
     }

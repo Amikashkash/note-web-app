@@ -24,24 +24,37 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
   readOnly = false,
 }) => {
   const data = useMemo<RecipeData>(() => {
+    const defaultData: RecipeData = {
+      servings: '',
+      prepTime: '',
+      cookTime: '',
+      ingredients: [''],
+      instructions: [''],
+    };
+
+    if (!value) {
+      return defaultData;
+    }
+
     try {
-      return value
-        ? JSON.parse(value)
-        : {
-            servings: '',
-            prepTime: '',
-            cookTime: '',
-            ingredients: [''],
-            instructions: [''],
-          };
-    } catch {
+      const parsed = JSON.parse(value);
+
+      // Validate and normalize the structure
       return {
-        servings: '',
-        prepTime: '',
-        cookTime: '',
-        ingredients: [''],
-        instructions: [''],
+        servings: parsed.servings || '',
+        prepTime: parsed.prepTime || '',
+        cookTime: parsed.cookTime || '',
+        ingredients: Array.isArray(parsed.ingredients) && parsed.ingredients.length > 0
+          ? parsed.ingredients
+          : [''],
+        instructions: Array.isArray(parsed.instructions) && parsed.instructions.length > 0
+          ? parsed.instructions
+          : Array.isArray(parsed.steps) && parsed.steps.length > 0
+            ? parsed.steps // Support AI format with 'steps' instead of 'instructions'
+            : [''],
       };
+    } catch {
+      return defaultData;
     }
   }, [value]);
 
