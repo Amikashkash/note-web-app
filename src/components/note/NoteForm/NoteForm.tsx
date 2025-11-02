@@ -62,46 +62,48 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   const handleAIContentExtracted = (result: AIExtractionResult) => {
     setAiResult(result);
     setTitle(result.title);
-    // Auto-convert to plain text immediately
-    convertAIResultToTemplate('plain');
+    // Auto-convert to plain text immediately - pass result directly
+    convertAIResultToTemplate('plain', result);
   };
 
-  const convertAIResultToTemplate = (targetTemplate: TemplateType) => {
-    if (!aiResult) return;
+  const convertAIResultToTemplate = (targetTemplate: TemplateType, extractionResult?: AIExtractionResult) => {
+    // Use provided result or fall back to state
+    const resultToUse = extractionResult || aiResult;
+    if (!resultToUse) return;
 
     switch (targetTemplate) {
       case 'recipe':
         // Support both 'steps' and 'instructions' from AI
-        const steps = aiResult.content.steps || aiResult.content.instructions || [];
-        const ingredients = aiResult.content.ingredients || [];
+        const steps = resultToUse.content.steps || resultToUse.content.instructions || [];
+        const ingredients = resultToUse.content.ingredients || [];
 
         setContent(JSON.stringify({
-          servings: aiResult.content.servings || '',
-          prepTime: aiResult.content.prepTime || '',
-          cookTime: aiResult.content.cookTime || '',
+          servings: resultToUse.content.servings || '',
+          prepTime: resultToUse.content.prepTime || '',
+          cookTime: resultToUse.content.cookTime || '',
           ingredients: Array.isArray(ingredients) ? ingredients : [],
           instructions: Array.isArray(steps) ? steps : [],
         }));
         break;
       case 'shopping':
-        if (aiResult.type === 'shopping' && aiResult.content.items) {
-          setContent(JSON.stringify(aiResult.content.items));
+        if (resultToUse.type === 'shopping' && resultToUse.content.items) {
+          setContent(JSON.stringify(resultToUse.content.items));
         }
         break;
       case 'plain':
       default:
         // Convert to plain text
         let plainText = '';
-        if (aiResult.type === 'recipe') {
-          plainText += `מרכיבים:\n${aiResult.content.ingredients?.join('\n') || ''}\n\n`;
-          plainText += `הוראות הכנה:\n${aiResult.content.steps?.join('\n') || ''}`;
-        } else if (aiResult.type === 'article') {
-          plainText = aiResult.content.summary || aiResult.rawText || '';
-        } else if (aiResult.type === 'general' && aiResult.content.text) {
+        if (resultToUse.type === 'recipe') {
+          plainText += `מרכיבים:\n${resultToUse.content.ingredients?.join('\n') || ''}\n\n`;
+          plainText += `הוראות הכנה:\n${resultToUse.content.steps?.join('\n') || ''}`;
+        } else if (resultToUse.type === 'article') {
+          plainText = resultToUse.content.summary || resultToUse.rawText || '';
+        } else if (resultToUse.type === 'general' && resultToUse.content.text) {
           // Text summary - use the text field directly
-          plainText = aiResult.content.text;
+          plainText = resultToUse.content.text;
         } else {
-          plainText = JSON.stringify(aiResult.content, null, 2);
+          plainText = JSON.stringify(resultToUse.content, null, 2);
         }
         setContent(plainText);
         break;
