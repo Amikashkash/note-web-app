@@ -3,10 +3,13 @@
  * תומכת ב:
  * - **טקסט מודגש** -> <strong>
  * - *טקסט נטוי* -> <em>
+ * - זיהוי אוטומטי של URLs והצגתם כ-preview cards
  * - שמירה על מספור ו-bullets
  */
 
 import React from 'react';
+import { LinkPreview } from '@/components/common/LinkPreview';
+import { extractUrls } from '@/services/api/linkPreview';
 
 interface FormattedTextProps {
   content: string;
@@ -14,6 +17,9 @@ interface FormattedTextProps {
 }
 
 export const FormattedText: React.FC<FormattedTextProps> = ({ content, className = '' }) => {
+  // Extract URLs from content for preview cards
+  const urls = React.useMemo(() => extractUrls(content), [content]);
+
   /**
    * המרת markdown פשוט ל-HTML
    */
@@ -22,14 +28,47 @@ export const FormattedText: React.FC<FormattedTextProps> = ({ content, className
 
     const lines = text.split('\n');
     return lines.map((line, lineIndex) => {
-      // עיבוד של **bold** ו-*italic* בשורה
+      // עיבוד של **bold**, *italic*, ו-URLs בשורה
       const parts: React.ReactNode[] = [];
       let remainingText = line;
       let partKey = 0;
 
-      // regex למציאת **bold** או *italic*
+      // regex למציאת **bold**, *italic*, או URLs
       // נעבור על הטקסט ונמיר את הסימונים
       while (remainingText.length > 0) {
+        // חיפוש URLs
+        const urlMatch = remainingText.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch && urlMatch.index !== undefined) {
+          // הוסף טקסט רגיל לפני ה-URL
+          if (urlMatch.index > 0) {
+            parts.push(
+              <span key={`${lineIndex}-${partKey++}`}>
+                {remainingText.substring(0, urlMatch.index)}
+              </span>
+            );
+          }
+
+          // הוסף את ה-URL כקישור לחיץ (לא preview - זה יופיע בנפרד)
+          const url = urlMatch[1];
+          parts.push(
+            <a
+              key={`${lineIndex}-${partKey++}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              dir="ltr"
+            >
+              {url}
+            </a>
+          );
+
+          // המשך עם שאר הטקסט
+          remainingText = remainingText.substring(urlMatch.index + urlMatch[0].length);
+          continue;
+        }
+
+
         // חיפוש **bold**
         const boldMatch = remainingText.match(/\*\*(.+?)\*\*/);
         if (boldMatch && boldMatch.index !== undefined) {
@@ -96,8 +135,20 @@ export const FormattedText: React.FC<FormattedTextProps> = ({ content, className
   };
 
   return (
-    <div className={`whitespace-pre-wrap ${className}`} style={{ direction: 'rtl', textAlign: 'right' }}>
-      {formatText(content)}
+    <div className={className}>
+      {/* Main formatted text */}
+      <div className="whitespace-pre-wrap" style={{ direction: 'rtl', textAlign: 'right' }}>
+        {formatText(content)}
+      </div>
+
+      {/* Link previews at the bottom */}
+      {urls.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {urls.map((url, index) => (
+            <LinkPreview key={`${url}-${index}`} url={url} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
