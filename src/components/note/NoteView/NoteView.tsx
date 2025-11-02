@@ -23,6 +23,8 @@ interface NoteViewProps {
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onUpdate?: (noteId: string, updates: { title?: string; content?: string }) => void;
+  onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
+  categories?: Array<{ id: string; name: string; icon: string }>;
 }
 
 export const NoteView: React.FC<NoteViewProps> = ({
@@ -31,8 +33,11 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onDelete,
   onTogglePin,
   onUpdate,
+  onMoveToCategory,
+  categories = [],
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
@@ -81,6 +86,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
     if (success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
+
+  const handleMoveToCategory = (newCategoryId: string) => {
+    if (onMoveToCategory && newCategoryId !== note.categoryId) {
+      onMoveToCategory(note.id, newCategoryId);
+      setShowMoveMenu(false);
+      onClose();
     }
   };
 
@@ -235,12 +248,40 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
+        {/* תפריט העברה לקטגוריה */}
+        {showMoveMenu && categories.length > 0 && (
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">העבר לקטגוריה:</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {categories
+                .filter(cat => cat.id !== note.categoryId)
+                .map((category) => (
+                  <Button
+                    key={category.id}
+                    onClick={() => handleMoveToCategory(category.id)}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-2 justify-start"
+                  >
+                    <span className="text-lg">{category.icon}</span>
+                    <span className="truncate">{category.name}</span>
+                  </Button>
+                ))}
+            </div>
+          </div>
+        )}
+
         {/* כפתורי פעולה */}
         <div className="flex flex-col gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex gap-2">
             <Button onClick={handleShare} variant="outline" className="flex-1">
               🔗 שתף
             </Button>
+            {onMoveToCategory && categories.length > 1 && (
+              <Button onClick={() => setShowMoveMenu(!showMoveMenu)} variant="outline" className="flex-1">
+                📁 העבר
+              </Button>
+            )}
             <Button variant="danger" onClick={handleDelete} className="flex-1">
               🗑 מחק
             </Button>

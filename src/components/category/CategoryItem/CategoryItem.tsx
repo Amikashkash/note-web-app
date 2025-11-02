@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import type { Category } from '@/types';
 import { useNotes } from '@/hooks/useNotes';
 import { useAuthStore } from '@/store/authStore';
+import { useCategoryStore } from '@/store/categoryStore';
 import { NotesList } from '@/components/note/NotesList';
 import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
@@ -21,6 +22,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 }) => {
   const { user } = useAuthStore();
   const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
+  const { categories } = useCategoryStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showNoteView, setShowNoteView] = useState(false);
@@ -29,6 +31,13 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 
   // סינון פתקים לפי קטגוריה זו
   const categoryNotes = allNotes.filter(note => note.categoryId === category.id);
+
+  // רשימת קטגוריות להעברת פתק
+  const categoriesForMove = categories.map(cat => ({
+    id: cat.id,
+    name: cat.name,
+    icon: cat.icon || '📁',
+  }));
 
   const handleAddNote = () => {
     setEditingNote(null);
@@ -54,6 +63,21 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       await togglePinNote(noteId, isPinned);
     } catch (error) {
       console.error('Error toggling pin:', error);
+    }
+  };
+
+  const handleMoveToCategory = async (noteId: string, newCategoryId: string) => {
+    try {
+      const noteToMove = allNotes.find(n => n.id === noteId);
+      if (!noteToMove) return;
+
+      await updateNote(noteId, {
+        ...noteToMove,
+        categoryId: newCategoryId,
+      });
+    } catch (error) {
+      console.error('Error moving note:', error);
+      alert('שגיאה בהעברת הפתק');
     }
   };
 
@@ -192,6 +216,8 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
               console.error('Error updating note:', error);
             }
           }}
+          onMoveToCategory={handleMoveToCategory}
+          categories={categoriesForMove}
         />
       )}
 
