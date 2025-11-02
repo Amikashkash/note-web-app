@@ -1,0 +1,211 @@
+/**
+ * Share Page - Handles incoming shared content from other apps via Web Share Target API
+ */
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import { useCategoryStore } from '@/store/categoryStore';
+import { useNoteStore } from '@/store/noteStore';
+import { Button } from '@/components/common/Button';
+import { Input } from '@/components/common/Input';
+import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+
+export const Share: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuthStore();
+  const { categories } = useCategoryStore();
+  const { createNote } = useNoteStore();
+
+  // Extract shared data from URL params
+  const sharedTitle = searchParams.get('title') || '';
+  const sharedText = searchParams.get('text') || '';
+  const sharedUrl = searchParams.get('url') || '';
+
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    // If not logged in, redirect to login
+    if (!user) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    // Build content from shared data
+    let combinedContent = '';
+
+    if (sharedTitle) {
+      setTitle(sharedTitle);
+    }
+
+    if (sharedText) {
+      combinedContent += sharedText;
+    }
+
+    if (sharedUrl) {
+      if (combinedContent) {
+        combinedContent += '\n\n';
+      }
+      combinedContent += sharedUrl;
+    }
+
+    setContent(combinedContent);
+
+    // Auto-select first category if available
+    if (categories.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [user, navigate, sharedTitle, sharedText, sharedUrl, categories, selectedCategoryId]);
+
+  const handleSave = async () => {
+    if (!title.trim() && !content.trim()) {
+      alert('אנא הזן כותרת או תוכן');
+      return;
+    }
+
+    if (!selectedCategoryId) {
+      alert('אנא בחר קטגוריה');
+      return;
+    }
+
+    if (!user) {
+      alert('אנא התחבר למערכת');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await createNote({
+        title: title || 'פתק משותף',
+        content,
+        categoryId: selectedCategoryId,
+        templateType: 'plain',
+        userId: user.uid,
+        tags: [],
+        color: null,
+        order: 0,
+        sharedWith: [],
+        isPinned: false,
+      });
+
+      // Navigate to home after successful save
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Error saving shared note:', error);
+      alert('שגיאה בשמירת הפתק');
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    navigate('/', { replace: true });
+  };
+
+  // Show loading while checking auth
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="animate-spin text-4xl">⏳</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-4">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2 flex items-center gap-2">
+            <span>🔗</span>
+            <span>שמירת תוכן משותף</span>
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            תוכן שהתקבל משיתוף מאפליקציה אחרת
+          </p>
+        </div>
+
+        {/* Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 space-y-4">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              כותרת:
+            </label>
+            <Input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="הזן כותרת לפתק..."
+              disabled={saving}
+            />
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              תוכן:
+            </label>
+            <EnhancedTextarea
+              value={content}
+              onChange={setContent}
+              placeholder="תוכן הפתק..."
+              disabled={saving}
+              rows={10}
+            />
+          </div>
+
+          {/* Category Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              קטגוריה:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  onClick={() => setSelectedCategoryId(category.id)}
+                  variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
+                  disabled={saving}
+                  className="justify-start"
+                >
+                  <span className="text-lg">{category.icon || '📁'}</span>
+                  <span className="truncate">{category.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
+            <Button
+              onClick={handleSave}
+              disabled={saving || !selectedCategoryId}
+              className="flex-1"
+            >
+              {saving ? '⏳ שומר...' : '✓ שמור פתק'}
+            </Button>
+            <Button
+              onClick={handleCancel}
+              variant="secondary"
+              disabled={saving}
+            >
+              ביטול
+            </Button>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            💡 <strong>טיפ:</strong> עכשיו תוכל לשתף תוכן מכל אפליקציה ישירות לפתקים שלך!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

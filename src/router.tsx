@@ -9,6 +9,7 @@ import Home from '@/pages/Home/Home';
 import CategoriesManagement from '@/pages/CategoriesManagement/CategoriesManagement';
 import { Archive } from '@/pages/Archive';
 import { Settings } from '@/pages/Settings';
+import { Share } from '@/pages/Share';
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +45,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Settings />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/share',
+    element: (
+      <ProtectedRoute>
+        <Share />
       </ProtectedRoute>
     ),
   },

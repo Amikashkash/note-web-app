@@ -53,7 +53,17 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'maskable'
           }
-        ]
+        ],
+        share_target: {
+          action: '/share',
+          method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url'
+          }
+        }
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
