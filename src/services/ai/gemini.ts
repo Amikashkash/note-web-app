@@ -43,6 +43,12 @@ const fetchUrlContent = async (url: string): Promise<string> => {
         const data = await response.json();
         return data.contents || '';
       }
+    },
+    // thingproxy.freeboard.io - another alternative
+    {
+      name: 'thingproxy',
+      getUrl: (url: string) => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
+      parseResponse: async (response: Response) => response.text()
     }
   ];
 
@@ -62,8 +68,11 @@ const fetchUrlContent = async (url: string): Promise<string> => {
       // Check if we got actual content (not an error page)
       if (htmlContent.length < 100 ||
           htmlContent.includes('Enable JavaScript') ||
-          htmlContent.includes('Access Denied')) {
-        throw new Error('Proxy returned invalid content');
+          htmlContent.includes('Access Denied') ||
+          htmlContent.includes('Forbidden') ||
+          htmlContent.includes('Cloudflare') ||
+          htmlContent.includes('captcha')) {
+        throw new Error('Proxy returned invalid or blocked content');
       }
 
       // Clean HTML and extract text
@@ -71,18 +80,35 @@ const fetchUrlContent = async (url: string): Promise<string> => {
       const doc = parser.parseFromString(htmlContent, 'text/html');
 
       // Remove script and style elements
-      const scripts = doc.querySelectorAll('script, style, noscript');
+      const scripts = doc.querySelectorAll('script, style, noscript, header, nav, footer');
       scripts.forEach(el => el.remove());
 
-      // Get text content
-      const text = doc.body.textContent || '';
-      const cleanedText = text.replace(/\s+/g, ' ').trim();
+      // Try to find main content areas first
+      const mainContent = doc.querySelector('main, article, [role="main"], .content, #content');
+      const text = mainContent ? mainContent.textContent : doc.body.textContent;
+
+      if (!text) {
+        throw new Error('No text content found');
+      }
+
+      // Clean up whitespace
+      const cleanedText = text
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
 
       // Limit to first 10000 characters to avoid token limits
       const finalText = cleanedText.substring(0, 10000).trim();
 
-      if (finalText.length < 50) {
-        throw new Error('Extracted text too short');
+      // More strict validation
+      if (finalText.length < 100) {
+        throw new Error(`Extracted text too short (${finalText.length} chars)`);
+      }
+
+      // Check if content is meaningful (not just navigation/boilerplate)
+      const meaningfulWords = finalText.split(/\s+/).filter(word => word.length > 3).length;
+      if (meaningfulWords < 20) {
+        throw new Error('Content appears to be mostly navigation/boilerplate');
       }
 
       console.log(`✓ Successfully fetched content using ${proxy.name}`);
@@ -94,9 +120,9 @@ const fetchUrlContent = async (url: string): Promise<string> => {
     }
   }
 
-  // If all proxies failed, just pass the URL to Gemini
-  console.warn('All proxies failed, sending URL directly to Gemini');
-  return `URL: ${url}\n\nNote: Could not fetch content automatically. Please analyze this URL directly.`;
+  // If all proxies failed, provide a helpful error message
+  console.error('All proxies failed to fetch content');
+  throw new Error('לא ניתן לגשת לתוכן האתר. אתרים כמו פייסבוק, אינסטגרם ואתרי מניות חוסמים גישה אוטומטית. נסה להעתיק ידנית את התוכן.');
 };
 
 /**

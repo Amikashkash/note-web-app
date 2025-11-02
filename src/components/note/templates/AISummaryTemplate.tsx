@@ -22,6 +22,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIExtractionResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSummarize = async () => {
     if (!url.trim()) {
@@ -36,6 +37,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
 
     setLoading(true);
     setResult(null);
+    setError(null);
 
     try {
       // Try to get user's API key (optional - will fallback to env variable)
@@ -53,7 +55,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
     } catch (error) {
       console.error('AI Extraction Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'שגיאה בחילוץ התוכן';
-      alert(errorMessage);
+      setError(errorMessage);
       onError?.(errorMessage);
     } finally {
       setLoading(false);
@@ -93,7 +95,10 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
           </Button>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          💡 עובד מצוין עם: בלוגים, מתכונים, כתבות, Instagram
+          ✅ עובד עם: בלוגים, מתכונים, כתבות חדשותיות
+        </p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          ❌ לא עובד עם: פייסבוק, אינסטגרם, אתרי מניות (חסומים)
         </p>
       </div>
 
@@ -110,8 +115,33 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
         </div>
       )}
 
+      {/* Error Display */}
+      {error && !loading && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <p className="font-semibold text-red-800 dark:text-red-300 mb-2">
+                שגיאה בחילוץ התוכן
+              </p>
+              <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+                {error}
+              </p>
+              <div className="bg-red-100 dark:bg-red-900/30 rounded p-3 text-sm text-red-800 dark:text-red-300">
+                <p className="font-medium mb-2">💡 טיפים:</p>
+                <ul className="space-y-1 pr-4">
+                  <li>• אתרים כמו פייסבוק, אינסטגרם ומניות חוסמים גישה אוטומטית</li>
+                  <li>• נסה להעתיק את התוכן ידנית ולהדביק בתבנית טקסט חופשי</li>
+                  <li>• עובד הכי טוב עם בלוגים, מתכונים וכתבות רגילות</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Result Preview */}
-      {result && !loading && (
+      {result && !loading && !error && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-2xl">✓</span>
