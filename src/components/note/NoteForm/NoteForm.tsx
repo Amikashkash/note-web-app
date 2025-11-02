@@ -56,14 +56,14 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [aiResult, setAiResult] = useState<AIExtractionResult | null>(null);
-  const [showConversionOptions, setShowConversionOptions] = useState(false);
 
   const isEditMode = !!note;
 
   const handleAIContentExtracted = (result: AIExtractionResult) => {
     setAiResult(result);
     setTitle(result.title);
-    setShowConversionOptions(true);
+    // Auto-convert to plain text immediately
+    convertAIResultToTemplate('plain');
   };
 
   const convertAIResultToTemplate = (targetTemplate: TemplateType) => {
@@ -105,7 +105,6 @@ export const NoteForm: React.FC<NoteFormProps> = ({
     }
 
     setTemplateType(targetTemplate);
-    setShowConversionOptions(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -208,23 +207,12 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           )}
         </div>
 
-        {/* Conversion Options Dialog */}
-        {showConversionOptions && aiResult && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-3">
-              התוכן מוכן! לחץ למטה כדי לשמור
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() => convertAIResultToTemplate('plain')}
-                size="sm"
-              >
-                📝 שמור כטקסט חופשי
-              </Button>
-            </div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-              💡 הבינה המלאכותית כבר סידרה את התוכן בצורה יפה
+        {/* AI Success Message */}
+        {aiResult && content && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+            <p className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+              <span>✓</span>
+              <span>התוכן חולץ וסודר בהצלחה! מוכן לשמירה</span>
             </p>
           </div>
         )}
