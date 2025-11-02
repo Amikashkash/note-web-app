@@ -97,6 +97,9 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           plainText += `הוראות הכנה:\n${aiResult.content.steps?.join('\n') || ''}`;
         } else if (aiResult.type === 'article') {
           plainText = aiResult.content.summary || aiResult.rawText || '';
+        } else if (aiResult.type === 'general' && aiResult.content.text) {
+          // Text summary - use the text field directly
+          plainText = aiResult.content.text;
         } else {
           plainText = JSON.stringify(aiResult.content, null, 2);
         }
