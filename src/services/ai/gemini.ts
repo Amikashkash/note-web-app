@@ -16,9 +16,10 @@ export interface AIExtractionResult {
  */
 const initGemini = (apiKey: string) => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Using gemini-pro for stable, reliable responses
-  // This is the recommended model for v1beta API
-  return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  // Using gemini-2.0-flash - the current stable model as of 2025
+  // Gemini 1.0 and 1.5 models have been retired
+  // Alternatives: 'gemini-2.5-flash', 'gemini-2.5-pro' for more complex tasks
+  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 };
 
 /**
