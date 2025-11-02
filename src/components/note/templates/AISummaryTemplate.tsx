@@ -5,7 +5,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
-import { extractContentFromUrl, type AIExtractionResult } from '@/services/ai/gemini';
+import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+import { extractContentFromUrl, summarizeText, type AIExtractionResult } from '@/services/ai/gemini';
 import { getGeminiApiKey } from '@/services/api/userSettings';
 import { useAuthStore } from '@/store/authStore';
 
@@ -19,14 +20,21 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
   onError,
 }) => {
   const { user } = useAuthStore();
+  const [mode, setMode] = useState<'url' | 'text'>('url');
   const [url, setUrl] = useState('');
+  const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIExtractionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSummarize = async () => {
-    if (!url.trim()) {
+    if (mode === 'url' && !url.trim()) {
       alert('אנא הזן כתובת URL');
+      return;
+    }
+
+    if (mode === 'text' && !text.trim()) {
+      alert('אנא הזן טקסט לסיכום');
       return;
     }
 
@@ -48,10 +56,25 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
         // Ignore - will use environment variable
       }
 
-      // Extract content (will use env variable if no user key)
-      const extracted = await extractContentFromUrl(url, apiKey);
-      setResult(extracted);
-      onContentExtracted?.(extracted);
+      if (mode === 'url') {
+        // Extract content from URL
+        const extracted = await extractContentFromUrl(url, apiKey);
+        setResult(extracted);
+        onContentExtracted?.(extracted);
+      } else {
+        // Summarize text directly
+        const summary = await summarizeText(text, apiKey);
+        const extracted: AIExtractionResult = {
+          type: 'general',
+          title: 'סיכום טקסט',
+          content: {
+            text: summary
+          },
+          rawText: summary
+        };
+        setResult(extracted);
+        onContentExtracted?.(extracted);
+      }
     } catch (error) {
       console.error('AI Extraction Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'שגיאה בחילוץ התוכן';
@@ -75,32 +98,83 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* URL Input */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          הדבק קישור לסיכום בינה מלאכותית:
-        </label>
-        <div className="flex gap-2">
-          <Input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com/article..."
-            disabled={loading}
-            className="flex-1"
-            dir="ltr"
-          />
-          <Button onClick={handleSummarize} disabled={loading || !url.trim()}>
-            {loading ? '⏳ מסכם...' : '🤖 סכם'}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          ✅ עובד עם: בלוגים, מתכונים, כתבות חדשותיות
-        </p>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          ❌ לא עובד עם: פייסבוק, אינסטגרם, אתרי מניות (חסומים)
-        </p>
+      {/* Mode Tabs */}
+      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => setMode('url')}
+          className={`px-4 py-2 font-medium transition-colors ${
+            mode === 'url'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          🔗 מקישור
+        </button>
+        <button
+          onClick={() => setMode('text')}
+          className={`px-4 py-2 font-medium transition-colors ${
+            mode === 'text'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          📝 מטקסט
+        </button>
       </div>
+
+      {/* URL Mode */}
+      {mode === 'url' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            הדבק קישור לסיכום בינה מלאכותית:
+          </label>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/article..."
+              disabled={loading}
+              className="flex-1"
+              dir="ltr"
+            />
+            <Button onClick={handleSummarize} disabled={loading || !url.trim()}>
+              {loading ? '⏳ מסכם...' : '🤖 סכם'}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            ✅ עובד עם: בלוגים, מתכונים, כתבות חדשותיות
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            ❌ לא עובד עם: פייסבוק, אינסטגרם, אתרי מניות (חסומים)
+          </p>
+        </div>
+      )}
+
+      {/* Text Mode */}
+      {mode === 'text' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            הדבק טקסט לסיכום:
+          </label>
+          <EnhancedTextarea
+            value={text}
+            onChange={setText}
+            placeholder="הדבק כאן טקסט ארוך שברצונך לסכם..."
+            disabled={loading}
+            rows={8}
+            className="w-full"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              💡 הבינה המלאכותית תסכם את הטקסט בצורה תמציתית
+            </p>
+            <Button onClick={handleSummarize} disabled={loading || !text.trim()}>
+              {loading ? '⏳ מסכם...' : '🤖 סכם'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -167,7 +241,12 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
               {result.type === 'article' && result.content.summary && (
                 <p className="line-clamp-3">{result.content.summary}</p>
               )}
-              {result.type === 'general' && (
+              {result.type === 'general' && result.content.text && (
+                <div className="whitespace-pre-wrap max-h-60 overflow-y-auto">
+                  {result.content.text}
+                </div>
+              )}
+              {result.type === 'general' && !result.content.text && (
                 <p>✓ התוכן סודר ומוכן לשמירה</p>
               )}
             </div>
@@ -176,29 +255,50 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
       )}
 
       {/* Instructions */}
-      {!result && !loading && (
+      {!result && !loading && !error && (
         <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-2xl">🤖</span>
             <h4 className="font-semibold text-gray-800 dark:text-gray-200">סיכום חכם עם AI</h4>
           </div>
-          <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
-              <span>הדבק קישור לכתבה, מתכון, או פוסט</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
-              <span>ה-AI יחלץ את המידע החשוב ויסדר אותו</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
-              <span>התוכן ישמר אוטומטית בצורה מסודרת</span>
-            </li>
-          </ul>
+
+          {mode === 'url' ? (
+            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>הדבק קישור לכתבה, מתכון, או פוסט</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>ה-AI יחלץ את המידע החשוב ויסדר אותו</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>התוכן ישמר אוטומטית בצורה מסודרת</span>
+              </li>
+            </ul>
+          ) : (
+            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>הדבק טקסט ארוך שברצונך לסכם</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>הבינה המלאכותית תיצור סיכום תמציתי וברור</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">✓</span>
+                <span>מושלם לטקסטים ארוכים, מאמרים, או פוסטים</span>
+              </li>
+            </ul>
+          )}
+
           <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
             <p className="text-xs text-gray-600 dark:text-gray-400">
-              💡 <strong>טיפ:</strong> עובד הכי טוב עם דפים עם תוכן טקסטואלי (בלוגים, מתכונים, כתבות)
+              💡 <strong>טיפ:</strong> {mode === 'url'
+                ? 'עובד הכי טוב עם דפים עם תוכן טקסטואלי (בלוגים, מתכונים, כתבות)'
+                : 'העתק טקסט מפייסבוק, אינסטגרם או כל מקור אחר לסיכום מהיר'}
             </p>
           </div>
         </div>
