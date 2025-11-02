@@ -24,36 +24,79 @@ const initGemini = (apiKey: string) => {
 
 /**
  * Fetch URL content using a CORS proxy
+ * Tries multiple proxy services for better reliability
  */
 const fetchUrlContent = async (url: string): Promise<string> => {
-  try {
-    // Use allorigins.win as CORS proxy (free service)
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-
-    if (!data.contents) {
-      throw new Error('Failed to fetch URL content');
+  // List of CORS proxy services to try
+  const proxies = [
+    // corsproxy.io - supports JavaScript-heavy sites
+    {
+      name: 'corsproxy',
+      getUrl: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      parseResponse: async (response: Response) => response.text()
+    },
+    // api.allorigins.win - fallback
+    {
+      name: 'allorigins',
+      getUrl: (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      parseResponse: async (response: Response) => {
+        const data = await response.json();
+        return data.contents || '';
+      }
     }
+  ];
 
-    // Clean HTML and extract text (simple approach)
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, 'text/html');
+  // Try each proxy until one works
+  for (const proxy of proxies) {
+    try {
+      console.log(`Trying ${proxy.name} proxy...`);
+      const proxyUrl = proxy.getUrl(url);
+      const response = await fetch(proxyUrl);
 
-    // Remove script and style elements
-    const scripts = doc.querySelectorAll('script, style');
-    scripts.forEach(el => el.remove());
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-    // Get text content
-    const text = doc.body.textContent || '';
+      const htmlContent = await proxy.parseResponse(response);
 
-    // Limit to first 10000 characters to avoid token limits
-    return text.substring(0, 10000).trim();
-  } catch (error) {
-    console.error('URL Fetch Error:', error);
-    // Fallback: just use the URL itself
-    return `URL: ${url}`;
+      // Check if we got actual content (not an error page)
+      if (htmlContent.length < 100 ||
+          htmlContent.includes('Enable JavaScript') ||
+          htmlContent.includes('Access Denied')) {
+        throw new Error('Proxy returned invalid content');
+      }
+
+      // Clean HTML and extract text
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+
+      // Remove script and style elements
+      const scripts = doc.querySelectorAll('script, style, noscript');
+      scripts.forEach(el => el.remove());
+
+      // Get text content
+      const text = doc.body.textContent || '';
+      const cleanedText = text.replace(/\s+/g, ' ').trim();
+
+      // Limit to first 10000 characters to avoid token limits
+      const finalText = cleanedText.substring(0, 10000).trim();
+
+      if (finalText.length < 50) {
+        throw new Error('Extracted text too short');
+      }
+
+      console.log(`✓ Successfully fetched content using ${proxy.name}`);
+      return finalText;
+
+    } catch (error) {
+      console.error(`${proxy.name} failed:`, error);
+      continue; // Try next proxy
+    }
   }
+
+  // If all proxies failed, just pass the URL to Gemini
+  console.warn('All proxies failed, sending URL directly to Gemini');
+  return `URL: ${url}\n\nNote: Could not fetch content automatically. Please analyze this URL directly.`;
 };
 
 /**
