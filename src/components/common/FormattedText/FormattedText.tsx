@@ -137,7 +137,7 @@ export const FormattedText: React.FC<FormattedTextProps> = ({ content, className
   return (
     <div className={className}>
       {/* Main formatted text */}
-      <div className="whitespace-pre-wrap" style={{ direction: 'rtl', textAlign: 'right' }}>
+      <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-100" style={{ direction: 'rtl', textAlign: 'right' }}>
         {formatText(content)}
       </div>
 

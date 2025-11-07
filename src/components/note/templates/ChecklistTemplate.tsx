@@ -112,10 +112,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     <div className="space-y-3">
       {/* התקדמות */}
       {totalCount > 0 && (
-        <div className="bg-blue-50 p-3 rounded-lg">
+        <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">התקדמות:</span>
-            <span className="text-sm font-bold text-blue-600">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">התקדמות:</span>
+            <span className="text-sm font-bold text-blue-600 dark:text-blue-300">
               {completedCount} / {totalCount} ({Math.round((completedCount / totalCount) * 100)}%)
             </span>
           </div>
@@ -131,7 +131,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       {/* רשימת משימות */}
       <div className="space-y-2">
         {items.length === 0 ? (
-          <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">
+          <div className="text-center p-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
             אין משימות עדיין
           </div>
         ) : (
@@ -173,7 +173,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     {readOnly ? (
                       <span
                         className={`${
-                          item.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                          item.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'
                         }`}
                       >
                         {item.text}
@@ -191,7 +191,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                         }}
                         placeholder="הזן משימה..."
                         className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
-                          item.completed ? 'line-through text-gray-500' : 'text-gray-700'
+                          item.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'
                         }`}
                       />
                     )}

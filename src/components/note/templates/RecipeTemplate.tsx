@@ -95,9 +95,9 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
       {/* פרטי מתכון */}
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">מנות</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">מנות</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700">{data.servings || '-'}</div>
+            <div className="text-sm text-gray-700 dark:text-gray-200">{data.servings || '-'}</div>
           ) : (
             <input
               type="text"
@@ -109,9 +109,9 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">זמן הכנה</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">זמן הכנה</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700">{data.prepTime || '-'}</div>
+            <div className="text-sm text-gray-700 dark:text-gray-200">{data.prepTime || '-'}</div>
           ) : (
             <input
               type="text"
@@ -123,9 +123,9 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">זמן בישול</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">זמן בישול</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700">{data.cookTime || '-'}</div>
+            <div className="text-sm text-gray-700 dark:text-gray-200">{data.cookTime || '-'}</div>
           ) : (
             <input
               type="text"
@@ -140,13 +140,13 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
 
       {/* מרכיבים */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">🥕 מרכיבים:</h4>
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">🥕 מרכיבים:</h4>
         <div className="space-y-2">
           {data.ingredients.map((ingredient, index) => (
             <div key={index} className="flex items-center gap-2">
-              <span className="text-gray-500">•</span>
+              <span className="text-gray-500 dark:text-gray-400">•</span>
               {readOnly ? (
-                <span className="flex-1 text-sm text-gray-700">{ingredient || '-'}</span>
+                <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{ingredient || '-'}</span>
               ) : (
                 <>
                   <input
@@ -183,13 +183,13 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
 
       {/* הוראות הכנה */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">👨‍🍳 הוראות הכנה:</h4>
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">👨‍🍳 הוראות הכנה:</h4>
         <div className="space-y-2">
           {data.instructions.map((instruction, index) => (
             <div key={index} className="flex items-start gap-2">
-              <span className="text-gray-500 font-medium text-sm">{index + 1}.</span>
+              <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">{index + 1}.</span>
               {readOnly ? (
-                <span className="flex-1 text-sm text-gray-700">{instruction || '-'}</span>
+                <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{instruction || '-'}</span>
               ) : (
                 <>
                   <textarea

@@ -188,7 +188,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
 
       {/* תוכן הפתק */}
       <div className="flex-1 overflow-hidden mb-3">
-        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap line-clamp-3 leading-relaxed">
+        <p className="text-sm text-gray-700 dark:text-gray-100 whitespace-pre-wrap line-clamp-3 leading-relaxed">
           {displayContent}
         </p>
       </div>
