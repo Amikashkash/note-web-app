@@ -17,6 +17,16 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
   const { categories, isLoading } = useCategories();
   const { allNotes, isLoading: notesLoading } = useNotes();
 
+  // Debug for v1.0.7
+  if (searchQuery.trim()) {
+    console.log('🔍 v1.0.7 CategoryList Search:', {
+      searchQuery,
+      totalCategories: categories.length,
+      totalNotes: allNotes.length,
+      notesLoading
+    });
+  }
+
   // סינון קטגוריות לפי מחרוזת החיפוש
   // מחפש גם בשם הקטגוריה וגם בפתקים שלה (כותרת, תוכן, תגיות)
   const filteredCategories = categories.filter(category => {

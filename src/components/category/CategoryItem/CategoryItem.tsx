@@ -50,6 +50,16 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     return titleMatch || contentMatch || tagsMatch;
   });
 
+  // Debug for v1.0.7
+  if (searchQuery.trim()) {
+    console.log(`📦 CategoryItem "${category.name}":`, {
+      searchQuery,
+      totalNotesInCategory: allNotes.filter(n => n.categoryId === category.id).length,
+      matchingNotes: categoryNotes.length,
+      isExpanded
+    });
+  }
+
   // רשימת קטגוריות להעברת פתק
   const categoriesForMove = categories.map(cat => ({
     id: cat.id,
