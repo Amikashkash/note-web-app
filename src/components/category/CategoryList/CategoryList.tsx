@@ -17,6 +17,11 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
   const { categories, isLoading } = useCategories();
   const { allNotes } = useNotes();
 
+  // Debug logging
+  console.log('📋 CategoryList received searchQuery:', searchQuery);
+  console.log('📋 Total categories:', categories.length);
+  console.log('📋 Total notes:', allNotes.length);
+
   // סינון קטגוריות לפי מחרוזת החיפוש
   // מחפש גם בשם הקטגוריה וגם בפתקים שלה (כותרת, תוכן, תגיות)
   const filteredCategories = categories.filter(category => {
@@ -36,6 +41,8 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
 
     return categoryNameMatch || hasMatchingNotes;
   });
+
+  console.log('📋 Filtered categories:', filteredCategories.length);
 
   if (isLoading && categories.length === 0) {
     return (
