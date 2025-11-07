@@ -3,7 +3,7 @@
  * Displays a single category with its notes in horizontal scroll
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Category } from '@/types';
 import { useNotes } from '@/hooks/useNotes';
 import { useAuthStore } from '@/store/authStore';
@@ -56,6 +56,15 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     name: cat.name,
     icon: cat.icon || '📁',
   }));
+
+  // Auto-expand category when searching and it has matching notes
+  useEffect(() => {
+    if (searchQuery.trim() && categoryNotes.length > 0) {
+      setIsExpanded(true);
+    } else if (!searchQuery.trim()) {
+      setIsExpanded(false);
+    }
+  }, [searchQuery, categoryNotes.length]);
 
   const handleAddNote = () => {
     setEditingNote(null);
