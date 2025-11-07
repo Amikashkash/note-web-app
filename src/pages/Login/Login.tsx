@@ -126,6 +126,7 @@ export const Login: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             📝 אפליקציית פתקים
           </h1>
+          <span className="text-[9px] text-gray-400 block -mt-2 mb-2">v1.0.1</span>
           <p className="text-gray-600">
             {mode === 'signin' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש'}
           </p>

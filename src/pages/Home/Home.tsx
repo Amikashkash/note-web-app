@@ -22,7 +22,10 @@ export const Home: React.FC = () => {
       <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-shrink">
-            <h1 className="text-base sm:text-2xl font-bold text-primary dark:text-blue-400 truncate">📝 פתקים</h1>
+            <div className="flex flex-col">
+              <h1 className="text-base sm:text-2xl font-bold text-primary dark:text-blue-400 truncate">📝 פתקים</h1>
+              <span className="text-[8px] sm:text-[10px] text-gray-400 dark:text-gray-500">v1.0.1</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-4 flex-shrink-0">
