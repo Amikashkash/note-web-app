@@ -25,7 +25,10 @@ export const Home: React.FC = () => {
           {/* שורה ראשונה - לוגו, חיפוש ופרופיל */}
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <h1 className="text-xl sm:text-3xl font-bold text-white whitespace-nowrap">📝 פתקים</h1>
+              <div className="flex flex-col">
+                <h1 className="text-xl sm:text-3xl font-bold text-white whitespace-nowrap">📝 פתקים</h1>
+                <span className="text-[8px] sm:text-[10px] text-white/60">v1.0.3</span>
+              </div>
 
               {/* שדה חיפוש */}
               <div className="flex-1 max-w-md hidden sm:block">
