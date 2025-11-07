@@ -17,6 +17,13 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
   const { categories, isLoading } = useCategories();
   const { allNotes, isLoading: notesLoading } = useNotes();
 
+  // Debug: Log when searching
+  if (searchQuery.trim() && allNotes.length > 0) {
+    console.log('🔍 v1.0.5 - Searching for:', searchQuery);
+    console.log('📊 Total notes to search:', allNotes.length);
+    console.log('📝 Sample note:', allNotes[0]);
+  }
+
   // סינון קטגוריות לפי מחרוזת החיפוש
   // מחפש גם בשם הקטגוריה וגם בפתקים שלה (כותרת, תוכן, תגיות)
   const filteredCategories = categories.filter(category => {
@@ -37,6 +44,17 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
       const titleMatch = note.title.toLowerCase().includes(query);
       const contentMatch = note.content.toLowerCase().includes(query);
       const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+
+      // Debug: Log matches
+      if (titleMatch || contentMatch || tagsMatch) {
+        console.log(`✅ Match in "${category.name}":`, {
+          noteTitle: note.title,
+          titleMatch,
+          contentMatch,
+          tagsMatch
+        });
+      }
+
       return titleMatch || contentMatch || tagsMatch;
     });
 
