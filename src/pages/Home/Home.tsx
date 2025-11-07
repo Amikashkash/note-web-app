@@ -15,6 +15,7 @@ export const Home: React.FC = () => {
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-x-hidden transition-colors">
@@ -24,7 +25,7 @@ export const Home: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-shrink">
             <div className="flex flex-col">
               <h1 className="text-base sm:text-2xl font-bold text-primary dark:text-blue-400 truncate">📝 פתקים</h1>
-              <span className="text-[8px] sm:text-[10px] text-gray-400 dark:text-gray-500">v1.0.1</span>
+              <span className="text-[8px] sm:text-[10px] text-gray-400 dark:text-gray-500">v1.0.2</span>
             </div>
           </div>
 
@@ -59,6 +60,30 @@ export const Home: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Search Bar */}
+        <div className="container mx-auto px-3 sm:px-4 pb-3 pt-1">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="חפש פתקים לפי כותרת או תוכן..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 pr-10 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-blue-500 focus:border-transparent transition-colors"
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
+              🔍
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -80,7 +105,10 @@ export const Home: React.FC = () => {
 
         {/* Categories List */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-6 transition-colors">
-          <CategoryList onCreateFirstCategory={() => setShowCategoryForm(true)} />
+          <CategoryList
+            onCreateFirstCategory={() => setShowCategoryForm(true)}
+            searchQuery={searchQuery}
+          />
         </div>
 
         {/* Category Form Modal */}

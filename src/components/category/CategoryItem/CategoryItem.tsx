@@ -15,10 +15,12 @@ import type { Note } from '@/types/note';
 
 interface CategoryItemProps {
   category: Category;
+  searchQuery?: string;
 }
 
 export const CategoryItem: React.FC<CategoryItemProps> = ({
   category,
+  searchQuery = '',
 }) => {
   const { user } = useAuthStore();
   const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
@@ -30,7 +32,19 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
 
   // סינון פתקים לפי קטגוריה זו
-  const categoryNotes = allNotes.filter(note => note.categoryId === category.id);
+  const categoryNotes = allNotes.filter(note => {
+    if (note.categoryId !== category.id) return false;
+
+    // אם אין חיפוש, הצג את כל הפתקים
+    if (!searchQuery.trim()) return true;
+
+    // חיפוש בכותרת ובתוכן
+    const query = searchQuery.toLowerCase();
+    const titleMatch = note.title?.toLowerCase().includes(query);
+    const contentMatch = note.content?.toLowerCase().includes(query);
+
+    return titleMatch || contentMatch;
+  });
 
   // רשימת קטגוריות להעברת פתק
   const categoriesForMove = categories.map(cat => ({
@@ -120,6 +134,11 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       alert('שגיאה בשמירת הפתק');
     }
   };
+
+  // אם יש חיפוש ואין תוצאות, אל תציג את הקטגוריה
+  if (searchQuery.trim() && categoryNotes.length === 0) {
+    return null;
+  }
 
   return (
     <div className="mb-3 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-r-4 transition-colors" style={{ borderRightColor: category.color }}>

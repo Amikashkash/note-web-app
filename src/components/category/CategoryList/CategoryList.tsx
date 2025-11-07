@@ -9,9 +9,10 @@ import { CategoryItem } from '../CategoryItem/CategoryItem';
 
 interface CategoryListProps {
   onCreateFirstCategory?: () => void;
+  searchQuery?: string;
 }
 
-export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory }) => {
+export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory, searchQuery = '' }) => {
   const { categories, isLoading } = useCategories();
 
   if (isLoading && categories.length === 0) {
@@ -24,7 +25,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
 
   if (categories.length === 0) {
     return (
-      <div className="text-center p-4 sm:p-8 text-gray-500">
+      <div className="text-center p-4 sm:p-8 text-gray-500 dark:text-gray-400">
         <p className="mb-4 text-sm sm:text-base">עדיין אין קטגוריות</p>
         <button
           onClick={onCreateFirstCategory}
@@ -42,6 +43,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
         <CategoryItem
           key={category.id}
           category={category}
+          searchQuery={searchQuery}
         />
       ))}
     </div>
