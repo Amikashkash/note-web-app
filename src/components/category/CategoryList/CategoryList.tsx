@@ -15,12 +15,13 @@ interface CategoryListProps {
 
 export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory, searchQuery = '' }) => {
   const { categories, isLoading } = useCategories();
-  const { allNotes } = useNotes();
+  const { allNotes, isLoading: notesLoading } = useNotes();
 
   // Debug logging
   console.log('📋 CategoryList received searchQuery:', searchQuery);
   console.log('📋 Total categories:', categories.length);
   console.log('📋 Total notes:', allNotes.length);
+  console.log('📋 Notes loading:', notesLoading);
 
   // סינון קטגוריות לפי מחרוזת החיפוש
   // מחפש גם בשם הקטגוריה וגם בפתקים שלה (כותרת, תוכן, תגיות)
@@ -29,6 +30,12 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
 
     const query = searchQuery.toLowerCase();
     const categoryNameMatch = category.name.toLowerCase().includes(query);
+
+    // אם הפתקים עדיין נטענים, הראה את הקטגוריה אם השם שלה תואם
+    // כך המשתמש יראה תוצאות חלקיות במקום שום דבר
+    if (notesLoading) {
+      return categoryNameMatch;
+    }
 
     // בדיקה אם יש פתקים בקטגוריה שתואמים לחיפוש
     const categoryNotes = allNotes.filter(note => note.categoryId === category.id);
