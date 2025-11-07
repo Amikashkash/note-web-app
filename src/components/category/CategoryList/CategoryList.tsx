@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { useCategories } from '@/hooks/useCategories';
+import { useNotes } from '@/hooks/useNotes';
 import { CategoryItem } from '../CategoryItem/CategoryItem';
 
 interface CategoryListProps {
@@ -14,15 +15,26 @@ interface CategoryListProps {
 
 export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory, searchQuery = '' }) => {
   const { categories, isLoading } = useCategories();
+  const { allNotes } = useNotes();
 
   // סינון קטגוריות לפי מחרוזת החיפוש
+  // מחפש גם בשם הקטגוריה וגם בפתקים שלה (כותרת, תוכן, תגיות)
   const filteredCategories = categories.filter(category => {
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
     const categoryNameMatch = category.name.toLowerCase().includes(query);
 
-    return categoryNameMatch;
+    // בדיקה אם יש פתקים בקטגוריה שתואמים לחיפוש
+    const categoryNotes = allNotes.filter(note => note.categoryId === category.id);
+    const hasMatchingNotes = categoryNotes.some(note => {
+      const titleMatch = note.title.toLowerCase().includes(query);
+      const contentMatch = note.content.toLowerCase().includes(query);
+      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+      return titleMatch || contentMatch || tagsMatch;
+    });
+
+    return categoryNameMatch || hasMatchingNotes;
   });
 
   if (isLoading && categories.length === 0) {
