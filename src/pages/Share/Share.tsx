@@ -15,7 +15,7 @@ export const Share: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
-  const { categories } = useCategoryStore();
+  const { categories, subscribeToCategories } = useCategoryStore();
   const { createNote } = useNoteStore();
 
   // Extract shared data from URL params
@@ -27,7 +27,26 @@ export const Share: React.FC = () => {
   const [content, setContent] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // Load categories when user is available
+  useEffect(() => {
+    if (user) {
+      console.log('📂 Loading categories for user:', user.uid);
+      subscribeToCategories(user.uid);
+      setLoading(false);
+    }
+  }, [user, subscribeToCategories]);
+
+  // Auto-select first category when categories load
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategoryId) {
+      console.log('✅ Auto-selecting first category:', categories[0].name);
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, selectedCategoryId]);
+
+  // Load shared content once
   useEffect(() => {
     // If not logged in, redirect to login
     if (!user) {
@@ -54,12 +73,7 @@ export const Share: React.FC = () => {
     }
 
     setContent(combinedContent);
-
-    // Auto-select first category if available
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [user, navigate, sharedTitle, sharedText, sharedUrl, categories, selectedCategoryId]);
+  }, [user, navigate, sharedTitle, sharedText, sharedUrl]);
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {
@@ -110,7 +124,22 @@ export const Share: React.FC = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="animate-spin text-4xl">⏳</div>
+        <div className="text-center">
+          <div className="animate-spin text-4xl mb-4">⏳</div>
+          <p className="text-gray-600 dark:text-gray-400">טוען...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while categories are being fetched
+  if (loading && categories.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin text-4xl mb-4">📂</div>
+          <p className="text-gray-600 dark:text-gray-400">טוען קטגוריות...</p>
+        </div>
       </div>
     );
   }
@@ -184,7 +213,7 @@ export const Share: React.FC = () => {
           <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
             <Button
               onClick={handleSave}
-              disabled={saving || !selectedCategoryId}
+              disabled={saving || !selectedCategoryId || (!title.trim() && !content.trim())}
               className="flex-1"
             >
               {saving ? '⏳ שומר...' : '✓ שמור פתק'}
@@ -197,6 +226,28 @@ export const Share: React.FC = () => {
               ביטול
             </Button>
           </div>
+
+          {/* Show warning if no category selected */}
+          {categories.length === 0 && (
+            <div className="space-y-3">
+              <div className="text-sm text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                <p className="font-medium mb-2">⚠️ לא נמצאו קטגוריות</p>
+                <p className="mb-3">כדי לשמור פתקים, תחילה צריך ליצור לפחות קטגוריה אחת.</p>
+                <Button
+                  onClick={() => navigate('/', { replace: true })}
+                  size="sm"
+                  className="w-full"
+                >
+                  📁 עבור לעמוד הבית ליצירת קטגוריה
+                </Button>
+              </div>
+            </div>
+          )}
+          {categories.length > 0 && !selectedCategoryId && (
+            <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+              💡 בוחר קטגוריה אוטומטית...
+            </div>
+          )}
         </div>
 
         {/* Info */}

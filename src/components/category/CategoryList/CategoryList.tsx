@@ -9,10 +9,21 @@ import { CategoryItem } from '../CategoryItem/CategoryItem';
 
 interface CategoryListProps {
   onCreateFirstCategory?: () => void;
+  searchQuery?: string;
 }
 
-export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory }) => {
+export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategory, searchQuery = '' }) => {
   const { categories, isLoading } = useCategories();
+
+  // סינון קטגוריות לפי מחרוזת החיפוש
+  const filteredCategories = categories.filter(category => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const categoryNameMatch = category.name.toLowerCase().includes(query);
+
+    return categoryNameMatch;
+  });
 
   if (isLoading && categories.length === 0) {
     return (
@@ -36,12 +47,22 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onCreateFirstCategor
     );
   }
 
+  if (filteredCategories.length === 0 && searchQuery.trim()) {
+    return (
+      <div className="text-center p-4 sm:p-8 text-gray-500 dark:text-gray-400">
+        <div className="text-4xl mb-4">🔍</div>
+        <p className="text-sm sm:text-base">לא נמצאו תוצאות עבור "{searchQuery}"</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 sm:space-y-3">
-      {categories.map((category) => (
+      {filteredCategories.map((category) => (
         <CategoryItem
           key={category.id}
           category={category}
+          searchQuery={searchQuery}
         />
       ))}
     </div>

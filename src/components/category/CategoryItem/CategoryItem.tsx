@@ -17,10 +17,12 @@ import * as categoryAPI from '@/services/api/categories';
 
 interface CategoryItemProps {
   category: Category;
+  searchQuery?: string;
 }
 
 export const CategoryItem: React.FC<CategoryItemProps> = ({
   category,
+  searchQuery = '',
 }) => {
   const { user } = useAuthStore();
   const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
@@ -31,9 +33,22 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   const [showShareManagement, setShowShareManagement] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
+  const [draggingNote, setDraggingNote] = useState<Note | null>(null);
+  const [dragOverNote, setDragOverNote] = useState<Note | null>(null);
 
-  // סינון פתקים לפי קטגוריה זו
-  const categoryNotes = allNotes.filter(note => note.categoryId === category.id);
+  // סינון פתקים לפי קטגוריה זו וחיפוש
+  const categoryNotes = allNotes.filter(note => {
+    if (note.categoryId !== category.id) return false;
+
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const titleMatch = note.title.toLowerCase().includes(query);
+    const contentMatch = note.content.toLowerCase().includes(query);
+    const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+
+    return titleMatch || contentMatch || tagsMatch;
+  });
 
   // רשימת קטגוריות להעברת פתק
   const categoriesForMove = categories.map(cat => ({
@@ -104,6 +119,61 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   const isOwner = user && category.userId === user.uid;
   const isShared = category.sharedWith && category.sharedWith.length > 0;
 
+  // Drag and Drop handlers
+  const handleDragStart = (note: Note) => {
+    setDraggingNote(note);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingNote(null);
+    setDragOverNote(null);
+  };
+
+  const handleDragOver = (note: Note) => {
+    if (draggingNote && draggingNote.id !== note.id) {
+      setDragOverNote(note);
+    }
+  };
+
+  const handleDrop = async (targetNote: Note) => {
+    if (!draggingNote || draggingNote.id === targetNote.id) {
+      setDragOverNote(null);
+      return;
+    }
+
+    try {
+      // Get the current order of notes
+      const sortedNotes = [...categoryNotes].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      // Find positions
+      const dragIndex = sortedNotes.findIndex(n => n.id === draggingNote.id);
+      const dropIndex = sortedNotes.findIndex(n => n.id === targetNote.id);
+
+      if (dragIndex === -1 || dropIndex === -1) return;
+
+      // Reorder the array
+      const newNotes = [...sortedNotes];
+      const [removed] = newNotes.splice(dragIndex, 1);
+      newNotes.splice(dropIndex, 0, removed);
+
+      // Update order for all affected notes
+      const updates = newNotes.map((note, index) => {
+        if (note.order !== index) {
+          return updateNote(note.id, { ...note, order: index });
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(updates);
+      console.log('✅ Note order updated successfully');
+    } catch (error) {
+      console.error('❌ Error reordering notes:', error);
+      alert('שגיאה בשינוי סדר הפתקים');
+    }
+
+    setDragOverNote(null);
+  };
+
   const handleSubmitNote = async (data: {
     title: string;
     content: string;
@@ -154,31 +224,34 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   };
 
   return (
-    <div className="mb-3 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-r-4 transition-colors" style={{ borderRightColor: category.color }}>
+    <div
+      className="mb-4 bg-white dark:bg-gray-800 rounded-card p-5 shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-hover-dark transition-smooth hover-slide overflow-visible"
+      style={{ borderRight: `6px solid ${category.color}` }}
+    >
       {/* כותרת הקטגוריה */}
-      <div className="flex items-center justify-between p-2 sm:p-4">
-        <div className="flex items-center gap-2 sm:gap-3 flex-1">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3 flex-1">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-sm sm:text-base"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-base"
           >
             {isExpanded ? '▼' : '◀'}
           </button>
-          {category.icon && <span className="text-xl sm:text-2xl">{category.icon}</span>}
+          {category.icon && <span className="text-2xl">{category.icon}</span>}
           <div>
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-sm sm:text-base">{category.name}</h3>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{categoryNotes.length} פתקים</p>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{category.name}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{categoryNotes.length} פתקים</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-2">
           {isOwner && (
             <button
               onClick={() => setShowShareManagement(true)}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded transition-colors font-medium ${
+              className={`px-3 py-1.5 text-sm rounded-xl transition-smooth font-medium ${
                 isShared
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 hover:-translate-y-0.5'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:-translate-y-0.5'
               }`}
               title={isShared ? `משותף עם ${category.sharedWith.length} משתמשים` : 'שתף קטגוריה'}
             >
@@ -186,13 +259,13 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             </button>
           )}
           {!isOwner && isShared && (
-            <span className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+            <span className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-xl font-medium">
               👥 משותף
             </span>
           )}
           <button
             onClick={handleAddNote}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-primary dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 rounded transition-colors font-medium"
+            className="px-5 py-2.5 text-sm bg-gradient-primary dark:bg-gradient-primary-dark text-white rounded-xl font-medium shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5"
           >
             + פתק
           </button>
@@ -201,14 +274,14 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 
       {/* תצוגה מקדימה של כותרות פתקים כשהקטגוריה סגורה */}
       {!isExpanded && categoryNotes.length > 0 && (
-        <div className="px-2 sm:px-4 pb-2 sm:pb-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-            <div className="flex gap-1.5 sm:gap-2 py-1.5 sm:py-2 min-w-max">
+        <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
+          <div className="overflow-x-auto notes-scroll">
+            <div className="flex gap-3 min-w-max">
               {categoryNotes.slice(0, 10).map((note) => (
                 <button
                   key={note.id}
                   onClick={() => handleViewNote(note)}
-                  className="px-3 py-1.5 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-colors border border-gray-200 dark:border-gray-600"
+                  className="px-4 py-2 bg-gradient-note dark:bg-gradient-note-dark hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
                   style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
                 >
                   {note.isPinned && '📌 '}
@@ -218,7 +291,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
               {categoryNotes.length > 10 && (
                 <button
                   onClick={() => setIsExpanded(true)}
-                  className="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap"
+                  className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth"
                 >
                   +{categoryNotes.length - 10} עוד...
                 </button>
@@ -230,13 +303,19 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
 
       {/* רשימת הפתקים (מתקפלת) */}
       {isExpanded && (
-        <div className="px-2 sm:px-4 pb-2 sm:pb-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
           <NotesList
             notes={categoryNotes}
             onView={handleViewNote}
             onDelete={handleDeleteNote}
             onTogglePin={handleTogglePin}
             onAddNote={handleAddNote}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            draggingNoteId={draggingNote?.id}
+            dragOverNoteId={dragOverNote?.id}
           />
         </div>
       )}

@@ -141,6 +141,12 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                         type="text"
                         value={row.description}
                         onChange={(e) => handleUpdateRow(row.id, 'description', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddRow();
+                          }
+                        }}
                         placeholder="הזן תיאור..."
                         className="w-full px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
                       />

@@ -107,10 +107,14 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         const newText = value.substring(0, cursorPos) + `\n${nextNumber}. ` + value.substring(cursorPos);
         onChange(newText);
 
-        // הזזת הסמן למיקום הנכון
+        // הזזת הסמן למיקום הנכון וגלילה
         setTimeout(() => {
           const newPos = cursorPos + nextNumber.toString().length + 3;
           textarea.setSelectionRange(newPos, newPos);
+          // גלילה כדי להראות את הסמן
+          const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+          const cursorLine = newText.substring(0, newPos).split('\n').length;
+          textarea.scrollTop = Math.max(0, (cursorLine - 3) * lineHeight);
         }, 0);
         return;
       }
@@ -123,10 +127,14 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         const newText = value.substring(0, cursorPos) + `\n${bullet} ` + value.substring(cursorPos);
         onChange(newText);
 
-        // הזזת הסמן למיקום הנכון
+        // הזזת הסמן למיקום הנכון וגלילה
         setTimeout(() => {
           const newPos = cursorPos + 3;
           textarea.setSelectionRange(newPos, newPos);
+          // גלילה כדי להראות את הסמן
+          const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+          const cursorLine = newText.substring(0, newPos).split('\n').length;
+          textarea.scrollTop = Math.max(0, (cursorLine - 3) * lineHeight);
         }, 0);
         return;
       }

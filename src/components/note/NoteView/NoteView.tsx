@@ -128,11 +128,11 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* כפתור חזרה */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-          title="חזרה"
+          className="absolute top-4 right-4 z-10 bg-gradient-primary dark:bg-gradient-primary-dark text-white p-2.5 rounded-full shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 hover:scale-110"
+          title="סגור"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
@@ -185,7 +185,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
             {note.templateType === 'plain' && (
               <button
                 onClick={() => setIsEditMode(!isEditMode)}
-                className="text-sm px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                className="text-sm px-4 py-2 rounded-xl bg-gradient-primary dark:bg-gradient-primary-dark text-white shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 font-semibold"
               >
                 {isEditMode ? '👁️ צפייה' : '✏️ עריכה'}
               </button>

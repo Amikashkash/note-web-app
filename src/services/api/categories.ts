@@ -213,10 +213,35 @@ export const shareCategoryWithUser = async (
       throw new Error('הקטגוריה כבר משותפת עם משתמש זה');
     }
 
+    // Share the category
     await updateDoc(categoryRef, {
       sharedWith: [...currentSharedWith, targetUserId],
       updatedAt: serverTimestamp(),
     });
+
+    // Share all notes in this category
+    const notesRef = collection(db, 'notes');
+    const notesQuery = query(notesRef, where('categoryId', '==', categoryId));
+    const notesSnapshot = await getDocs(notesQuery);
+
+    console.log(`Sharing ${notesSnapshot.size} notes in category ${categoryId} with user ${targetUserId}`);
+
+    // Update all notes in this category to add the user to sharedWith
+    const updatePromises = notesSnapshot.docs.map(async (noteDoc) => {
+      const noteData = noteDoc.data();
+      const noteSharedWith = noteData.sharedWith || [];
+
+      if (!noteSharedWith.includes(targetUserId)) {
+        const noteRef = doc(db, 'notes', noteDoc.id);
+        await updateDoc(noteRef, {
+          sharedWith: [...noteSharedWith, targetUserId],
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    await Promise.all(updatePromises);
+    console.log(`Successfully shared category and all notes with ${userEmail}`);
   } catch (error: any) {
     console.error('Error sharing category:', error);
     throw error;
@@ -241,10 +266,35 @@ export const unshareCategoryWithUser = async (
     const categoryData = categorySnapshot.docs[0].data() as Category;
     const currentSharedWith = categoryData.sharedWith || [];
 
+    // Unshare the category
     await updateDoc(categoryRef, {
-      sharedWith: currentSharedWith.filter(id => id !== userId),
+      sharedWith: currentSharedWith.filter((id: string) => id !== userId),
       updatedAt: serverTimestamp(),
     });
+
+    // Unshare all notes in this category
+    const notesRef = collection(db, 'notes');
+    const notesQuery = query(notesRef, where('categoryId', '==', categoryId));
+    const notesSnapshot = await getDocs(notesQuery);
+
+    console.log(`Unsharing ${notesSnapshot.size} notes in category ${categoryId} from user ${userId}`);
+
+    // Update all notes in this category to remove the user from sharedWith
+    const updatePromises = notesSnapshot.docs.map(async (noteDoc) => {
+      const noteData = noteDoc.data();
+      const noteSharedWith = noteData.sharedWith || [];
+
+      if (noteSharedWith.includes(userId)) {
+        const noteRef = doc(db, 'notes', noteDoc.id);
+        await updateDoc(noteRef, {
+          sharedWith: noteSharedWith.filter((id: string) => id !== userId),
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    await Promise.all(updatePromises);
+    console.log(`Successfully unshared category and all notes from user ${userId}`);
   } catch (error: any) {
     console.error('Error unsharing category:', error);
     throw new Error('Failed to remove user from category');

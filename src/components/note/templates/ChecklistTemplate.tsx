@@ -183,6 +183,12 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                         type="text"
                         value={item.text}
                         onChange={(e) => handleUpdateText(item.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddItem();
+                          }
+                        }}
                         placeholder="הזן משימה..."
                         className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
                           item.completed ? 'line-through text-gray-500' : 'text-gray-700'

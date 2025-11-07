@@ -1,10 +1,12 @@
 /**
  * תבנית תכנית עבודה - סעיפים עם כותרות ותוכן
- * כל סעיף מכיל כותרת משנה וטקסט חופשי
+ * כל סעיף מכיל כותרת משנה וטקסט חופשי עם תמיכה במספור אוטומטי ועיצוב טקסט
  */
 
 import React, { useMemo } from 'react';
 import { Button } from '@/components/common/Button';
+import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+import { FormattedText } from '@/components/common/FormattedText';
 
 export interface WorkPlanSection {
   id: string;
@@ -70,16 +72,16 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
     return (
       <div className="space-y-4">
         {sections.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">אין סעיפים בתכנית</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center py-8">אין סעיפים בתכנית</p>
         ) : (
           sections.map((section) => (
-            <div key={section.id} className="bg-white rounded-lg border border-gray-200 p-4">
-              <h4 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
-                <span className="text-blue-600">▸</span>
+            <div key={section.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
+                <span className="text-blue-600 dark:text-blue-400">▸</span>
                 {section.header || 'כותרת ריקה'}
               </h4>
-              <div className="text-gray-700 whitespace-pre-wrap pr-6">
-                {section.content || 'אין תוכן'}
+              <div className="text-gray-700 dark:text-gray-300 pr-6">
+                <FormattedText content={section.content || 'אין תוכן'} />
               </div>
             </div>
           ))
@@ -129,19 +131,24 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
             type="text"
             value={section.header}
             onChange={(e) => handleUpdateSection(section.id, 'header', e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleAddSection();
+              }
+            }}
             placeholder="הזן כותרת סעיף..."
-            className="w-full px-3 py-2 mb-2 text-lg font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 mb-2 text-lg font-bold border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             style={{ direction: 'rtl', textAlign: 'right' }}
           />
 
-          {/* תוכן הסעיף */}
-          <textarea
+          {/* תוכן הסעיף - עם תמיכה במספור ועיצוב טקסט */}
+          <EnhancedTextarea
             value={section.content}
-            onChange={(e) => handleUpdateSection(section.id, 'content', e.target.value)}
-            placeholder="הזן תוכן הסעיף..."
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-            style={{ direction: 'rtl', textAlign: 'right' }}
+            onChange={(content) => handleUpdateSection(section.id, 'content', content)}
+            placeholder="הזן תוכן הסעיף... (1. למספור, * לנקודות)"
+            rows={5}
+            className="text-sm"
           />
         </div>
       ))}

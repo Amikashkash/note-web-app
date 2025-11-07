@@ -12,6 +12,12 @@ interface NotesListProps {
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onAddNote: () => void;
+  onDragStart?: (note: Note) => void;
+  onDragEnd?: () => void;
+  onDragOver?: (note: Note) => void;
+  onDrop?: (targetNote: Note) => void;
+  draggingNoteId?: string;
+  dragOverNoteId?: string;
 }
 
 export const NotesList: React.FC<NotesListProps> = ({
@@ -20,12 +26,23 @@ export const NotesList: React.FC<NotesListProps> = ({
   onDelete,
   onTogglePin,
   onAddNote,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  draggingNoteId,
+  dragOverNoteId,
 }) => {
   // מיון: פתקים מוצמדים קודם, ואז לפי סדר
   const sortedNotes = [...notes].sort((a, b) => {
+    // קודם כל, מוצמדים לפני לא-מוצמדים
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
-    return a.order - b.order;
+
+    // בתוך אותה קבוצה (מוצמדים או לא), מיון לפי order
+    const orderA = a.order ?? 0;
+    const orderB = b.order ?? 0;
+    return orderA - orderB;
   });
 
   if (notes.length === 0) {
@@ -53,6 +70,12 @@ export const NotesList: React.FC<NotesListProps> = ({
               onView={onView}
               onDelete={onDelete}
               onTogglePin={onTogglePin}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              isDragging={draggingNoteId === note.id}
+              isDragOver={dragOverNoteId === note.id}
             />
           ))}
         </div>

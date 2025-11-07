@@ -70,3 +70,81 @@ body {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
 }
+
+/* ========== Modern Gradient Design Styles ========== */
+
+/* Gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-primary-dark {
+  background: linear-gradient(135deg, #5568d3 0%, #63408a 100%);
+}
+
+.bg-gradient-note {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.bg-gradient-note-dark {
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+.hover-slide {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-slide:hover {
+  transform: translateX(-5px);
+}
+
+/* RTL support for hover */
+[dir="rtl"] .hover-slide:hover {
+  transform: translateX(5px);
+}
+
+/* Custom scrollbar for note lists */
+.notes-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.notes-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.notes-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 10px;
+}
+
+.notes-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Dark mode scrollbar */
+.dark .notes-scroll::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.dark .notes-scroll::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
+
+.dark .notes-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

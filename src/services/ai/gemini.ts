@@ -14,12 +14,17 @@ export interface AIExtractionResult {
 /**
  * Initialize Gemini AI
  */
-const initGemini = (apiKey: string) => {
+const initGemini = (apiKey: string, maxOutputTokens?: number) => {
   const genAI = new GoogleGenerativeAI(apiKey);
   // Using gemini-2.0-flash - the current stable model as of 2025
   // Gemini 1.0 and 1.5 models have been retired
   // Alternatives: 'gemini-2.5-flash', 'gemini-2.5-pro' for more complex tasks
-  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  return genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: {
+      maxOutputTokens: maxOutputTokens || 2048,
+    },
+  });
 };
 
 /**
@@ -151,7 +156,8 @@ export const extractContentFromUrl = async (
   apiKey?: string
 ): Promise<AIExtractionResult> => {
   const key = getApiKey(apiKey);
-  const model = initGemini(key);
+  // Triple the default token limit for more detailed extractions (2048 -> 6144)
+  const model = initGemini(key, 6144);
 
   // Fetch the actual content from the URL
   const urlContent = await fetchUrlContent(url);
@@ -220,10 +226,13 @@ Important rules:
  */
 export const summarizeText = async (text: string, apiKey?: string): Promise<string> => {
   const key = getApiKey(apiKey);
-  const model = initGemini(key);
+  // Triple the default token limit for longer, more detailed summaries (2048 -> 6144)
+  const model = initGemini(key, 6144);
 
   const prompt = `
-Please provide a concise summary of the following text in Hebrew:
+Please provide a detailed and comprehensive summary of the following text in Hebrew.
+The summary should be thorough and include all important details, key points, and main ideas.
+Aim for a summary that is about 3 times longer than a typical brief summary.
 
 ${text}
 

@@ -23,18 +23,18 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseStyles = 'rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseStyles = 'rounded-xl font-medium transition-smooth disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantStyles = {
-    primary: 'bg-primary text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700',
-    secondary: 'bg-secondary text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700',
-    danger: 'bg-danger text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700',
-    outline: 'border-2 border-primary text-primary hover:bg-primary hover:text-white dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:border-blue-600',
+    primary: 'bg-gradient-primary dark:bg-gradient-primary-dark text-white shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark hover:-translate-y-0.5',
+    secondary: 'bg-white text-gray-700 dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-card dark:hover:shadow-card-dark',
+    danger: 'bg-red-500 text-white shadow-button hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 hover:-translate-y-0.5',
+    outline: 'border-2 border-primary text-primary hover:bg-primary hover:text-white dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:border-blue-600 hover:-translate-y-0.5',
   };
 
   const sizeStyles = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-5 py-2.5 text-base',
     lg: 'px-6 py-3 text-lg',
   };
 
