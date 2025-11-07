@@ -66,6 +66,11 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     }
   }, [searchQuery, categoryNotes.length]);
 
+  // אם יש חיפוש ואין תוצאות, אל תציג את הקטגוריה
+  if (searchQuery.trim() && categoryNotes.length === 0) {
+    return null;
+  }
+
   const handleAddNote = () => {
     setEditingNote(null);
     setShowNoteForm(true);

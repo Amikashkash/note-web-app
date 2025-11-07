@@ -1,6 +1,6 @@
 {
   "name": "notes-app",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "אפליקציית פתקים מאורגנים בקטגוריות",
   "type": "module",
   "scripts": {
