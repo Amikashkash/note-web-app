@@ -295,7 +295,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
                 <button
                   key={note.id}
                   onClick={() => handleViewNote(note)}
-                  className="px-4 py-2 bg-gradient-note dark:bg-gradient-note-dark hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
+                  className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
                   style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
                 >
                   {note.isPinned && '📌 '}

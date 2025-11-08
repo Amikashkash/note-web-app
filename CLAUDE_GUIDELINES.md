@@ -51,6 +51,16 @@ For this project, increment patch version for each change.
   - Fix async loading issue
   ```
 
+### Push Approval Workflow ⚠️ IMPORTANT
+- **NEVER push to GitHub automatically**
+- **ALWAYS wait for user approval before pushing**
+- After making changes and committing locally:
+  1. Run build to verify changes work
+  2. Inform user about changes made
+  3. Tell user to test locally first
+  4. Wait for user's explicit approval to push
+  5. Only push after user confirms everything works
+
 ### Push Retry Strategy
 - If push fails with 403: branch name doesn't match session ID
 - If push fails with network error: retry with exponential backoff (2s, 4s, 8s, 16s)
