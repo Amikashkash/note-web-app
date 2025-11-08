@@ -105,7 +105,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           plainText += `מרכיבים:\n${resultToUse.content.ingredients?.join('\n') || ''}\n\n`;
           plainText += `הוראות הכנה:\n${resultToUse.content.steps?.join('\n') || ''}`;
         } else if (resultToUse.type === 'article') {
-          plainText = resultToUse.content.summary || resultToUse.rawText || '';
+          plainText = resultToUse.content.summary || resultToUse.content.text || '';
         } else if (resultToUse.type === 'general' && resultToUse.content.text) {
           // Text summary - use the text field directly
           plainText = resultToUse.content.text;

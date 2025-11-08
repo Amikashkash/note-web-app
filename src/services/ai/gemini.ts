@@ -209,13 +209,33 @@ Important rules:
     }
 
     const extracted: AIExtractionResult = JSON.parse(jsonMatch[0]);
-    extracted.rawText = text;
+    // Don't store rawText - we only want the clean Hebrew content
 
     return extracted;
   } catch (error) {
     console.error('Gemini AI Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to extract content: ${errorMessage}`);
+
+    // Check if error is from URL fetching
+    if (error instanceof Error && error.message.includes('לא ניתן לגשת לתוכן האתר')) {
+      throw error; // Re-throw the Hebrew error as-is
+    }
+
+    // For other errors, provide Hebrew error messages
+    const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
+
+    if (errorMessage.includes('API key')) {
+      throw new Error('מפתח API של Gemini לא מוגדר. אנא הגדר מפתח API בהגדרות.');
+    }
+
+    if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+      throw new Error('הגעת למגבלת השימוש ב-API של Gemini. נסה שוב מאוחר יותר.');
+    }
+
+    if (errorMessage.includes('JSON')) {
+      throw new Error('הבינה המלאכותית החזירה תשובה לא תקינה. נסה שוב.');
+    }
+
+    throw new Error(`שגיאה בחילוץ תוכן: ${errorMessage}`);
   }
 };
 
@@ -243,6 +263,18 @@ Summary:
     return response.text();
   } catch (error) {
     console.error('Gemini AI Error:', error);
-    throw new Error('Failed to summarize text');
+
+    // Provide Hebrew error messages
+    const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
+
+    if (errorMessage.includes('API key')) {
+      throw new Error('מפתח API של Gemini לא מוגדר. אנא הגדר מפתח API בהגדרות.');
+    }
+
+    if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+      throw new Error('הגעת למגבלת השימוש ב-API של Gemini. נסה שוב מאוחר יותר.');
+    }
+
+    throw new Error(`שגיאה בסיכום טקסט: ${errorMessage}`);
   }
 };

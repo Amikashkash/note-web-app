@@ -69,8 +69,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
           title: 'סיכום טקסט',
           content: {
             text: summary
-          },
-          rawText: summary
+          }
         };
         setResult(extracted);
         onContentExtracted?.(extracted);
