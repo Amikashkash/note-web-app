@@ -68,7 +68,9 @@ For this project, increment patch version for each change.
 ## Testing Changes
 
 ### Before Committing
-1. **Build check**: Run `npm run build` (or `npx vite build` to skip TypeScript errors)
+1. **Build check**: Run `npx vite build` (NOT `npm run build`)
+   - ALWAYS use `npx vite build` to skip pre-existing TypeScript errors
+   - `npm run build` will fail due to TypeScript errors in Firebase code
 2. **Visual check**: Verify in browser if possible
 3. **Version check**: Confirm version number is updated and visible
 
@@ -115,10 +117,11 @@ For this project, increment patch version for each change.
 ## Code Quality
 
 ### TypeScript Errors
-- Pre-existing TypeScript errors may exist
-- Use `npx vite build` if `npm run build` fails due to TS errors
+- Pre-existing TypeScript errors exist in Firebase API code
+- **ALWAYS use `npx vite build`** - never use `npm run build`
+- These errors don't affect runtime or production builds
 - Don't introduce new TypeScript errors
-- Document if you need to work around existing errors
+- GitHub Actions workflow uses `npx vite build` to skip TS checks
 
 ### Console Logs
 - Use for debugging during development
