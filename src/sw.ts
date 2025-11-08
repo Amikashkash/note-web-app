@@ -18,11 +18,17 @@ precacheAndRoute(self.__WB_MANIFEST);
 // Cleanup old caches
 cleanupOutdatedCaches();
 
-// Route for navigation requests
+// Route for navigation requests - always try network first with short timeout
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
       cacheName: 'pages-cache',
+      networkTimeoutSeconds: 3, // Fallback to cache after 3 seconds
+      plugins: [
+        new CacheableResponsePlugin({
+          statuses: [0, 200],
+        }),
+      ],
     })
   )
 );
@@ -45,11 +51,40 @@ registerRoute(
   'GET'
 );
 
-// Cache Firebase Storage
+// Don't cache Firebase API calls (Firestore, Auth, Functions)
+// These need to always be fresh to avoid stale data
+registerRoute(
+  /^https:\/\/firestore\.googleapis\.com\/.*/i,
+  new NetworkFirst({
+    cacheName: 'firestore-api',
+    networkTimeoutSeconds: 5,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 0, // Don't cache
+      }),
+    ],
+  })
+);
+
+registerRoute(
+  /^https:\/\/.*\.firebaseapp\.com\/.*/i,
+  new NetworkFirst({
+    cacheName: 'firebase-app',
+    networkTimeoutSeconds: 5,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 0, // Don't cache
+      }),
+    ],
+  })
+);
+
+// Cache Firebase Storage (images, files, etc.)
 registerRoute(
   /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
   new NetworkFirst({
     cacheName: 'firebase-storage-cache',
+    networkTimeoutSeconds: 5,
     plugins: [
       new ExpirationPlugin({
         maxEntries: 50,
