@@ -27,7 +27,7 @@ export const Home: React.FC = () => {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="flex flex-col">
                 <h1 className="text-xl sm:text-3xl font-bold text-white whitespace-nowrap">📝 פתקים</h1>
-                <span className="text-[8px] sm:text-[10px] text-white/60">v1.2.4</span>
+                <span className="text-[8px] sm:text-[10px] text-white/60">v1.2.6</span>
               </div>
 
               {/* שדה חיפוש */}
