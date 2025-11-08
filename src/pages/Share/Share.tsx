@@ -34,6 +34,7 @@ export const Share: React.FC = () => {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [workplanMainTitle, setWorkplanMainTitle] = useState(''); // For work plan library name
   const [actionMode, setActionMode] = useState<ActionMode>('new');
   const [templateMode, setTemplateMode] = useState<TemplateMode>('ai');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -238,7 +239,7 @@ export const Share: React.FC = () => {
             content: content,
           };
           noteContent = JSON.stringify([section]);
-          noteTitle = ''; // Leave main title empty for user to fill (library name)
+          noteTitle = workplanMainTitle; // Use the main title user entered
         }
 
         await createNote({
@@ -418,16 +419,39 @@ export const Share: React.FC = () => {
             </div>
           )}
 
-          {/* Title */}
+          {/* Work Plan Main Title (only for new work plan notes) */}
+          {actionMode === 'new' && templateMode === 'workplan' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                שם הספרייה (כותרת ראשית) *
+              </label>
+              <Input
+                type="text"
+                value={workplanMainTitle}
+                onChange={(e) => setWorkplanMainTitle(e.target.value)}
+                placeholder='לדוגמה: "📚 מדריכי React" או "🎬 סרטוני הדרכה"'
+                disabled={saving || aiProcessing}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                💡 זו הכותרת הראשית של הספרייה - תוכל להוסיף עוד קישורים לאותה ספרייה מאוחר יותר
+              </p>
+            </div>
+          )}
+
+          {/* Title (section title for work plan, note title for others) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              כותרת:
+              {actionMode === 'new' && templateMode === 'workplan' ? 'כותרת הסעיף:' : 'כותרת:'}
             </label>
             <Input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="הזן כותרת לפתק..."
+              placeholder={
+                actionMode === 'new' && templateMode === 'workplan'
+                  ? 'כותרת הקישור/סעיף הראשון...'
+                  : 'הזן כותרת לפתק...'
+              }
               disabled={saving || aiProcessing}
             />
           </div>
@@ -542,7 +566,8 @@ export const Share: React.FC = () => {
                 aiProcessing ||
                 (actionMode === 'new' && !selectedCategoryId) ||
                 (actionMode === 'append' && !selectedNoteId) ||
-                (!title.trim() && !content.trim())
+                (!title.trim() && !content.trim()) ||
+                (actionMode === 'new' && templateMode === 'workplan' && !workplanMainTitle.trim())
               }
               className="flex-1"
             >
