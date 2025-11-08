@@ -41,6 +41,7 @@ export const Share: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [swNotActive, setSwNotActive] = useState(false);
 
   // Detect content type
   const hasUrl = !!sharedUrl;
@@ -52,7 +53,8 @@ export const Share: React.FC = () => {
       const shareId = searchParams.get('shareId');
 
       if (shareId) {
-        // Load from cache (POST method)
+        // Load from cache (POST method via Service Worker)
+        console.log('🔍 Loading share data from cache with ID:', shareId);
         try {
           const cache = await caches.open('share-data-cache');
           const response = await cache.match(`/share-data/${shareId}`);
@@ -62,21 +64,44 @@ export const Share: React.FC = () => {
             setSharedTitle(data.title || '');
             setSharedText(data.text || '');
             setSharedUrl(data.url || '');
-            console.log('✅ Loaded share data from cache:', shareId);
+            console.log('✅ Loaded share data from cache:', {
+              titleLength: (data.title || '').length,
+              textLength: (data.text || '').length,
+              urlLength: (data.url || '').length,
+            });
 
             // Clean up old cache entry
             await cache.delete(`/share-data/${shareId}`);
           } else {
             console.warn('⚠️ Share data not found in cache:', shareId);
+            console.log('💡 This might happen if the Service Worker was not active during share');
           }
         } catch (error) {
           console.error('❌ Error loading share data from cache:', error);
         }
       } else {
-        // Load from URL params (GET method - fallback)
-        setSharedTitle(searchParams.get('title') || '');
-        setSharedText(searchParams.get('text') || '');
-        setSharedUrl(searchParams.get('url') || '');
+        // Load from URL params (GET method - fallback for when SW is not active)
+        console.log('📄 Loading share data from URL params (GET fallback)');
+        const title = searchParams.get('title') || '';
+        const text = searchParams.get('text') || '';
+        const url = searchParams.get('url') || '';
+
+        console.log('📊 URL params data:', {
+          titleLength: title.length,
+          textLength: text.length,
+          urlLength: url.length,
+        });
+
+        setSharedTitle(title);
+        setSharedText(text);
+        setSharedUrl(url);
+
+        // If all params are empty, might be arriving from direct POST that wasn't intercepted
+        if (!title && !text && !url) {
+          console.warn('⚠️ No share data found in URL params or cache');
+          console.log('💡 Service Worker might not be active. Try refreshing the app first.');
+          setSwNotActive(true);
+        }
       }
     };
 
@@ -426,6 +451,16 @@ export const Share: React.FC = () => {
                   <div className="text-xs font-medium text-gray-700 dark:text-gray-300">תכנית עבודה</div>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Service Worker Not Active Warning */}
+          {swNotActive && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium mb-2">⚠️ לא התקבל תוכן לשיתוף</p>
+              <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                ייתכן שזה קרה כי האפליקציה עדיין לא הייתה פעילה. אנא פתח את האפליקציה קודם ואז נסה לשתף שוב.
+              </p>
             </div>
           )}
 

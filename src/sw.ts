@@ -34,7 +34,11 @@ self.addEventListener('fetch', (event) => {
           const text = formData.get('text') || '';
           const urlParam = formData.get('url') || '';
 
-          console.log('📦 SW: Received share data, title length:', String(title).length, 'text length:', String(text).length);
+          console.log('📦 SW: Received share data:');
+          console.log('  - Title length:', String(title).length);
+          console.log('  - Text length:', String(text).length);
+          console.log('  - URL length:', String(urlParam).length);
+          console.log('  - URL:', urlParam ? String(urlParam).substring(0, 100) + '...' : '(empty)');
 
           // Store shared data in cache with unique ID
           const shareId = `share-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
