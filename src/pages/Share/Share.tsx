@@ -196,17 +196,54 @@ export const Share: React.FC = () => {
           throw new Error('לא נמצא פתק');
         }
 
+        let updatedContent = existingNote.content;
+
+        // If appending to a workplan note, add as new section
+        if (existingNote.templateType === 'workplan') {
+          try {
+            const sections = JSON.parse(existingNote.content || '[]');
+            const newSection = {
+              id: Date.now().toString(),
+              header: title || 'קישור משותף',
+              content: content,
+            };
+            sections.push(newSection);
+            updatedContent = JSON.stringify(sections);
+          } catch (e) {
+            // If parsing fails, treat as plain text
+            updatedContent = existingNote.content + '\n\n' + content;
+          }
+        } else {
+          // For plain notes, just append
+          updatedContent = existingNote.content + '\n\n' + content;
+        }
+
         await updateNote(selectedNoteId, {
           ...existingNote,
-          content: existingNote.content + '\n\n' + content,
+          content: updatedContent,
         });
       } else {
         // Create new note
         const templateType: TemplateType = templateMode === 'workplan' ? 'workplan' : 'plain';
 
+        // For workplan template, create a section with shared title and content
+        let noteContent = content;
+        let noteTitle = title || 'פתק משותף';
+
+        if (templateMode === 'workplan') {
+          // Create a work plan section from shared content
+          const section = {
+            id: Date.now().toString(),
+            header: title || 'קישור משותף',
+            content: content,
+          };
+          noteContent = JSON.stringify([section]);
+          noteTitle = ''; // Leave main title empty for user to fill (library name)
+        }
+
         await createNote({
-          title: title || 'פתק משותף',
-          content,
+          title: noteTitle,
+          content: noteContent,
           categoryId: selectedCategoryId,
           templateType,
           userId: user.uid,
