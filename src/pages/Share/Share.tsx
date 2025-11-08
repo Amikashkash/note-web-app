@@ -1,5 +1,6 @@
 /**
  * Share Page - Handles incoming shared content from other apps via Web Share Target API
+ * Now with smart template selection and append-to-existing-note functionality
  */
 
 import React, { useEffect, useState } from 'react';
@@ -7,9 +8,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { useNoteStore } from '@/store/noteStore';
+import { useNotes } from '@/hooks/useNotes';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
+import { extractContentFromUrl, summarizeText } from '@/services/ai/gemini';
+import { getGeminiApiKey } from '@/services/api/userSettings';
+import type { TemplateType } from '@/types/note';
+
+type ActionMode = 'new' | 'append';
+type TemplateMode = 'ai' | 'plain' | 'workplan';
 
 export const Share: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +25,7 @@ export const Share: React.FC = () => {
   const { user } = useAuthStore();
   const { categories, subscribeToCategories } = useCategoryStore();
   const { createNote } = useNoteStore();
+  const { allNotes } = useNotes();
 
   // Extract shared data from URL params
   const sharedTitle = searchParams.get('title') || '';
@@ -25,9 +34,18 @@ export const Share: React.FC = () => {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [actionMode, setActionMode] = useState<ActionMode>('new');
+  const [templateMode, setTemplateMode] = useState<TemplateMode>('ai');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedNoteId, setSelectedNoteId] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Detect content type
+  const hasUrl = !!sharedUrl;
+  const hasText = !!sharedText;
 
   // Load categories when user is available
   useEffect(() => {
@@ -46,7 +64,7 @@ export const Share: React.FC = () => {
     }
   }, [categories, selectedCategoryId]);
 
-  // Load shared content once
+  // Load shared content and decide on smart defaults
   useEffect(() => {
     // If not logged in, redirect to login
     if (!user) {
@@ -54,26 +72,98 @@ export const Share: React.FC = () => {
       return;
     }
 
-    // Build content from shared data
-    let combinedContent = '';
-
+    // Set title from shared data
     if (sharedTitle) {
       setTitle(sharedTitle);
     }
 
+    // Smart default: If URL provided, default to AI mode
+    if (hasUrl) {
+      setTemplateMode('ai');
+    } else if (hasText) {
+      setTemplateMode('plain');
+    }
+
+    // Build initial content
+    let combinedContent = '';
     if (sharedText) {
       combinedContent += sharedText;
     }
-
     if (sharedUrl) {
       if (combinedContent) {
         combinedContent += '\n\n';
       }
       combinedContent += sharedUrl;
     }
-
     setContent(combinedContent);
-  }, [user, navigate, sharedTitle, sharedText, sharedUrl]);
+  }, [user, navigate, sharedTitle, sharedText, sharedUrl, hasUrl, hasText]);
+
+  // Smart AI processing when template changes to AI
+  useEffect(() => {
+    if (templateMode === 'ai' && content && !aiProcessing && !aiError) {
+      handleAIProcess();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateMode]);
+
+  const handleAIProcess = async () => {
+    if (!user) return;
+
+    setAiProcessing(true);
+    setAiError(null);
+
+    try {
+      // Get API key
+      let apiKey: string | undefined;
+      try {
+        apiKey = (await getGeminiApiKey(user.uid)) || undefined;
+      } catch (e) {
+        // Use environment variable
+      }
+
+      if (hasUrl) {
+        // Process URL with AI
+        const result = await extractContentFromUrl(sharedUrl, apiKey);
+        setTitle(result.title || sharedTitle || 'סיכום מקישור');
+
+        // Format content based on type
+        if (result.type === 'general' && result.content.text) {
+          setContent(result.content.text);
+        } else if (result.type === 'recipe') {
+          let recipeText = '';
+          if (result.content.ingredients) {
+            recipeText += `מרכיבים:\n${result.content.ingredients.join('\n')}\n\n`;
+          }
+          if (result.content.steps) {
+            recipeText += `הוראות הכנה:\n${result.content.steps.join('\n')}`;
+          }
+          setContent(recipeText);
+        } else if (result.type === 'article' && result.content.summary) {
+          setContent(result.content.summary);
+        } else {
+          setContent(JSON.stringify(result.content, null, 2));
+        }
+      } else if (hasText) {
+        // Process text with AI
+        const summary = await summarizeText(sharedText, apiKey);
+        setTitle(sharedTitle || 'סיכום טקסט');
+        setContent(summary);
+      }
+    } catch (error) {
+      console.error('AI processing error:', error);
+      setAiError(error instanceof Error ? error.message : 'שגיאה בעיבוד AI');
+      // Keep original content on error
+      let combinedContent = '';
+      if (sharedText) combinedContent += sharedText;
+      if (sharedUrl) {
+        if (combinedContent) combinedContent += '\n\n';
+        combinedContent += sharedUrl;
+      }
+      setContent(combinedContent);
+    } finally {
+      setAiProcessing(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {
@@ -81,8 +171,13 @@ export const Share: React.FC = () => {
       return;
     }
 
-    if (!selectedCategoryId) {
+    if (actionMode === 'new' && !selectedCategoryId) {
       alert('אנא בחר קטגוריה');
+      return;
+    }
+
+    if (actionMode === 'append' && !selectedNoteId) {
+      alert('אנא בחר פתק');
       return;
     }
 
@@ -94,18 +189,35 @@ export const Share: React.FC = () => {
     setSaving(true);
 
     try {
-      await createNote({
-        title: title || 'פתק משותף',
-        content,
-        categoryId: selectedCategoryId,
-        templateType: 'plain',
-        userId: user.uid,
-        tags: [],
-        color: null,
-        order: 0,
-        sharedWith: [],
-        isPinned: false,
-      });
+      if (actionMode === 'append') {
+        // Append to existing note
+        const existingNote = allNotes.find(n => n.id === selectedNoteId);
+        if (!existingNote) {
+          throw new Error('לא נמצא פתק');
+        }
+
+        const { updateNote } = useNotes.getState();
+        await updateNote(selectedNoteId, {
+          ...existingNote,
+          content: existingNote.content + '\n\n' + content,
+        });
+      } else {
+        // Create new note
+        const templateType: TemplateType = templateMode === 'workplan' ? 'workplan' : 'plain';
+
+        await createNote({
+          title: title || 'פתק משותף',
+          content,
+          categoryId: selectedCategoryId,
+          templateType,
+          userId: user.uid,
+          tags: [],
+          color: null,
+          order: 0,
+          sharedWith: [],
+          isPinned: false,
+        });
+      }
 
       // Navigate to home after successful save
       navigate('/', { replace: true });
@@ -119,6 +231,11 @@ export const Share: React.FC = () => {
   const handleCancel = () => {
     navigate('/', { replace: true });
   };
+
+  // Get notes for selected category (for append mode)
+  const categoryNotes = selectedCategoryId
+    ? allNotes.filter(n => n.categoryId === selectedCategoryId)
+    : [];
 
   // Show loading while checking auth
   if (!user) {
@@ -154,12 +271,117 @@ export const Share: React.FC = () => {
             <span>שמירת תוכן משותף</span>
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            תוכן שהתקבל משיתוף מאפליקציה אחרת
+            {hasUrl ? '🌐 קישור התקבל' : '📝 טקסט התקבל'}
           </p>
         </div>
 
         {/* Form */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 space-y-4">
+          {/* Action Mode Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              פעולה:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setActionMode('new')}
+                disabled={saving || aiProcessing}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  actionMode === 'new'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                }`}
+              >
+                <div className="text-2xl mb-1">✨</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">פתק חדש</div>
+              </button>
+              <button
+                onClick={() => setActionMode('append')}
+                disabled={saving || aiProcessing}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  actionMode === 'append'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                }`}
+              >
+                <div className="text-2xl mb-1">➕</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">הוסף לפתק</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Template Mode Selection (only for new notes) */}
+          {actionMode === 'new' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                תבנית:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setTemplateMode('ai')}
+                  disabled={saving || aiProcessing}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    templateMode === 'ai'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">🤖</div>
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300">AI סיכום</div>
+                </button>
+                <button
+                  onClick={() => setTemplateMode('plain')}
+                  disabled={saving || aiProcessing}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    templateMode === 'plain'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">📝</div>
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300">טקסט חופשי</div>
+                </button>
+                <button
+                  onClick={() => setTemplateMode('workplan')}
+                  disabled={saving || aiProcessing}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    templateMode === 'workplan'
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">📋</div>
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300">תכנית עבודה</div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* AI Processing Status */}
+          {aiProcessing && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="animate-spin text-2xl">🤖</div>
+                <div>
+                  <p className="font-medium text-blue-800 dark:text-blue-300">מעבד עם AI...</p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    {hasUrl ? 'מנתח קישור ומסכם' : 'מסכם טקסט'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AI Error */}
+          {aiError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-sm text-red-700 dark:text-red-300">⚠️ {aiError}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                התוכן המקורי נשמר למטה
+              </p>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -170,7 +392,7 @@ export const Share: React.FC = () => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="הזן כותרת לפתק..."
-              disabled={saving}
+              disabled={saving || aiProcessing}
             />
           </div>
 
@@ -183,45 +405,117 @@ export const Share: React.FC = () => {
               value={content}
               onChange={setContent}
               placeholder="תוכן הפתק..."
-              disabled={saving}
+              disabled={saving || aiProcessing}
               rows={10}
             />
           </div>
 
-          {/* Category Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              קטגוריה:
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {categories.map((category) => (
-                <Button
-                  key={category.id}
-                  onClick={() => setSelectedCategoryId(category.id)}
-                  variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
-                  disabled={saving}
-                  className="justify-start"
-                >
-                  <span className="text-lg">{category.icon || '📁'}</span>
-                  <span className="truncate">{category.name}</span>
-                </Button>
-              ))}
+          {/* Category Selection (for new notes) */}
+          {actionMode === 'new' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                קטגוריה:
+              </label>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    onClick={() => setSelectedCategoryId(category.id)}
+                    variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
+                    disabled={saving || aiProcessing}
+                    className="justify-start"
+                  >
+                    <span className="text-lg">{category.icon || '📁'}</span>
+                    <span className="truncate">{category.name}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Note Selection (for append mode) */}
+          {actionMode === 'append' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  בחר קטגוריה:
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                  {categories.map((category) => (
+                    <Button
+                      key={category.id}
+                      onClick={() => {
+                        setSelectedCategoryId(category.id);
+                        setSelectedNoteId('');
+                      }}
+                      variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
+                      disabled={saving || aiProcessing}
+                      className="justify-start text-sm"
+                    >
+                      <span>{category.icon || '📁'}</span>
+                      <span className="truncate">{category.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCategoryId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    בחר פתק להוספה:
+                  </label>
+                  {categoryNotes.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border dark:border-gray-700 rounded-lg p-2">
+                      {categoryNotes.map((note) => (
+                        <button
+                          key={note.id}
+                          onClick={() => setSelectedNoteId(note.id)}
+                          disabled={saving || aiProcessing}
+                          className={`p-3 rounded-lg border-2 text-right transition-all ${
+                            selectedNoteId === note.id
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="font-medium text-sm text-gray-800 dark:text-gray-200">
+                            {note.isPinned && '📌 '}
+                            {note.title}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                            {note.content.substring(0, 60)}...
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 p-4 text-center border dark:border-gray-700 rounded-lg">
+                      אין פתקים בקטגוריה זו
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
             <Button
               onClick={handleSave}
-              disabled={saving || !selectedCategoryId || (!title.trim() && !content.trim())}
+              disabled={
+                saving ||
+                aiProcessing ||
+                (actionMode === 'new' && !selectedCategoryId) ||
+                (actionMode === 'append' && !selectedNoteId) ||
+                (!title.trim() && !content.trim())
+              }
               className="flex-1"
             >
-              {saving ? '⏳ שומר...' : '✓ שמור פתק'}
+              {saving ? '⏳ שומר...' : actionMode === 'append' ? '➕ הוסף לפתק' : '✓ שמור פתק'}
             </Button>
             <Button
               onClick={handleCancel}
               variant="secondary"
-              disabled={saving}
+              disabled={saving || aiProcessing}
             >
               ביטול
             </Button>
@@ -243,18 +537,19 @@ export const Share: React.FC = () => {
               </div>
             </div>
           )}
-          {categories.length > 0 && !selectedCategoryId && (
-            <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
-              💡 בוחר קטגוריה אוטומטית...
-            </div>
-          )}
         </div>
 
         {/* Info */}
-        <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            💡 <strong>טיפ:</strong> עכשיו תוכל לשתף תוכן מכל אפליקציה ישירות לפתקים שלך!
+        <div className="mt-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+          <p className="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">
+            ✨ שיתוף חכם עם AI!
           </p>
+          <ul className="text-xs text-purple-700 dark:text-purple-400 space-y-1">
+            <li>🤖 סיכום AI - מסכם קישורים וטקסטים באופן אוטומטי</li>
+            <li>📝 טקסט חופשי - שמירה ישירה ללא עיבוד</li>
+            <li>📋 תכנית עבודה - מושלם לספריית קישורים</li>
+            <li>➕ הוסף לפתק קיים - צבור קישורים באותו פתק</li>
+          </ul>
         </div>
       </div>
     </div>
