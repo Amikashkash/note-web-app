@@ -141,7 +141,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     <div
       onDragOver={onDragOver ? handleDragOver : undefined}
       onDrop={onDrop ? handleDrop : undefined}
-      className={`flex-shrink-0 min-w-[200px] w-64 h-44 bg-gradient-note rounded-note p-4 shadow-note dark:shadow-note-dark transition-smooth flex flex-col cursor-pointer ${
+      className={`flex-shrink-0 min-w-[200px] w-full sm:w-64 h-44 bg-gradient-note rounded-note p-4 shadow-note dark:shadow-note-dark transition-smooth flex flex-col cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isDragOver ? 'ring-2 ring-primary-start shadow-note-hover dark:shadow-note-hover-dark scale-105' : 'hover:shadow-note-hover dark:hover:shadow-note-hover-dark hover:-translate-y-1'
