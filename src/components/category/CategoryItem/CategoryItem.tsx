@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Category } from '@/types';
 import { useNotes } from '@/hooks/useNotes';
 import { useAuthStore } from '@/store/authStore';
@@ -24,6 +25,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   category,
   searchQuery = '',
 }) => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
   const { categories } = useCategoryStore();
@@ -252,8 +254,17 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             {isExpanded ? '▼' : '◀'}
           </button>
           {category.icon && <span className="text-2xl">{category.icon}</span>}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{category.name}</h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{category.name}</h3>
+              <button
+                onClick={() => navigate(`/category/${category.id}`)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="פתח בתצוגה מלאה"
+              >
+                🔍 הצג הכל
+              </button>
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">{categoryNotes.length} פתקים</p>
           </div>
         </div>

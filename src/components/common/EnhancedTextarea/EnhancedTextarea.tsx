@@ -151,6 +151,20 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         }, 0);
         return;
       }
+
+      // Enter רגיל - גלילה אוטומטית כדי להראות את השורה החדשה
+      setTimeout(() => {
+        if (!textarea) return;
+        // גלילה כדי להראות את הסמן בשורה החדשה
+        const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.substring(0, cursorPos);
+        const cursorLine = textBeforeCursor.split('\n').length;
+
+        // גלול כך שהסמן יהיה 3 שורות מלמעלה של ה-textarea
+        const scrollTarget = Math.max(0, (cursorLine - 3) * lineHeight);
+        textarea.scrollTop = scrollTarget;
+      }, 0);
     }
   };
 
@@ -189,6 +203,38 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   };
 
   /**
+   * טיפול בהדבקה ידנית (למובייל)
+   */
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = value.substring(0, start) + text + value.substring(end);
+
+      onChange(newText);
+
+      // החזרת הסמן למיקום הנכון
+      setTimeout(() => {
+        const newPos = start + text.length;
+        textarea.setSelectionRange(newPos, newPos);
+        textarea.focus();
+      }, 0);
+    } catch (err) {
+      console.error('Failed to read clipboard:', err);
+      // אם אין הרשאה, נסה להשתמש ב-execCommand (fallback ישן)
+      try {
+        document.execCommand('paste');
+      } catch (e) {
+        alert('לא ניתן להדביק. אנא נסה שוב או השתמש בתפריט ההדבקה של הדפדפן.');
+      }
+    }
+  };
+
+  /**
    * כפתורי עיצוב
    */
   const FormatButton: React.FC<{ label: string; onClick: () => void; title: string }> = ({ label, onClick, title }) => (
@@ -197,7 +243,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded border border-gray-300 dark:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
     >
       {label}
     </button>
@@ -206,8 +252,13 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   return (
     <div className="w-full">
       {/* סרגל כלים */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-gray-200">
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex gap-2 flex-wrap">
+          <FormatButton
+            label="📋 הדבק"
+            onClick={handlePaste}
+            title="הדבק טקסט מהלוח (מיועד למובייל)"
+          />
           <FormatButton
             label="מודגש"
             onClick={() => insertFormatting('**', '**')}
@@ -219,8 +270,8 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
             title="טקסט נטוי"
           />
         </div>
-        <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
-        <span className="text-xs text-gray-500">
+        <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           טיפים: 1. למספור | * לנקודות
         </span>
       </div>

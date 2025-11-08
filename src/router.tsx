@@ -10,6 +10,7 @@ import CategoriesManagement from '@/pages/CategoriesManagement/CategoriesManagem
 import { Archive } from '@/pages/Archive';
 import { Settings } from '@/pages/Settings';
 import { Share } from '@/pages/Share';
+import { CategoryView } from '@/pages/CategoryView';
 
 export const router = createBrowserRouter([
   {
@@ -53,6 +54,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Share />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/category/:categoryId',
+    element: (
+      <ProtectedRoute>
+        <CategoryView />
       </ProtectedRoute>
     ),
   },
