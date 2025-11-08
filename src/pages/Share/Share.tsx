@@ -25,7 +25,7 @@ export const Share: React.FC = () => {
   const { user } = useAuthStore();
   const { categories, subscribeToCategories } = useCategoryStore();
   const { createNote } = useNoteStore();
-  const { allNotes } = useNotes();
+  const { allNotes, updateNote } = useNotes();
 
   // Extract shared data from URL params
   const sharedTitle = searchParams.get('title') || '';
@@ -196,7 +196,6 @@ export const Share: React.FC = () => {
           throw new Error('לא נמצא פתק');
         }
 
-        const { updateNote } = useNotes.getState();
         await updateNote(selectedNoteId, {
           ...existingNote,
           content: existingNote.content + '\n\n' + content,
