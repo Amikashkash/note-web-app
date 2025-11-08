@@ -287,9 +287,10 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         rows={rows}
         className={`
           w-full px-4 py-3
-          border border-gray-300 rounded-lg
+          border border-gray-300 dark:border-gray-600 rounded-lg
+          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
           focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
-          disabled:bg-gray-100 disabled:cursor-not-allowed
+          disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed
           resize-y
           font-sans
           ${className}
