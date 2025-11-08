@@ -163,7 +163,7 @@ export const extractContentFromUrl = async (
   const urlContent = await fetchUrlContent(url);
 
   const prompt = `
-You are a content extraction assistant. Analyze the following content from a URL and extract structured information.
+You are a content summarization assistant. Provide a detailed and comprehensive summary of the following content in Hebrew.
 
 URL: ${url}
 
@@ -175,22 +175,20 @@ Please analyze this content and respond with a JSON object in this exact format:
   "type": "recipe" | "shopping" | "article" | "stock" | "general",
   "title": "Title of the content",
   "content": {
-    // Structure based on type:
-    // For "recipe": { "servings": "", "prepTime": "", "cookTime": "", "ingredients": ["item1", "item2"], "steps": ["step1", "step2"] }
-    // For "shopping": { "items": [{"name": "item", "quantity": "", "category": ""}] }
-    // For "article": { "summary": "...", "keyPoints": ["point1", "point2"] }
-    // For "stock": { "symbol": "", "price": "", "change": "", "summary": "" }
-    // For "general": { "text": "..." }
+    "text": "Detailed summary in Hebrew - include ALL important details, key points, and main ideas. The summary should be thorough and comprehensive, about 3 times longer than a typical brief summary."
   }
 }
 
 Important rules:
 1. Detect the content type accurately (recipe, shopping list, article, stock info, or general)
-2. Extract all relevant information
-3. For recipes: include ALL ingredients with quantities and ALL steps in order
-4. For shopping lists: categorize items if possible
-5. Return ONLY valid JSON, no markdown, no explanations
-6. Use Hebrew for summaries when possible
+2. Provide a DETAILED and COMPREHENSIVE summary in Hebrew
+3. Include ALL important information, key points, dates, numbers, and context
+4. For recipes: include ALL ingredients with quantities and ALL steps in clear order
+5. For shopping lists: list all items with details
+6. For articles: provide thorough summary with all key points and takeaways
+7. The summary should be extensive and detailed - aim for completeness, not brevity
+8. Return ONLY valid JSON, no markdown, no explanations
+9. Always write the summary in Hebrew
 `;
 
   try {
