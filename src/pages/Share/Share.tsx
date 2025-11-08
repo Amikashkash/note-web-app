@@ -42,10 +42,49 @@ export const Share: React.FC = () => {
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [swNotActive, setSwNotActive] = useState(false);
+  const [checkingSW, setCheckingSW] = useState(true);
+  const [swReady, setSwReady] = useState(false);
 
   // Detect content type
   const hasUrl = !!sharedUrl;
   const hasText = !!sharedText;
+
+  // Check if Service Worker is ready on mount
+  useEffect(() => {
+    const checkServiceWorker = async () => {
+      console.log('🔍 Checking Service Worker status...');
+
+      if (!('serviceWorker' in navigator)) {
+        console.error('❌ Service Worker not supported');
+        setCheckingSW(false);
+        setSwReady(false);
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const isActive = registration.active !== null;
+
+        console.log('✅ Service Worker status:', {
+          active: isActive,
+          state: registration.active?.state,
+        });
+
+        setSwReady(isActive);
+        setCheckingSW(false);
+
+        if (!isActive) {
+          console.warn('⚠️ Service Worker not active - share may fail with long content');
+        }
+      } catch (error) {
+        console.error('❌ Error checking Service Worker:', error);
+        setCheckingSW(false);
+        setSwReady(false);
+      }
+    };
+
+    checkServiceWorker();
+  }, []);
 
   // Load shared data from cache or URL params
   useEffect(() => {
@@ -370,6 +409,26 @@ export const Share: React.FC = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {hasUrl ? '🌐 קישור התקבל' : '📝 טקסט התקבל'}
           </p>
+
+          {/* Service Worker Status Indicator */}
+          {checkingSW && (
+            <div className="mt-3 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <span className="animate-spin">⚙️</span>
+              <span>בודק מוכנות מערכת...</span>
+            </div>
+          )}
+          {!checkingSW && swReady && (
+            <div className="mt-3 text-xs text-green-600 dark:text-green-400 flex items-center gap-2">
+              <span>✅</span>
+              <span>מוכן לשיתוף תוכן</span>
+            </div>
+          )}
+          {!checkingSW && !swReady && (
+            <div className="mt-3 text-xs text-orange-600 dark:text-orange-400 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>מצב תאימות מוגבל - שיתוף טקסטים קצרים בלבד</span>
+            </div>
+          )}
         </div>
 
         {/* Form */}
@@ -458,9 +517,21 @@ export const Share: React.FC = () => {
           {swNotActive && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
               <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium mb-2">⚠️ לא התקבל תוכן לשיתוף</p>
-              <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                ייתכן שזה קרה כי האפליקציה עדיין לא הייתה פעילה. אנא פתח את האפליקציה קודם ואז נסה לשתף שוב.
+              <p className="text-xs text-yellow-700 dark:text-yellow-400 mb-3">
+                זה קורה כאשר משתפים תוכן לפני שהאפליקציה נטענה לחלוטין. כדי לתקן את זה:
               </p>
+              <ol className="text-xs text-yellow-700 dark:text-yellow-400 list-decimal list-inside space-y-1 mb-3">
+                <li>פתח את האפליקציה ישירות (לא דרך שיתוף)</li>
+                <li>המתן 2-3 שניות שהאפליקציה תיטען</li>
+                <li>עכשיו נסה לשתף שוב את התוכן</li>
+              </ol>
+              <Button
+                onClick={() => navigate('/', { replace: true })}
+                size="sm"
+                className="w-full"
+              >
+                🏠 פתח את האפליקציה
+              </Button>
             </div>
           )}
 
