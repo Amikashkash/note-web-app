@@ -27,11 +27,9 @@ export const Share: React.FC = () => {
   const { createNote } = useNoteStore();
   const { allNotes, updateNote } = useNotes();
 
-  // Extract shared data from URL params
-  const sharedTitle = searchParams.get('title') || '';
-  const sharedText = searchParams.get('text') || '';
-  const sharedUrl = searchParams.get('url') || '';
-
+  const [sharedTitle, setSharedTitle] = useState('');
+  const [sharedText, setSharedText] = useState('');
+  const [sharedUrl, setSharedUrl] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [workplanMainTitle, setWorkplanMainTitle] = useState(''); // For work plan library name
@@ -47,6 +45,43 @@ export const Share: React.FC = () => {
   // Detect content type
   const hasUrl = !!sharedUrl;
   const hasText = !!sharedText;
+
+  // Load shared data from cache or URL params
+  useEffect(() => {
+    const loadSharedData = async () => {
+      const shareId = searchParams.get('shareId');
+
+      if (shareId) {
+        // Load from cache (POST method)
+        try {
+          const cache = await caches.open('share-data-cache');
+          const response = await cache.match(`/share-data/${shareId}`);
+
+          if (response) {
+            const data = await response.json();
+            setSharedTitle(data.title || '');
+            setSharedText(data.text || '');
+            setSharedUrl(data.url || '');
+            console.log('✅ Loaded share data from cache:', shareId);
+
+            // Clean up old cache entry
+            await cache.delete(`/share-data/${shareId}`);
+          } else {
+            console.warn('⚠️ Share data not found in cache:', shareId);
+          }
+        } catch (error) {
+          console.error('❌ Error loading share data from cache:', error);
+        }
+      } else {
+        // Load from URL params (GET method - fallback)
+        setSharedTitle(searchParams.get('title') || '');
+        setSharedText(searchParams.get('text') || '');
+        setSharedUrl(searchParams.get('url') || '');
+      }
+    };
+
+    loadSharedData();
+  }, [searchParams]);
 
   // Load categories when user is available
   useEffect(() => {

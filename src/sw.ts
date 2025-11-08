@@ -98,6 +98,59 @@ registerRoute(
   'GET'
 );
 
+// ==================== SHARE TARGET HANDLING ====================
+
+/**
+ * Handle POST requests from Web Share Target API
+ * Converts FormData to URL parameters and redirects
+ */
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Check if this is a share target POST request
+  if (event.request.method === 'POST' && url.pathname === '/share') {
+    event.respondWith(
+      (async () => {
+        try {
+          const formData = await event.request.formData();
+          const title = formData.get('title') || '';
+          const text = formData.get('text') || '';
+          const urlParam = formData.get('url') || '';
+
+          // Store shared data in cache with unique ID
+          const shareId = `share-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const cache = await caches.open('share-data-cache');
+
+          const shareData = {
+            title,
+            text,
+            url: urlParam,
+            timestamp: Date.now(),
+          };
+
+          // Store as a cache entry
+          await cache.put(
+            new Request(`/share-data/${shareId}`),
+            new Response(JSON.stringify(shareData), {
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+
+          console.log('✅ SW: Stored share data with ID:', shareId);
+
+          // Redirect to share page with share ID
+          const redirectUrl = `/share?shareId=${shareId}`;
+          return Response.redirect(redirectUrl, 303);
+        } catch (error) {
+          console.error('❌ SW: Error handling share POST:', error);
+          // Fallback to share page without data
+          return Response.redirect('/share', 303);
+        }
+      })()
+    );
+  }
+});
+
 // ==================== NOTIFICATION HANDLING ====================
 
 interface ReminderData {

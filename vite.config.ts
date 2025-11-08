@@ -31,6 +31,10 @@ export default defineConfig({
         lang: 'he',
         start_url: '/',
         scope: '/',
+        permissions: [
+          'clipboard-read',
+          'clipboard-write'
+        ],
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -59,8 +63,8 @@ export default defineConfig({
         ],
         share_target: {
           action: '/share',
-          method: 'GET',
-          enctype: 'application/x-www-form-urlencoded',
+          method: 'POST',
+          enctype: 'multipart/form-data',
           params: {
             title: 'title',
             text: 'text',
