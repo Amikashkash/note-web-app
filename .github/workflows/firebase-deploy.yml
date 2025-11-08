@@ -45,6 +45,6 @@ jobs:
       - name: Deploy Firestore rules and indexes
         uses: w9jds/firebase-action@master
         with:
-          args: deploy --only firestore
+          args: deploy --only firestore --project notes-4-me
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
