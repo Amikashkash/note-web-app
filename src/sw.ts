@@ -12,6 +12,72 @@ import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
+// ==================== SHARE TARGET HANDLING ====================
+// This MUST be before Workbox routes to intercept POST requests
+
+/**
+ * Handle POST requests from Web Share Target API
+ * Converts FormData to cache storage and redirects with short ID
+ */
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Check if this is a share target POST request
+  if (event.request.method === 'POST' && url.pathname === '/share') {
+    console.log('🔗 SW: Intercepting share POST request');
+
+    event.respondWith(
+      (async () => {
+        try {
+          const formData = await event.request.formData();
+          const title = formData.get('title') || '';
+          const text = formData.get('text') || '';
+          const urlParam = formData.get('url') || '';
+
+          console.log('📦 SW: Received share data, title length:', String(title).length, 'text length:', String(text).length);
+
+          // Store shared data in cache with unique ID
+          const shareId = `share-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const cache = await caches.open('share-data-cache');
+
+          const shareData = {
+            title,
+            text,
+            url: urlParam,
+            timestamp: Date.now(),
+          };
+
+          // Store as a cache entry
+          await cache.put(
+            new Request(`/share-data/${shareId}`),
+            new Response(JSON.stringify(shareData), {
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+
+          console.log('✅ SW: Stored share data with ID:', shareId);
+
+          // Get the origin for proper redirect
+          const origin = self.location.origin;
+          const redirectUrl = `${origin}/share?shareId=${shareId}`;
+
+          console.log('↩️ SW: Redirecting to:', redirectUrl);
+
+          return Response.redirect(redirectUrl, 303);
+        } catch (error) {
+          console.error('❌ SW: Error handling share POST:', error);
+          // Fallback to share page without data
+          const origin = self.location.origin;
+          return Response.redirect(`${origin}/share`, 303);
+        }
+      })()
+    );
+
+    // Prevent further event propagation
+    return;
+  }
+});
+
 // Precache all assets
 precacheAndRoute(self.__WB_MANIFEST);
 
@@ -97,59 +163,6 @@ registerRoute(
   }),
   'GET'
 );
-
-// ==================== SHARE TARGET HANDLING ====================
-
-/**
- * Handle POST requests from Web Share Target API
- * Converts FormData to URL parameters and redirects
- */
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // Check if this is a share target POST request
-  if (event.request.method === 'POST' && url.pathname === '/share') {
-    event.respondWith(
-      (async () => {
-        try {
-          const formData = await event.request.formData();
-          const title = formData.get('title') || '';
-          const text = formData.get('text') || '';
-          const urlParam = formData.get('url') || '';
-
-          // Store shared data in cache with unique ID
-          const shareId = `share-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const cache = await caches.open('share-data-cache');
-
-          const shareData = {
-            title,
-            text,
-            url: urlParam,
-            timestamp: Date.now(),
-          };
-
-          // Store as a cache entry
-          await cache.put(
-            new Request(`/share-data/${shareId}`),
-            new Response(JSON.stringify(shareData), {
-              headers: { 'Content-Type': 'application/json' },
-            })
-          );
-
-          console.log('✅ SW: Stored share data with ID:', shareId);
-
-          // Redirect to share page with share ID
-          const redirectUrl = `/share?shareId=${shareId}`;
-          return Response.redirect(redirectUrl, 303);
-        } catch (error) {
-          console.error('❌ SW: Error handling share POST:', error);
-          // Fallback to share page without data
-          return Response.redirect('/share', 303);
-        }
-      })()
-    );
-  }
-});
 
 // ==================== NOTIFICATION HANDLING ====================
 
