@@ -182,7 +182,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">תוכן:</h3>
-            {note.templateType === 'plain' && (
+            {(note.templateType === 'plain' || note.templateType === 'checklist' || note.templateType === 'workplan') && (
               <button
                 onClick={() => setIsEditMode(!isEditMode)}
                 className="text-sm px-4 py-2 rounded-xl bg-gradient-primary dark:bg-gradient-primary-dark text-white shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 font-semibold"
@@ -194,13 +194,13 @@ export const NoteView: React.FC<NoteViewProps> = ({
           {note.templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'checklist' ? (
-            <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={false} />
+            <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />
           ) : note.templateType === 'recipe' ? (
             <RecipeTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'shopping' ? (
             <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />
           ) : note.templateType === 'workplan' ? (
-            <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={false} />
+            <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />
           ) : isEditMode ? (
             <EnhancedTextarea
               value={content}
