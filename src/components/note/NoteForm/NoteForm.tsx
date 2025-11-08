@@ -9,7 +9,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { ReminderPicker } from '@/components/common/ReminderPicker';
-import { AVAILABLE_COLORS } from '@/utils/constants';
+import { AVAILABLE_COLORS, LENGTH_LIMITS } from '@/utils/constants';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -156,13 +156,14 @@ export const NoteForm: React.FC<NoteFormProps> = ({
         {/* כותרת */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            כותרת *
+            כותרת * <span className="text-xs text-gray-500">({title.length}/{LENGTH_LIMITS.NOTE_TITLE})</span>
           </label>
           <Input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value.slice(0, LENGTH_LIMITS.NOTE_TITLE))}
             placeholder="הזן כותרת..."
+            maxLength={LENGTH_LIMITS.NOTE_TITLE}
             required
           />
         </div>

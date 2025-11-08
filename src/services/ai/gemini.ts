@@ -181,14 +181,15 @@ Please analyze this content and respond with a JSON object in this exact format:
 
 Important rules:
 1. Detect the content type accurately (recipe, shopping list, article, stock info, or general)
-2. Provide a DETAILED and COMPREHENSIVE summary in Hebrew
+2. Provide a DETAILED and COMPREHENSIVE summary in HEBREW ONLY - NO ENGLISH
 3. Include ALL important information, key points, dates, numbers, and context
 4. For recipes: include ALL ingredients with quantities and ALL steps in clear order
 5. For shopping lists: list all items with details
 6. For articles: provide thorough summary with all key points and takeaways
 7. The summary should be extensive and detailed - aim for completeness, not brevity
-8. Return ONLY valid JSON, no markdown, no explanations
-9. Always write the summary in Hebrew
+8. Return ONLY valid JSON, no markdown, no explanations, no English text
+9. The "text" field must contain ONLY Hebrew characters - translate everything to Hebrew
+10. Do NOT include any introductory phrases in English like "Here is" or "This is"
 `;
 
   try {
@@ -209,7 +210,30 @@ Important rules:
     }
 
     const extracted: AIExtractionResult = JSON.parse(jsonMatch[0]);
-    // Don't store rawText - we only want the clean Hebrew content
+
+    // Clean up any English introductory text from the summary
+    if (extracted.content && extracted.content.text) {
+      let cleanText = extracted.content.text;
+
+      // Remove common English phrases at the start
+      const englishPrefixes = [
+        /^Here is .*?:\s*/i,
+        /^This is .*?:\s*/i,
+        /^Summary:\s*/i,
+        /^Content:\s*/i,
+        /^Article:\s*/i,
+        /^Recipe:\s*/i,
+        /^The following .*?:\s*/i,
+        /^Based on .*?:\s*/i,
+      ];
+
+      for (const prefix of englishPrefixes) {
+        cleanText = cleanText.replace(prefix, '');
+      }
+
+      // Trim any leading/trailing whitespace
+      extracted.content.text = cleanText.trim();
+    }
 
     return extracted;
   } catch (error) {

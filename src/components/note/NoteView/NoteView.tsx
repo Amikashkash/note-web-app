@@ -18,6 +18,7 @@ import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
+import { LENGTH_LIMITS } from '@/utils/constants';
 import * as noteAPI from '@/services/api/notes';
 
 interface NoteViewProps {
@@ -142,7 +143,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <Input
               type="text"
               value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value.slice(0, LENGTH_LIMITS.NOTE_TITLE))}
+              maxLength={LENGTH_LIMITS.NOTE_TITLE}
               className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 border-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 rounded px-2 dark:bg-gray-800"
               placeholder="כותרת הפתק..."
             />

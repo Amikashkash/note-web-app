@@ -46,3 +46,10 @@ export const TEMPLATE_NAMES_EN = {
   shopping: 'Shopping List',
   workplan: 'Work Plan',
 } as const;
+
+// הגבלות אורך
+export const LENGTH_LIMITS = {
+  NOTE_TITLE: 50, // תווים מקסימליים לכותרת פתק
+  CATEGORY_NAME: 30, // תווים מקסימליים לשם קטגוריה
+  TAG_NAME: 20, // תווים מקסימליים לתג
+} as const;
