@@ -298,33 +298,42 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       </div>
 
       {/* תצוגה מקדימה של כותרות פתקים כשהקטגוריה סגורה */}
-      {!isExpanded && categoryNotes.length > 0 && (
-        <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
-          <div className="overflow-x-auto notes-scroll">
-            <div className="flex gap-3 min-w-max">
-              {categoryNotes.slice(0, 10).map((note) => (
-                <button
-                  key={note.id}
-                  onClick={() => handleViewNote(note)}
-                  className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
-                  style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
-                >
-                  {note.isPinned && '📌 '}
-                  {note.title}
-                </button>
-              ))}
-              {categoryNotes.length > 10 && (
-                <button
-                  onClick={() => setIsExpanded(true)}
-                  className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth"
-                >
-                  +{categoryNotes.length - 10} עוד...
-                </button>
-              )}
+      {!isExpanded && categoryNotes.length > 0 && (() => {
+        // מיון: פתקים מוצמדים קודם
+        const sortedNotes = [...categoryNotes].sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return (a.order || 0) - (b.order || 0);
+        });
+
+        return (
+          <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
+            <div className="overflow-x-auto notes-scroll" dir="rtl">
+              <div className="flex gap-3 min-w-max">
+                {sortedNotes.slice(0, 10).map((note) => (
+                  <button
+                    key={note.id}
+                    onClick={() => handleViewNote(note)}
+                    className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
+                    style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
+                  >
+                    {note.isPinned && '📌 '}
+                    {note.title}
+                  </button>
+                ))}
+                {categoryNotes.length > 10 && (
+                  <button
+                    onClick={() => setIsExpanded(true)}
+                    className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth"
+                  >
+                    +{categoryNotes.length - 10} עוד...
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* רשימת הפתקים (מתקפלת) */}
       {isExpanded && (
