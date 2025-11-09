@@ -309,12 +309,12 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
         return (
           <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
             <div className="overflow-x-auto notes-scroll" dir="rtl">
-              <div className="flex gap-3 min-w-max">
+              <div className="flex gap-3">
                 {sortedNotes.slice(0, 10).map((note) => (
                   <button
                     key={note.id}
                     onClick={() => handleViewNote(note)}
-                    className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap transition-smooth hover-lift border-r-3"
+                    className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 transition-smooth hover-lift border-r-3 flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
                     style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
                   >
                     {note.isPinned && '📌 '}
@@ -324,7 +324,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
                 {categoryNotes.length > 10 && (
                   <button
                     onClick={() => setIsExpanded(true)}
-                    className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth"
+                    className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
                   >
                     +{categoryNotes.length - 10} עוד...
                   </button>
