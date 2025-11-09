@@ -11,6 +11,10 @@ import { Archive } from '@/pages/Archive';
 import { Settings } from '@/pages/Settings';
 import { Share } from '@/pages/Share';
 import { CategoryView } from '@/pages/CategoryView';
+import { About } from '@/pages/About';
+import { Privacy } from '@/pages/Privacy';
+import { Terms } from '@/pages/Terms';
+import { WhatsNew } from '@/pages/WhatsNew';
 
 export const router = createBrowserRouter([
   {
@@ -62,6 +66,38 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CategoryView />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/about',
+    element: (
+      <ProtectedRoute>
+        <About />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/privacy',
+    element: (
+      <ProtectedRoute>
+        <Privacy />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/terms',
+    element: (
+      <ProtectedRoute>
+        <Terms />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/whats-new',
+    element: (
+      <ProtectedRoute>
+        <WhatsNew />
       </ProtectedRoute>
     ),
   },

@@ -9,10 +9,11 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
+import { ProfileMenu } from '@/components/profile/ProfileMenu';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +28,7 @@ export const Home: React.FC = () => {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="flex flex-col">
                 <h1 className="text-xl sm:text-3xl font-bold text-white whitespace-nowrap">📝 פתקים</h1>
-                <span className="text-[8px] sm:text-[10px] text-white/60">v1.4.3</span>
+                <span className="text-[8px] sm:text-[10px] text-white/60">v1.4.4</span>
               </div>
 
               {/* שדה חיפוש */}
@@ -70,25 +71,7 @@ export const Home: React.FC = () => {
                 </span>
               </button>
 
-              {user?.photoURL && (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || 'משתמש'}
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white/50"
-                />
-              )}
-              <div className="text-right hidden lg:block">
-                <p className="font-medium text-white text-sm">{user?.displayName}</p>
-                <p className="text-xs text-white/80">{user?.email}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={signOut}
-                className="text-xs sm:text-sm whitespace-nowrap px-3 sm:px-4 bg-white/10 hover:bg-white/20 text-white border-white/30 hover:border-white/50"
-              >
-                התנתק
-              </Button>
+              <ProfileMenu />
             </div>
           </div>
 
