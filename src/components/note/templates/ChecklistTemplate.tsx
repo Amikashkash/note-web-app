@@ -2,7 +2,7 @@
  * תבנית רשימת משימות - To-Do List
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/common/Button';
 
 export interface ChecklistItem {
@@ -24,6 +24,9 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   onChange,
   readOnly = false,
 }) => {
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+  const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
   const items = useMemo<ChecklistItem[]>(() => {
     try {
       const parsed = value ? JSON.parse(value) : [];
@@ -44,14 +47,23 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   }, [value]);
 
+  useEffect(() => {
+    if (lastAddedId && inputRefs.current[lastAddedId]) {
+      inputRefs.current[lastAddedId]?.focus();
+      setLastAddedId(null);
+    }
+  }, [lastAddedId, items]);
+
   const handleAddItem = () => {
+    const newId = Date.now().toString();
     const newItem: ChecklistItem = {
-      id: Date.now().toString(),
+      id: newId,
       text: '',
       completed: false,
     };
     const updatedItems = [...items, newItem];
     onChange(JSON.stringify(updatedItems));
+    setLastAddedId(newId);
   };
 
   const handleToggleItem = (id: string) => {
@@ -138,20 +150,20 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
           items.map((item) => {
             const dateStatus = getDateStatus(item.dueDate);
             const borderColor = !item.completed && dateStatus === 'overdue'
-              ? 'border-red-300'
+              ? 'border-red-300 dark:border-red-700'
               : !item.completed && dateStatus === 'soon'
-              ? 'border-yellow-300'
+              ? 'border-yellow-300 dark:border-yellow-700'
               : item.completed
-              ? 'border-green-200'
-              : 'border-gray-200';
+              ? 'border-green-200 dark:border-green-800'
+              : 'border-gray-200 dark:border-gray-600';
 
             return (
               <div
                 key={item.id}
                 className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-all ${
                   item.completed
-                    ? 'bg-green-50 ' + borderColor
-                    : 'bg-white ' + borderColor + ' hover:border-gray-300'
+                    ? 'bg-green-50 dark:bg-green-900/20 ' + borderColor
+                    : 'bg-white dark:bg-gray-700 ' + borderColor + ' hover:border-gray-300 dark:hover:border-gray-500'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -161,8 +173,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     onClick={() => handleToggleItem(item.id)}
                     className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                       item.completed
-                        ? 'bg-green-500 border-green-500'
-                        : 'bg-white border-gray-300 hover:border-green-400'
+                        ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600'
+                        : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 hover:border-green-400 dark:hover:border-green-500'
                     }`}
                   >
                     {item.completed && <span className="text-white text-sm">✓</span>}
@@ -180,6 +192,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       </span>
                     ) : (
                       <input
+                        ref={(el) => (inputRefs.current[item.id] = el)}
                         type="text"
                         value={item.text}
                         onChange={(e) => handleUpdateText(item.id, e.target.value)}
@@ -197,6 +210,100 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     )}
                   </div>
 
+                  {/* תאריך */}
+                  {readOnly ? (
+                    item.dueDate && (
+                      <span
+                        className={`flex-shrink-0 text-sm ${
+                          dateStatus === 'overdue'
+                            ? 'text-red-600'
+                            : dateStatus === 'soon'
+                            ? 'text-yellow-600'
+                            : 'text-blue-600'
+                        }`}
+                        title={`יעד: ${new Date(item.dueDate).toLocaleDateString('he-IL')}${item.dueTime ? ` ${item.dueTime}` : ''}`}
+                      >
+                        📅
+                      </span>
+                    )
+                  ) : (
+                    <div className="relative flex-shrink-0 flex items-center gap-1">
+                      <input
+                        id={`date-${item.id}`}
+                        type="date"
+                        value={item.dueDate || ''}
+                        onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
+                        className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
+                        style={{ zIndex: 10 }}
+                      />
+                      <label
+                        htmlFor={`date-${item.id}`}
+                        className={`cursor-pointer text-lg pointer-events-none ${
+                          item.dueDate
+                            ? dateStatus === 'overdue'
+                              ? 'text-red-600'
+                              : dateStatus === 'soon'
+                              ? 'text-yellow-600'
+                              : 'text-blue-600'
+                            : 'text-gray-400'
+                        }`}
+                        title={item.dueDate ? `יעד: ${new Date(item.dueDate).toLocaleDateString('he-IL')}${item.dueTime ? ` ${item.dueTime}` : ''}` : 'הוסף תאריך יעד'}
+                      >
+                        📅
+                      </label>
+                      {item.dueDate && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateDueDate(item.id, '');
+                            handleUpdateDueTime(item.id, '');
+                          }}
+                          className="text-xs text-gray-400 hover:text-red-600 relative z-20"
+                          title="הסר תאריך"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* שעה (מוצג רק אם יש תאריך ובמצב עריכה) */}
+                  {!readOnly && item.dueDate && (
+                    <div className="relative flex-shrink-0 flex items-center gap-1">
+                      <input
+                        id={`time-${item.id}`}
+                        type="time"
+                        value={item.dueTime || ''}
+                        onChange={(e) => handleUpdateDueTime(item.id, e.target.value)}
+                        className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
+                        style={{ zIndex: 10 }}
+                      />
+                      <label
+                        htmlFor={`time-${item.id}`}
+                        className={`cursor-pointer text-lg pointer-events-none ${
+                          item.dueTime ? 'text-blue-600' : 'text-gray-400'
+                        }`}
+                        title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
+                      >
+                        🕐
+                      </label>
+                      {item.dueTime && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateDueTime(item.id, '');
+                          }}
+                          className="text-xs text-gray-400 hover:text-red-600 relative z-20"
+                          title="הסר שעה"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* כפתור מחיקה */}
                   {!readOnly && (
                     <button
@@ -207,80 +314,6 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     >
                       🗑
                     </button>
-                  )}
-                </div>
-
-                {/* תאריך יעד */}
-                <div className="flex items-center gap-2 mr-9">
-                  {readOnly ? (
-                    item.dueDate && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span
-                          className={`px-2 py-0.5 rounded-full ${
-                            dateStatus === 'overdue'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200'
-                              : dateStatus === 'soon'
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                          }`}
-                        >
-                          {dateStatus === 'overdue' && '🔴 '}
-                          {dateStatus === 'soon' && '🟡 '}
-                          {dateStatus === 'future' && '📅 '}
-                          {new Date(item.dueDate).toLocaleDateString('he-IL', {
-                            day: 'numeric',
-                            month: 'short',
-                          })}
-                          {item.dueTime && ` • ${item.dueTime}`}
-                        </span>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">תאריך:</label>
-                        <input
-                          type="date"
-                          value={item.dueDate || ''}
-                          onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
-                          className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        />
-                        {item.dueDate && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleUpdateDueDate(item.id, '');
-                              handleUpdateDueTime(item.id, '');
-                            }}
-                            className="text-xs text-gray-500 hover:text-red-600"
-                            title="הסר תאריך"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                      {item.dueDate && (
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-600">שעה:</label>
-                          <input
-                            type="time"
-                            value={item.dueTime || ''}
-                            onChange={(e) => handleUpdateDueTime(item.id, e.target.value)}
-                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                          />
-                          {item.dueTime && (
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateDueTime(item.id, '')}
-                              className="text-xs text-gray-500 hover:text-red-600"
-                              title="הסר שעה"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   )}
                 </div>
               </div>

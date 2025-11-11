@@ -163,17 +163,32 @@ For this project, increment patch version for each change.
 
 ## Session Context
 
-### Current State (as of v1.0.5)
-- Version display added to UI
-- Search functionality implemented (searches title, content, tags)
-- Search waits for notes to load before filtering
-- Debug logs active to diagnose search issues
-- Working branch: `claude/add-version-display-011CUrYBh1agrcjAuGUzqP9R`
+### Current State (as of v1.4.6)
+- Responsive note cards fixed for small screens (w-52 instead of w-full)
+- Checklist template improved with inline date/time icons
+- Dark mode fully supported in checklist template
+- Auto-focus on new task when pressing Enter
+- README updated with complete feature list
+- Working branch: `main`
 
-### Active Issues
-- User reports search not working despite implementation
-- Investigating with debug logs in v1.0.5
-- Waiting for user console output to diagnose
+### Recent Changes (v1.4.6)
+- **Note Cards**: Fixed width issue on screens below 640px - cards now display with horizontal scroll
+- **Checklist Template**:
+  - Removed accordion date card, replaced with icon-based date/time pickers
+  - Date icon (📅) and time icon (🕐) placed next to trash icon
+  - Clicking icons opens native date/time pickers
+  - Added delete buttons (X) for date/time
+  - Dark mode styling for tasks, borders, and checkboxes
+  - Auto-focus new task input when pressing Enter
+- **Documentation**: Complete README overhaul with all implemented features
+
+### Previous State (v1.4.4-1.4.5)
+- About, Privacy, Terms, What's New pages added
+- Profile menu implemented
+- Pinned notes alignment fixed in collapsed mode
+- Category full-screen view with vertical note list
+- Dark mode fixes for textarea
+- Mobile responsive improvements
 
 ---
 
