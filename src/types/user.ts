@@ -21,10 +21,5 @@ export interface User {
   settings: UserSettings;
 }
 
-export const DEFAULT_USER_SETTINGS: UserSettings = {
-  language: 'he',
-  defaultCategoryColor: '#3B82F6',
-  theme: 'light',
-  encryptionEnabled: false,
-  encryptionLevel: 'none',
-};
+// ערכי ברירת המחדל עצמם נמצאים ב-`utils/defaults.ts` -
+// קובץ טיפוסים לא אמור להחזיק ערכים בזמן ריצה.

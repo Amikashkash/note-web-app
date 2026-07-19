@@ -7,12 +7,9 @@ import React, { useMemo } from 'react';
 import { Button } from '@/components/common/Button';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
+import type { WorkPlanSection } from '@/types/template';
 
-export interface WorkPlanSection {
-  id: string;
-  header: string;
-  content: string;
-}
+export type { WorkPlanSection };
 
 interface WorkPlanTemplateProps {
   value: string;

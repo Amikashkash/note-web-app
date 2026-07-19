@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** גרסת האפליקציה, מוזרקת בזמן build מתוך package.json */
+declare const __APP_VERSION__: string

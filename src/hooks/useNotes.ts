@@ -1,49 +1,46 @@
 /**
- * Custom Hook לשימוש בפתקים
+ * Hook לשימוש בפתקים
+ *
+ * נרשם למנוי המשותף של הפתקים כל עוד הקומפוננטה חיה. המנוי עצמו
+ * מנוהל ב-`noteStore` עם ספירת צרכנים, כך שאפשר לקרוא ל-hook הזה
+ * מכמה קומפוננטות במקביל בלי לפתוח מאזינים מיותרים.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNoteStore } from '@/store/noteStore';
 import { useAuthStore } from '@/store/authStore';
+import { byPinnedThenOrder } from '@/services/api/mappers';
+import type { Note } from '@/types/note';
 
 export const useNotes = (categoryId?: string) => {
-  const { user } = useAuthStore();
-  const {
-    notes,
-    isLoading,
-    error,
-    subscribeToNotes,
-    subscribeToNotesByCategory,
-    unsubscribeFromNotes,
-    createNote,
-    updateNote,
-    deleteNote,
-    reorderNote,
-    togglePinNote,
-    getNotesByCategory,
-    clearError,
-  } = useNoteStore();
+  const userId = useAuthStore((state) => state.user?.uid);
 
-  // מנוי לפתקים בעת טעינת הקומפוננטה
+  const notes = useNoteStore((state) => state.notes);
+  const isLoading = useNoteStore((state) => state.isLoading);
+  const error = useNoteStore((state) => state.error);
+  const subscribe = useNoteStore((state) => state.subscribe);
+  const unsubscribe = useNoteStore((state) => state.unsubscribe);
+
+  const createNote = useNoteStore((state) => state.createNote);
+  const updateNote = useNoteStore((state) => state.updateNote);
+  const archiveNote = useNoteStore((state) => state.archiveNote);
+  const reorderNotes = useNoteStore((state) => state.reorderNotes);
+  const togglePinNote = useNoteStore((state) => state.togglePinNote);
+  const clearError = useNoteStore((state) => state.clearError);
+
   useEffect(() => {
-    if (user?.uid) {
-      if (categoryId) {
-        // מנוי לפתקים של קטגוריה ספציפית
-        subscribeToNotesByCategory(categoryId);
-      } else {
-        // מנוי לכל הפתקים של המשתמש
-        subscribeToNotes(user.uid);
-      }
-    }
+    if (!userId) return;
 
-    return () => {
-      unsubscribeFromNotes();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, categoryId]);
+    subscribe(userId);
+    return () => unsubscribe();
+  }, [userId, subscribe, unsubscribe]);
 
-  // אם נתבקשה קטגוריה ספציפית, מחזירים רק את הפתקים שלה
-  const filteredNotes = categoryId ? getNotesByCategory(categoryId) : notes;
+  // הסינון לפי קטגוריה נעשה מקומית מתוך הרשימה המשותפת -
+  // זול יותר ממנוי נפרד לכל קטגוריה.
+  const filteredNotes = useMemo<Note[]>(() => {
+    if (!categoryId) return notes;
+    return notes.filter((note) => note.categoryId === categoryId).sort(byPinnedThenOrder);
+  }, [notes, categoryId]);
 
   return {
     notes: filteredNotes,
@@ -52,8 +49,8 @@ export const useNotes = (categoryId?: string) => {
     error,
     createNote,
     updateNote,
-    deleteNote,
-    reorderNote,
+    archiveNote,
+    reorderNotes,
     togglePinNote,
     clearError,
   };

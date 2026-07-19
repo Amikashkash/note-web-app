@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Input } from '@/components/common';
 import { isValidEmail, isValidPassword } from '@/utils/validators';
+import { logger } from '@/utils/logger';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export const Login: React.FC = () => {
         setSuccessMessage('נשלח אימייל אימות לכתובת המייל שלך. אנא בדוק את תיבת הדואר שלך.');
       }
     } catch (error) {
-      console.error('Authentication error:', error);
+      logger.error('Authentication error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +103,7 @@ export const Login: React.FC = () => {
     try {
       await signInWithGoogle();
     } catch (error) {
-      console.error('Google sign-in error:', error);
+      logger.error('Google sign-in error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +127,7 @@ export const Login: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             📝 אפליקציית פתקים
           </h1>
-          <span className="text-[9px] text-gray-400 block -mt-2 mb-2">v1.4.4</span>
+          <span className="text-[9px] text-gray-400 block -mt-2 mb-2">v{__APP_VERSION__}</span>
           <p className="text-gray-600">
             {mode === 'signin' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש'}
           </p>

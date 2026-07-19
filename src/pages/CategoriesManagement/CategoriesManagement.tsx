@@ -9,6 +9,7 @@ import { useNotes } from '@/hooks/useNotes';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
 import { Button } from '@/components/common';
 import type { Category } from '@/types';
+import { logger } from '@/utils/logger';
 
 export const CategoriesManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export const CategoriesManagement: React.FC = () => {
       try {
         await removeCategory(categoryId);
       } catch (error) {
-        console.error('Error deleting category:', error);
+        logger.error('Error deleting category:', error);
         alert('שגיאה במחיקת הקטגוריה');
       }
     }

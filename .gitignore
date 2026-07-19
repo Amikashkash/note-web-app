@@ -10,7 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist
 *.local
+
+# Firebase Auth user export (contains user emails - do not commit)
+users.json
 
 # Editor directories and files
 .vscode/*

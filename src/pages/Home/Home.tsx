@@ -4,8 +4,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
@@ -13,7 +12,6 @@ import { ProfileMenu } from '@/components/profile/ProfileMenu';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,7 +26,7 @@ export const Home: React.FC = () => {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="flex flex-col">
                 <h1 className="text-xl sm:text-3xl font-bold text-white whitespace-nowrap">📝 פתקים</h1>
-                <span className="text-[8px] sm:text-[10px] text-white/60">v1.4.4</span>
+                <span className="text-[8px] sm:text-[10px] text-white/60">v{__APP_VERSION__}</span>
               </div>
 
               {/* שדה חיפוש */}

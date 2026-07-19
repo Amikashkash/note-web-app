@@ -1,19 +1,19 @@
 /**
- * CategoryItem Component
- * Displays a single category with its notes in horizontal scroll
+ * שורת קטגוריה בדף הבית - מציגה את פתקי הקטגוריה בגלילה אופקית
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Category } from '@/types';
-import { useNotes } from '@/hooks/useNotes';
+import type { Note } from '@/types/note';
+import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useAuthStore } from '@/store/authStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { NotesList } from '@/components/note/NotesList';
 import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
 import { ShareManagement } from '@/components/common/ShareManagement';
-import type { Note } from '@/types/note';
+import { filterNotesByQuery } from '@/utils/search';
 import * as categoryAPI from '@/services/api/categories';
 
 interface CategoryItemProps {
@@ -21,223 +21,85 @@ interface CategoryItemProps {
   searchQuery?: string;
 }
 
-export const CategoryItem: React.FC<CategoryItemProps> = ({
-  category,
-  searchQuery = '',
-}) => {
+/** כמה כותרות פתקים מוצגות בתצוגה המקופלת */
+const COLLAPSED_PREVIEW_COUNT = 10;
+
+export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuery = '' }) => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const { allNotes, createNote, updateNote, deleteNote, togglePinNote } = useNotes();
-  const { categories } = useCategoryStore();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const categories = useCategoryStore((state) => state.categories);
+
+  const {
+    notes,
+    saveNote,
+    updateNoteFields,
+    moveToCategory,
+    deleteNote,
+    pinNote,
+    moveNoteBefore,
+  } = useNoteEditor(category.id);
+
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
-  const [showNoteView, setShowNoteView] = useState(false);
-  const [showShareManagement, setShowShareManagement] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
+  const [showShareManagement, setShowShareManagement] = useState(false);
   const [draggingNote, setDraggingNote] = useState<Note | null>(null);
   const [dragOverNote, setDragOverNote] = useState<Note | null>(null);
 
-  // סינון פתקים לפי קטגוריה זו וחיפוש
-  const categoryNotes = allNotes.filter(note => {
-    if (note.categoryId !== category.id) return false;
+  const categoryNotes = useMemo(
+    () => filterNotesByQuery(notes, searchQuery),
+    [notes, searchQuery]
+  );
 
-    if (!searchQuery.trim()) return true;
+  const categoriesForMove = useMemo(
+    () =>
+      categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon || '📁',
+      })),
+    [categories]
+  );
 
-    const query = searchQuery.toLowerCase();
-    const titleMatch = note.title.toLowerCase().includes(query);
-    const contentMatch = note.content.toLowerCase().includes(query);
-    const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+  const hasSearch = searchQuery.trim().length > 0;
+  const matchCount = categoryNotes.length;
 
-    return titleMatch || contentMatch || tagsMatch;
-  });
+  // בזמן חיפוש הקטגוריה נפתחת אוטומטית אם יש בה תוצאות, ומחוץ לחיפוש
+  // נשמר מה שהמשתמש בחר. הערך נגזר ברינדור ולא מסונכרן דרך effect,
+  // כדי למנוע רינדור כפול בכל הקלדה בשדה החיפוש.
+  const isExpanded = hasSearch ? matchCount > 0 : manuallyExpanded;
 
-  // רשימת קטגוריות להעברת פתק
-  const categoriesForMove = categories.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    icon: cat.icon || '📁',
-  }));
+  // הפתק המוצג במודאל נלקח מהרשימה החיה, כדי שיתעדכן בזמן אמת
+  const activeNote = viewingNote
+    ? notes.find((note) => note.id === viewingNote.id) ?? viewingNote
+    : null;
 
-  // Auto-expand category when searching and it has matching notes
-  useEffect(() => {
-    if (searchQuery.trim() && categoryNotes.length > 0) {
-      setIsExpanded(true);
-    } else if (!searchQuery.trim()) {
-      setIsExpanded(false);
+  const isOwner = user !== null && category.userId === user.uid;
+  const isShared = category.sharedWith.length > 0;
+
+  const handleDrop = async (targetNote: Note) => {
+    if (draggingNote) {
+      await moveNoteBefore(draggingNote.id, targetNote.id);
     }
-  }, [searchQuery, categoryNotes.length]);
+    setDragOverNote(null);
+  };
 
-  // אם יש חיפוש ואין תוצאות, אל תציג את הקטגוריה
-  if (searchQuery.trim() && categoryNotes.length === 0) {
+  const handleSubmitNote = async (data: Parameters<typeof saveNote>[0]) => {
+    const saved = await saveNote(data, editingNote);
+    if (saved) {
+      setShowNoteForm(false);
+      setEditingNote(null);
+    }
+  };
+
+  // בחיפוש ללא תוצאות - הקטגוריה לא מוצגת כלל
+  if (hasSearch && matchCount === 0) {
     return null;
   }
 
-  const handleAddNote = () => {
-    setEditingNote(null);
-    setShowNoteForm(true);
-  };
-
-  const handleViewNote = (note: Note) => {
-    setViewingNote(note);
-    setShowNoteView(true);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    try {
-      await deleteNote(noteId);
-    } catch (error) {
-      console.error('Error deleting note:', error);
-      alert('שגיאה במחיקת הפתק');
-    }
-  };
-
-  const handleTogglePin = async (noteId: string, isPinned: boolean) => {
-    try {
-      await togglePinNote(noteId, isPinned);
-    } catch (error) {
-      console.error('Error toggling pin:', error);
-    }
-  };
-
-  const handleMoveToCategory = async (noteId: string, newCategoryId: string) => {
-    try {
-      const noteToMove = allNotes.find(n => n.id === noteId);
-      if (!noteToMove) return;
-
-      await updateNote(noteId, {
-        ...noteToMove,
-        categoryId: newCategoryId,
-      });
-    } catch (error) {
-      console.error('Error moving note:', error);
-      alert('שגיאה בהעברת הפתק');
-    }
-  };
-
-  const handleShareCategory = async (email: string) => {
-    try {
-      await categoryAPI.shareCategoryWithUser(category.id, email);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleUnshareCategory = async (userId: string) => {
-    try {
-      await categoryAPI.unshareCategoryWithUser(category.id, userId);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  // Check if user is the owner of the category
-  const isOwner = user && category.userId === user.uid;
-  const isShared = category.sharedWith && category.sharedWith.length > 0;
-
-  // Drag and Drop handlers
-  const handleDragStart = (note: Note) => {
-    setDraggingNote(note);
-  };
-
-  const handleDragEnd = () => {
-    setDraggingNote(null);
-    setDragOverNote(null);
-  };
-
-  const handleDragOver = (note: Note) => {
-    if (draggingNote && draggingNote.id !== note.id) {
-      setDragOverNote(note);
-    }
-  };
-
-  const handleDrop = async (targetNote: Note) => {
-    if (!draggingNote || draggingNote.id === targetNote.id) {
-      setDragOverNote(null);
-      return;
-    }
-
-    try {
-      // Get the current order of notes
-      const sortedNotes = [...categoryNotes].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-      // Find positions
-      const dragIndex = sortedNotes.findIndex(n => n.id === draggingNote.id);
-      const dropIndex = sortedNotes.findIndex(n => n.id === targetNote.id);
-
-      if (dragIndex === -1 || dropIndex === -1) return;
-
-      // Reorder the array
-      const newNotes = [...sortedNotes];
-      const [removed] = newNotes.splice(dragIndex, 1);
-      newNotes.splice(dropIndex, 0, removed);
-
-      // Update order for all affected notes
-      const updates = newNotes.map((note, index) => {
-        if (note.order !== index) {
-          return updateNote(note.id, { ...note, order: index });
-        }
-        return Promise.resolve();
-      });
-
-      await Promise.all(updates);
-      console.log('✅ Note order updated successfully');
-    } catch (error) {
-      console.error('❌ Error reordering notes:', error);
-      alert('שגיאה בשינוי סדר הפתקים');
-    }
-
-    setDragOverNote(null);
-  };
-
-  const handleSubmitNote = async (data: {
-    title: string;
-    content: string;
-    templateType: any;
-    tags: string[];
-    color: string | null;
-    reminderTime?: Date | null;
-    reminderEnabled?: boolean;
-  }) => {
-    if (!user) return;
-
-    try {
-      // Import Timestamp for reminder conversion
-      const { Timestamp } = await import('firebase/firestore');
-
-      if (editingNote) {
-        // עדכון פתק קיים
-        await updateNote(editingNote.id, {
-          ...data,
-          categoryId: category.id,
-          userId: user.uid,
-          order: editingNote.order,
-          sharedWith: editingNote.sharedWith,
-          isPinned: editingNote.isPinned,
-          reminderTime: data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null,
-          reminderEnabled: data.reminderEnabled || false,
-        });
-      } else {
-        // יצירת פתק חדש
-        const newOrder = categoryNotes.length;
-        await createNote({
-          ...data,
-          categoryId: category.id,
-          userId: user.uid,
-          order: newOrder,
-          sharedWith: [],
-          isPinned: false,
-          reminderTime: data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null,
-          reminderEnabled: data.reminderEnabled || false,
-        });
-      }
-      setShowNoteForm(false);
-      setEditingNote(null);
-    } catch (error) {
-      console.error('Error saving note:', error);
-      alert('שגיאה בשמירת הפתק');
-    }
-  };
+  const collapsedPreview = [...categoryNotes].slice(0, COLLAPSED_PREVIEW_COUNT);
+  const hiddenCount = categoryNotes.length - collapsedPreview.length;
 
   return (
     <div
@@ -248,15 +110,18 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3 flex-1">
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => setManuallyExpanded((previous) => !previous)}
             className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-base"
+            title={isExpanded ? 'קפל' : 'הרחב'}
           >
             {isExpanded ? '▼' : '◀'}
           </button>
           {category.icon && <span className="text-2xl">{category.icon}</span>}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{category.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                {category.name}
+              </h3>
               <button
                 onClick={() => navigate(`/category/${category.id}`)}
                 className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -289,7 +154,10 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             </span>
           )}
           <button
-            onClick={handleAddNote}
+            onClick={() => {
+              setEditingNote(null);
+              setShowNoteForm(true);
+            }}
             className="px-5 py-2.5 text-sm bg-gradient-primary dark:bg-gradient-primary-dark text-white rounded-xl font-medium shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5"
           >
             + פתק
@@ -297,56 +165,60 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
         </div>
       </div>
 
-      {/* תצוגה מקדימה של כותרות פתקים כשהקטגוריה סגורה */}
-      {!isExpanded && categoryNotes.length > 0 && (() => {
-        // מיון: פתקים מוצמדים קודם
-        const sortedNotes = [...categoryNotes].sort((a, b) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          return (a.order || 0) - (b.order || 0);
-        });
-
-        return (
-          <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
-            <div className="overflow-x-auto notes-scroll" dir="rtl">
-              <div className="flex gap-3">
-                {sortedNotes.slice(0, 10).map((note) => (
-                  <button
-                    key={note.id}
-                    onClick={() => handleViewNote(note)}
-                    className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 transition-smooth hover-lift border-r-3 flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
-                    style={{ borderRightColor: note.color || category.color, borderRightWidth: '3px' }}
-                  >
-                    {note.isPinned && '📌 '}
-                    {note.title}
-                  </button>
-                ))}
-                {categoryNotes.length > 10 && (
-                  <button
-                    onClick={() => setIsExpanded(true)}
-                    className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
-                  >
-                    +{categoryNotes.length - 10} עוד...
-                  </button>
-                )}
-              </div>
+      {/* תצוגה מקופלת - כותרות בלבד */}
+      {!isExpanded && categoryNotes.length > 0 && (
+        <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
+          <div className="overflow-x-auto notes-scroll" dir="rtl">
+            <div className="flex gap-3">
+              {collapsedPreview.map((note) => (
+                <button
+                  key={note.id}
+                  onClick={() => setViewingNote(note)}
+                  className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 transition-smooth hover-lift border-r-3 flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
+                  style={{
+                    borderRightColor: note.color || category.color,
+                    borderRightWidth: '3px',
+                  }}
+                >
+                  {note.isPinned && '📌 '}
+                  {note.title}
+                </button>
+              ))}
+              {hiddenCount > 0 && (
+                <button
+                  onClick={() => setManuallyExpanded(true)}
+                  className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
+                >
+                  +{hiddenCount} עוד...
+                </button>
+              )}
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
-      {/* רשימת הפתקים (מתקפלת) */}
+      {/* תצוגה מורחבת */}
       {isExpanded && (
         <div className="border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
           <NotesList
             notes={categoryNotes}
-            onView={handleViewNote}
-            onDelete={handleDeleteNote}
-            onTogglePin={handleTogglePin}
-            onAddNote={handleAddNote}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
+            onView={setViewingNote}
+            onDelete={deleteNote}
+            onTogglePin={pinNote}
+            onAddNote={() => {
+              setEditingNote(null);
+              setShowNoteForm(true);
+            }}
+            onDragStart={setDraggingNote}
+            onDragEnd={() => {
+              setDraggingNote(null);
+              setDragOverNote(null);
+            }}
+            onDragOver={(note) => {
+              if (draggingNote && draggingNote.id !== note.id) {
+                setDragOverNote(note);
+              }
+            }}
             onDrop={handleDrop}
             draggingNoteId={draggingNote?.id}
             dragOverNoteId={dragOverNote?.id}
@@ -355,36 +227,19 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       )}
 
       {/* תצוגת פתק מלא */}
-      {showNoteView && viewingNote && (
+      {activeNote && (
         <NoteView
-          note={viewingNote}
-          onClose={() => {
-            setShowNoteView(false);
-            setViewingNote(null);
-          }}
-          onDelete={handleDeleteNote}
-          onTogglePin={handleTogglePin}
-          onUpdate={async (noteId, updates) => {
-            try {
-              // עדכון מיידי של הפתק עם השינויים
-              const updatedNote = {
-                ...viewingNote,
-                ...(updates.title !== undefined && { title: updates.title }),
-                ...(updates.content !== undefined && { content: updates.content }),
-              };
-
-              await updateNote(noteId, updatedNote);
-              setViewingNote(updatedNote);
-            } catch (error) {
-              console.error('Error updating note:', error);
-            }
-          }}
-          onMoveToCategory={handleMoveToCategory}
+          note={activeNote}
+          onClose={() => setViewingNote(null)}
+          onDelete={deleteNote}
+          onTogglePin={pinNote}
+          onUpdate={updateNoteFields}
+          onMoveToCategory={moveToCategory}
           categories={categoriesForMove}
         />
       )}
 
-      {/* טופס הפתק */}
+      {/* טופס פתק */}
       {showNoteForm && (
         <NoteForm
           categoryId={category.id}
@@ -403,9 +258,9 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
           itemType="category"
           itemId={category.id}
           itemName={category.name}
-          currentSharedWith={category.sharedWith || []}
-          onShare={handleShareCategory}
-          onUnshare={handleUnshareCategory}
+          currentSharedWith={category.sharedWith}
+          onShare={(email) => categoryAPI.shareCategoryWithUser(category.id, email)}
+          onUnshare={(userId) => categoryAPI.unshareCategoryWithUser(category.id, userId)}
           onClose={() => setShowShareManagement(false)}
         />
       )}

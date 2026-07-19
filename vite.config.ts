@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { readFileSync } from 'fs'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// מספר הגרסה נלקח מ-package.json ומוזרק לקוד כ-`__APP_VERSION__`.
+// כך יש מקור אמת יחיד, ומסכי האפליקציה לא יכולים להציג גרסה מיושנת.
+const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',

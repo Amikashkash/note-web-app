@@ -1,13 +1,13 @@
 /**
- * קומפוננטה להצגת טקסט עם עיצוב markdown פשוט
- * תומכת ב:
- * - **טקסט מודגש** -> <strong>
- * - *טקסט נטוי* -> <em>
- * - זיהוי אוטומטי של URLs והצגתם כ-preview cards
- * - שמירה על מספור ו-bullets
+ * הצגת טקסט עם עיצוב markdown פשוט
+ *
+ * תומך ב:
+ * - **מודגש**
+ * - *נטוי*
+ * - זיהוי אוטומטי של קישורים (כקישור בשורה + כרטיס תצוגה מקדימה בתחתית)
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LinkPreview } from '@/components/common/LinkPreview';
 import { extractUrls } from '@/services/api/linkPreview';
 
@@ -16,132 +16,127 @@ interface FormattedTextProps {
   className?: string;
 }
 
-export const FormattedText: React.FC<FormattedTextProps> = ({ content, className = '' }) => {
-  // Extract URLs from content for preview cards
-  const urls = React.useMemo(() => extractUrls(content), [content]);
+type TokenType = 'text' | 'url' | 'bold' | 'italic';
 
-  /**
-   * המרת markdown פשוט ל-HTML
-   */
-  const formatText = (text: string): React.ReactNode[] => {
-    if (!text) return [];
+interface Token {
+  type: TokenType;
+  value: string;
+}
 
-    const lines = text.split('\n');
-    return lines.map((line, lineIndex) => {
-      // עיבוד של **bold**, *italic*, ו-URLs בשורה
-      const parts: React.ReactNode[] = [];
-      let remainingText = line;
-      let partKey = 0;
+/**
+ * הדפוסים הנתמכים, לפי סדר עדיפות בין התאמות שמתחילות באותו מקום.
+ * bold חייב להופיע לפני italic - אחרת טקסט מודגש היה נתפס כנטוי.
+ */
+const PATTERNS: { type: Exclude<TokenType, 'text'>; regex: RegExp }[] = [
+  { type: 'url', regex: /https?:\/\/[^\s]+/ },
+  { type: 'bold', regex: /\*\*(.+?)\*\*/ },
+  { type: 'italic', regex: /\*(.+?)\*/ },
+];
 
-      // regex למציאת **bold**, *italic*, או URLs
-      // נעבור על הטקסט ונמיר את הסימונים
-      while (remainingText.length > 0) {
-        // חיפוש URLs
-        const urlMatch = remainingText.match(/(https?:\/\/[^\s]+)/);
-        if (urlMatch && urlMatch.index !== undefined) {
-          // הוסף טקסט רגיל לפני ה-URL
-          if (urlMatch.index > 0) {
-            parts.push(
-              <span key={`${lineIndex}-${partKey++}`}>
-                {remainingText.substring(0, urlMatch.index)}
-              </span>
-            );
-          }
+/**
+ * פירוק שורה לאסימונים.
+ *
+ * בכל צעד נבחרת ההתאמה שמתחילה הכי מוקדם בשורה - ולא הדפוס הראשון
+ * שמצליח. זה מה שמאפשר לשלב טקסט מודגש וקישור באותה שורה: בגרסה קודמת
+ * הקישור נבדק תמיד ראשון, וכל מה שקדם לו נפלט כטקסט גולמי עם הכוכביות
+ * גלויות למשתמש.
+ */
+const tokenizeLine = (line: string): Token[] => {
+  const tokens: Token[] = [];
+  let remaining = line;
 
-          // הוסף את ה-URL כקישור לחיץ (לא preview - זה יופיע בנפרד)
-          const url = urlMatch[1];
-          parts.push(
-            <a
-              key={`${lineIndex}-${partKey++}`}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-              dir="ltr"
-            >
-              {url}
-            </a>
-          );
+  while (remaining.length > 0) {
+    let earliest:
+      | { type: Exclude<TokenType, 'text'>; index: number; match: RegExpMatchArray }
+      | null = null;
 
-          // המשך עם שאר הטקסט
-          remainingText = remainingText.substring(urlMatch.index + urlMatch[0].length);
-          continue;
-        }
+    for (const { type, regex } of PATTERNS) {
+      const match = remaining.match(regex);
+      if (match?.index === undefined) continue;
 
-
-        // חיפוש **bold**
-        const boldMatch = remainingText.match(/\*\*(.+?)\*\*/);
-        if (boldMatch && boldMatch.index !== undefined) {
-          // הוסף טקסט רגיל לפני ה-bold
-          if (boldMatch.index > 0) {
-            parts.push(
-              <span key={`${lineIndex}-${partKey++}`}>
-                {remainingText.substring(0, boldMatch.index)}
-              </span>
-            );
-          }
-
-          // הוסף את ה-bold
-          parts.push(
-            <strong key={`${lineIndex}-${partKey++}`} className="font-bold">
-              {boldMatch[1]}
-            </strong>
-          );
-
-          // המשך עם שאר הטקסט
-          remainingText = remainingText.substring(boldMatch.index + boldMatch[0].length);
-          continue;
-        }
-
-        // חיפוש *italic* (רק אם לא מצאנו bold)
-        const italicMatch = remainingText.match(/\*(.+?)\*/);
-        if (italicMatch && italicMatch.index !== undefined) {
-          // הוסף טקסט רגיל לפני ה-italic
-          if (italicMatch.index > 0) {
-            parts.push(
-              <span key={`${lineIndex}-${partKey++}`}>
-                {remainingText.substring(0, italicMatch.index)}
-              </span>
-            );
-          }
-
-          // הוסף את ה-italic
-          parts.push(
-            <em key={`${lineIndex}-${partKey++}`} className="italic">
-              {italicMatch[1]}
-            </em>
-          );
-
-          // המשך עם שאר הטקסט
-          remainingText = remainingText.substring(italicMatch.index + italicMatch[0].length);
-          continue;
-        }
-
-        // אם לא מצאנו עיצוב נוסף, הוסף את כל מה שנשאר
-        if (remainingText.length > 0) {
-          parts.push(<span key={`${lineIndex}-${partKey++}`}>{remainingText}</span>);
-        }
-        break;
+      if (earliest === null || match.index < earliest.index) {
+        earliest = { type, index: match.index, match };
       }
+    }
 
-      // החזר את השורה עם <br> בסוף (חוץ מהשורה האחרונה)
-      return (
-        <React.Fragment key={lineIndex}>
-          {parts.length > 0 ? parts : line || '\u00A0'}
-          {lineIndex < lines.length - 1 && <br />}
-        </React.Fragment>
-      );
+    if (!earliest) {
+      tokens.push({ type: 'text', value: remaining });
+      break;
+    }
+
+    if (earliest.index > 0) {
+      tokens.push({ type: 'text', value: remaining.slice(0, earliest.index) });
+    }
+
+    // לקישור לוקחים את ההתאמה המלאה; לעיצוב לוקחים את התוכן שבתוך הסימונים
+    tokens.push({
+      type: earliest.type,
+      value: earliest.type === 'url' ? earliest.match[0] : earliest.match[1],
     });
-  };
+
+    remaining = remaining.slice(earliest.index + earliest.match[0].length);
+  }
+
+  return tokens;
+};
+
+const renderToken = (token: Token, key: string): React.ReactNode => {
+  switch (token.type) {
+    case 'url':
+      return (
+        <a
+          key={key}
+          href={token.value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+          dir="ltr"
+        >
+          {token.value}
+        </a>
+      );
+    case 'bold':
+      return (
+        <strong key={key} className="font-bold">
+          {token.value}
+        </strong>
+      );
+    case 'italic':
+      return (
+        <em key={key} className="italic">
+          {token.value}
+        </em>
+      );
+    default:
+      return <span key={key}>{token.value}</span>;
+  }
+};
+
+/** רווח קשיח - שומר על גובה שורה ריקה */
+const NBSP = ' ';
+
+export const FormattedText: React.FC<FormattedTextProps> = ({ content, className = '' }) => {
+  const urls = useMemo(() => extractUrls(content), [content]);
+  const lines = useMemo(() => content.split('\n').map(tokenizeLine), [content]);
 
   return (
     <div className={className}>
-      {/* Main formatted text */}
-      <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-100" style={{ direction: 'rtl', textAlign: 'right' }}>
-        {formatText(content)}
+      <div
+        className="whitespace-pre-wrap text-gray-800 dark:text-gray-100"
+        style={{ direction: 'rtl', textAlign: 'right' }}
+      >
+        {lines.map((tokens, lineIndex) => (
+          <React.Fragment key={lineIndex}>
+            {tokens.length > 0
+              ? tokens.map((token, tokenIndex) =>
+                  renderToken(token, `${lineIndex}-${tokenIndex}`)
+                )
+              : NBSP}
+            {lineIndex < lines.length - 1 && <br />}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* Link previews at the bottom */}
       {urls.length > 0 && (
         <div className="mt-4 space-y-3">
           {urls.map((url, index) => (

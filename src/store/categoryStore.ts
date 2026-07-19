@@ -1,169 +1,118 @@
 /**
- * Zustand Store for Category Management
+ * Zustand Store לניהול קטגוריות
+ *
+ * ניהול המנוי זהה לזה של `noteStore`: מאזין יחיד עם ספירת צרכנים,
+ * כך שכמה קומפוננטות יכולות לצרוך את אותן קטגוריות בלי לפתוח
+ * מאזינים מיותרים ובלי שאחת תסגור את המנוי של השאר.
  */
 
 import { create } from 'zustand';
+import { Unsubscribe } from 'firebase/firestore';
 import * as categoryAPI from '@/services/api/categories';
-import type { Category } from '@/types';
+import { getErrorMessage } from '@/utils/errors';
+import { logger } from '@/utils/logger';
+import type { Category, CategoryInput } from '@/types';
 
 interface CategoryState {
-  // State
   categories: Category[];
   isLoading: boolean;
   error: string | null;
-  unsubscribe: (() => void) | null;
-  currentUserId: string | null;
 
-  // Actions
-  setCategories: (categories: Category[]) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
+  _unsubscribe: Unsubscribe | null;
+  _subscribedUserId: string | null;
+  _subscriberCount: number;
 
-  // CRUD Operations
+  subscribe: (userId: string) => void;
+  unsubscribe: () => void;
+
   createCategory: (userId: string, name: string, color?: string) => Promise<void>;
-  updateCategory: (categoryId: string, updates: Partial<Category>) => Promise<void>;
+  updateCategory: (categoryId: string, updates: Partial<CategoryInput>) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
-
-  // Real-time subscription
-  subscribeToCategories: (userId: string) => void;
-  unsubscribeFromCategories: () => void;
-
-  // Reset
-  reset: () => void;
+  clearError: () => void;
 }
 
-export const useCategoryStore = create<CategoryState>((set, get) => ({
-  // Initial state
-  categories: [],
-  isLoading: false,
-  error: null,
-  unsubscribe: null,
-  currentUserId: null,
-
-  /**
-   * Set categories
-   */
-  setCategories: (categories) => {
-    set({ categories, isLoading: false, error: null });
-  },
-
-  /**
-   * Set loading state
-   */
-  setLoading: (isLoading) => {
-    set({ isLoading });
-  },
-
-  /**
-   * Set error
-   */
-  setError: (error) => {
-    set({ error, isLoading: false });
-  },
-
-  /**
-   * Create a new category
-   */
-  createCategory: async (userId: string, name: string, color?: string) => {
+export const useCategoryStore = create<CategoryState>((set, get) => {
+  const runWrite = async <T>(action: () => Promise<T>): Promise<T> => {
+    set({ error: null });
     try {
-      set({ isLoading: true, error: null });
-      await categoryAPI.createCategory(userId, name, color);
-      // Real-time listener will update the categories
-      set({ isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
+      return await action();
+    } catch (error) {
+      set({ error: getErrorMessage(error) });
       throw error;
     }
-  },
+  };
 
-  /**
-   * Update a category
-   */
-  updateCategory: async (categoryId: string, updates: Partial<Category>) => {
-    try {
-      set({ isLoading: true, error: null });
-      await categoryAPI.updateCategory(categoryId, updates);
-      // Real-time listener will update the categories
-      set({ isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
+  return {
+    categories: [],
+    isLoading: false,
+    error: null,
 
-  /**
-   * Delete a category
-   */
-  deleteCategory: async (categoryId: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      await categoryAPI.deleteCategory(categoryId);
-      // Real-time listener will update the categories
-      set({ isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
+    _unsubscribe: null,
+    _subscribedUserId: null,
+    _subscriberCount: 0,
 
-  /**
-   * Subscribe to real-time categories updates
-   */
-  subscribeToCategories: (userId: string) => {
-    const { unsubscribe, currentUserId } = get();
+    subscribe: (userId: string) => {
+      const { _subscribedUserId, _subscriberCount, _unsubscribe } = get();
 
-    // If already subscribed to this user, do nothing
-    if (currentUserId === userId && unsubscribe) {
-      console.log('Already subscribed to user:', userId);
-      return;
-    }
+      if (_subscribedUserId === userId && _unsubscribe) {
+        set({ _subscriberCount: _subscriberCount + 1 });
+        return;
+      }
 
-    // Unsubscribe from previous subscription if exists
-    if (unsubscribe) {
-      unsubscribe();
-    }
+      if (_unsubscribe) {
+        _unsubscribe();
+      }
 
-    console.log('Creating new subscription for user:', userId);
-    set({ isLoading: true, currentUserId: userId });
+      logger.debug('Subscribing to categories for user:', userId);
+      set({
+        isLoading: true,
+        categories: [],
+        _subscribedUserId: userId,
+        _subscriberCount: 1,
+      });
 
-    // Set a timeout to stop loading state if subscription takes too long
-    const loadingTimeout = setTimeout(() => {
-      set({ isLoading: false });
-    }, 3000); // 3 seconds timeout
+      const unsubscribe = categoryAPI.subscribeToCategories(userId, (categories) => {
+        set({ categories, isLoading: false, error: null });
+      });
 
-    const newUnsubscribe = categoryAPI.subscribeToCategories(userId, (categories) => {
-      clearTimeout(loadingTimeout);
-      set({ categories, isLoading: false, error: null });
-    });
+      set({ _unsubscribe: unsubscribe });
+    },
 
-    set({ unsubscribe: newUnsubscribe });
-  },
+    unsubscribe: () => {
+      const { _subscriberCount, _unsubscribe } = get();
+      const remaining = Math.max(0, _subscriberCount - 1);
 
-  /**
-   * Unsubscribe from categories updates
-   */
-  unsubscribeFromCategories: () => {
-    const { unsubscribe } = get();
-    if (unsubscribe) {
-      unsubscribe();
-      set({ unsubscribe: null, currentUserId: null });
-    }
-  },
+      if (remaining > 0) {
+        set({ _subscriberCount: remaining });
+        return;
+      }
 
-  /**
-   * Reset store
-   */
-  reset: () => {
-    const { unsubscribe } = get();
-    if (unsubscribe) {
-      unsubscribe();
-    }
-    set({
-      categories: [],
-      isLoading: false,
-      error: null,
-      unsubscribe: null,
-      currentUserId: null,
-    });
-  },
-}));
+      if (_unsubscribe) {
+        logger.debug('Last subscriber left, closing categories subscription');
+        _unsubscribe();
+      }
+
+      set({
+        categories: [],
+        isLoading: false,
+        _unsubscribe: null,
+        _subscribedUserId: null,
+        _subscriberCount: 0,
+      });
+    },
+
+    createCategory: async (userId, name, color) => {
+      await runWrite(() => categoryAPI.createCategory(userId, name, color));
+    },
+
+    updateCategory: async (categoryId, updates) => {
+      await runWrite(() => categoryAPI.updateCategory(categoryId, updates));
+    },
+
+    deleteCategory: async (categoryId) => {
+      await runWrite(() => categoryAPI.deleteCategory(categoryId));
+    },
+
+    clearError: () => set({ error: null }),
+  };
+});

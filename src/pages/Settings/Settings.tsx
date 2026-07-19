@@ -8,6 +8,8 @@ import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { saveGeminiApiKey, getGeminiApiKey } from '@/services/api/userSettings';
+import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/errors';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -17,23 +19,31 @@ export const Settings: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadSettings();
-    }
-  }, [user]);
+  const userId = user?.uid;
 
-  const loadSettings = async () => {
-    if (!user) return;
-    try {
-      const apiKey = await getGeminiApiKey(user.uid);
-      if (apiKey) {
-        setGeminiApiKey(apiKey);
+  useEffect(() => {
+    if (!userId) return;
+
+    let cancelled = false;
+
+    const loadSettings = async () => {
+      try {
+        const apiKey = await getGeminiApiKey(userId);
+        // מתעלמים מתשובה שהגיעה אחרי שהקומפוננטה כבר פורקה
+        if (apiKey && !cancelled) {
+          setGeminiApiKey(apiKey);
+        }
+      } catch (error) {
+        logger.error('Error loading settings:', error);
       }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
+    };
+
+    loadSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -46,8 +56,8 @@ export const Settings: React.FC = () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('שגיאה בשמירת ההגדרות');
+      logger.error('Error saving settings:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }

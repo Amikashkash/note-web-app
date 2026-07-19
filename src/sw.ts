@@ -1,6 +1,10 @@
 /**
- * Custom Service Worker for handling notifications
- * This provides more reliable notification support for PWA
+ * Service Worker מותאם
+ *
+ * אחראי על שלושה דברים:
+ * 1. קליטת שיתופים נכנסים (Web Share Target)
+ * 2. אסטרטגיות cache לנכסים סטטיים
+ * 3. תזמון והצגה של התראות תזכורת
  */
 
 /// <reference lib="webworker" />
@@ -11,308 +15,201 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import type { ReminderMessage, ReminderMessageResult, ScheduledReminder } from './types/reminder';
 
-// ==================== SHARE TARGET HANDLING ====================
-// This MUST be before Workbox routes to intercept POST requests
+// ==================== קליטת שיתוף נכנס ====================
+// חייב להירשם לפני מסלולי Workbox כדי לתפוס בקשות POST
 
-/**
- * Handle POST requests from Web Share Target API
- * Converts FormData to cache storage and redirects with short ID
- */
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Check if this is a share target POST request
-  if (event.request.method === 'POST' && url.pathname === '/share') {
-    console.log('🔗 SW: Intercepting share POST request');
-
-    event.respondWith(
-      (async () => {
-        try {
-          const formData = await event.request.formData();
-          const title = formData.get('title') || '';
-          const text = formData.get('text') || '';
-          const urlParam = formData.get('url') || '';
-
-          console.log('📦 SW: Received share data:');
-          console.log('  - Title length:', String(title).length);
-          console.log('  - Text length:', String(text).length);
-          console.log('  - URL length:', String(urlParam).length);
-          console.log('  - URL:', urlParam ? String(urlParam).substring(0, 100) + '...' : '(empty)');
-
-          // Store shared data in cache with unique ID
-          const shareId = `share-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const cache = await caches.open('share-data-cache');
-
-          const shareData = {
-            title,
-            text,
-            url: urlParam,
-            timestamp: Date.now(),
-          };
-
-          // Store as a cache entry
-          await cache.put(
-            new Request(`/share-data/${shareId}`),
-            new Response(JSON.stringify(shareData), {
-              headers: { 'Content-Type': 'application/json' },
-            })
-          );
-
-          console.log('✅ SW: Stored share data with ID:', shareId);
-
-          // Get the origin for proper redirect
-          const origin = self.location.origin;
-          const redirectUrl = `${origin}/share?shareId=${shareId}`;
-
-          console.log('↩️ SW: Redirecting to:', redirectUrl);
-
-          return Response.redirect(redirectUrl, 303);
-        } catch (error) {
-          console.error('❌ SW: Error handling share POST:', error);
-          // Fallback to share page without data
-          const origin = self.location.origin;
-          return Response.redirect(`${origin}/share`, 303);
-        }
-      })()
-    );
-
-    // Prevent further event propagation
+  if (event.request.method !== 'POST' || url.pathname !== '/share') {
     return;
   }
+
+  event.respondWith(
+    (async () => {
+      const origin = self.location.origin;
+
+      try {
+        const formData = await event.request.formData();
+        const shareData = {
+          title: formData.get('title') ?? '',
+          text: formData.get('text') ?? '',
+          url: formData.get('url') ?? '',
+          timestamp: Date.now(),
+        };
+
+        // התוכן המשותף עלול להיות גדול מדי ל-query string, ולכן נשמר
+        // ב-cache ומועבר לדף בעזרת מזהה קצר.
+        const shareId = `share-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        const cache = await caches.open('share-data-cache');
+
+        await cache.put(
+          new Request(`/share-data/${shareId}`),
+          new Response(JSON.stringify(shareData), {
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+
+        return Response.redirect(`${origin}/share?shareId=${shareId}`, 303);
+      } catch (error) {
+        console.error('SW: Error handling share POST:', error);
+        return Response.redirect(`${origin}/share`, 303);
+      }
+    })()
+  );
 });
 
-// Precache all assets
-precacheAndRoute(self.__WB_MANIFEST);
+// ==================== Cache ====================
 
-// Cleanup old caches
+precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// Route for navigation requests - always try network first with short timeout
+// ניווטים - רשת תחילה, עם נפילה ל-cache אם הרשת איטית
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
       cacheName: 'pages-cache',
-      networkTimeoutSeconds: 3, // Fallback to cache after 3 seconds
-      plugins: [
-        new CacheableResponsePlugin({
-          statuses: [0, 200],
-        }),
-      ],
+      networkTimeoutSeconds: 3,
+      plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
     })
   )
 );
 
-// Cache Google Fonts
+// גופנים של Google - כמעט ולא משתנים
 registerRoute(
   /^https:\/\/fonts\.googleapis\.com\/.*/i,
   new CacheFirst({
     cacheName: 'google-fonts-cache',
     plugins: [
-      new ExpirationPlugin({
-        maxEntries: 10,
-        maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
+      new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   }),
   'GET'
 );
 
-// Don't cache Firebase API calls (Firestore, Auth, Functions)
-// These need to always be fresh to avoid stale data
-registerRoute(
-  /^https:\/\/firestore\.googleapis\.com\/.*/i,
-  new NetworkFirst({
-    cacheName: 'firestore-api',
-    networkTimeoutSeconds: 5,
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 0, // Don't cache
-      }),
-    ],
-  })
-);
-
-registerRoute(
-  /^https:\/\/.*\.firebaseapp\.com\/.*/i,
-  new NetworkFirst({
-    cacheName: 'firebase-app',
-    networkTimeoutSeconds: 5,
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 0, // Don't cache
-      }),
-    ],
-  })
-);
-
-// Cache Firebase Storage (images, files, etc.)
+// קבצים מ-Firebase Storage
 registerRoute(
   /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
   new NetworkFirst({
     cacheName: 'firebase-storage-cache',
     networkTimeoutSeconds: 5,
     plugins: [
-      new ExpirationPlugin({
-        maxEntries: 50,
-        maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
+      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 }),
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   }),
   'GET'
 );
 
-// ==================== NOTIFICATION HANDLING ====================
+// שים לב: אין כאן מסלול ל-firestore.googleapis.com בכוונה.
+// ה-SDK של Firestore מנהל בעצמו חיבור מתמשך ושכבת מטמון offline משלו,
+// ועטיפה שלו ב-Workbox רק פוגעת בסנכרון בזמן אמת. (בגרסה קודמת היה כאן
+// מסלול עם `maxEntries: 0` שנועד "לא לשמור" - אבל ערך 0 פשוט מתעלמים
+// ממנו, כך שהתגובות דווקא כן נשמרו ב-cache.)
 
-interface ReminderData {
-  noteId: string;
-  title: string;
-  body: string;
-  reminderTime: number;
-}
+// ==================== התראות ====================
 
-// Store for scheduled reminders
-const scheduledReminders = new Map<string, number>();
+/** טיימרים פעילים, לפי מזהה פתק */
+const scheduledTimers = new Map<string, number>();
 
-/**
- * Schedule a notification to be shown at a specific time
- */
-self.addEventListener('message', (event) => {
-  const { type, data } = event.data;
-
-  if (type === 'SCHEDULE_REMINDER') {
-    const reminderData: ReminderData = data;
-    const timeUntilReminder = reminderData.reminderTime - Date.now();
-
-    console.log('📅 SW: Scheduling reminder:', reminderData.title);
-    console.log('⏰ SW: Time until reminder:', Math.round(timeUntilReminder / 1000 / 60), 'minutes');
-
-    if (timeUntilReminder <= 0) {
-      // Show immediately
-      console.log('🔔 SW: Showing reminder immediately');
-      showReminderNotification(reminderData);
-    } else {
-      // Cancel existing reminder for this note if any
-      const existingTimerId = scheduledReminders.get(reminderData.noteId);
-      if (existingTimerId) {
-        clearTimeout(existingTimerId);
-      }
-
-      // Schedule new reminder
-      const timerId = self.setTimeout(() => {
-        console.log('🔔 SW: Reminder time reached for:', reminderData.title);
-        showReminderNotification(reminderData);
-        scheduledReminders.delete(reminderData.noteId);
-      }, timeUntilReminder);
-
-      scheduledReminders.set(reminderData.noteId, timerId);
-      console.log('✅ SW: Reminder scheduled successfully');
-    }
-
-    // Send acknowledgment back to client
-    event.ports[0]?.postMessage({ success: true });
-  } else if (type === 'CANCEL_REMINDER') {
-    const noteId = data.noteId;
-    const timerId = scheduledReminders.get(noteId);
-
-    if (timerId) {
-      clearTimeout(timerId);
-      scheduledReminders.delete(noteId);
-      console.log('🗑️ SW: Cancelled reminder for note:', noteId);
-    }
-
-    event.ports[0]?.postMessage({ success: true });
-  }
-});
-
-/**
- * Show a notification using Service Worker's showNotification API
- * This is more reliable than the browser's Notification API
- */
-async function showReminderNotification(data: ReminderData) {
+const showReminderNotification = async (reminder: ScheduledReminder): Promise<void> => {
   try {
-    console.log('🔔 SW: Showing notification:', data.title);
-
-    await self.registration.showNotification(data.title, {
-      body: data.body,
+    await self.registration.showNotification(reminder.title, {
+      body: reminder.body,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      tag: `note-${data.noteId}`,
+      tag: `note-${reminder.noteId}`,
       requireInteraction: true,
-      silent: false,
-      data: {
-        noteId: data.noteId,
-        url: '/', // Will open the app
-      },
+      data: { noteId: reminder.noteId },
       actions: [
-        {
-          action: 'open',
-          title: 'פתח פתק',
-        },
-        {
-          action: 'close',
-          title: 'סגור',
-        },
+        { action: 'open', title: 'פתח פתק' },
+        { action: 'close', title: 'סגור' },
       ],
     } as NotificationOptions);
-
-    console.log('✅ SW: Notification shown successfully');
   } catch (error) {
-    console.error('❌ SW: Error showing notification:', error);
+    console.error('SW: Error showing notification:', error);
   }
-}
+};
 
 /**
- * Handle notification click
+ * מחליף את כל התזכורות המתוזמנות ברשימה חדשה.
+ *
+ * החלפה מלאה (ולא הוספה/ביטול פרטני) מונעת מצב שבו טיימר של פתק שנמחק
+ * או שהתזכורת שלו בוטלה נשאר תלוי ומצוץ בכל זאת.
  */
-self.addEventListener('notificationclick', (event) => {
-  console.log('🖱️ SW: Notification clicked:', event.action);
+const syncReminders = (reminders: ScheduledReminder[]): number => {
+  for (const timerId of scheduledTimers.values()) {
+    clearTimeout(timerId);
+  }
+  scheduledTimers.clear();
 
-  event.notification.close();
+  const now = Date.now();
+  let scheduled = 0;
 
-  if (event.action === 'close') {
-    return;
+  for (const reminder of reminders) {
+    const delay = reminder.reminderTime - now;
+
+    if (delay <= 0) {
+      void showReminderNotification(reminder);
+      continue;
+    }
+
+    const timerId = self.setTimeout(() => {
+      scheduledTimers.delete(reminder.noteId);
+      void showReminderNotification(reminder);
+    }, delay);
+
+    scheduledTimers.set(reminder.noteId, timerId);
+    scheduled += 1;
   }
 
-  // Open the app when notification is clicked
+  return scheduled;
+};
+
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  const message = event.data as ReminderMessage | undefined;
+  if (message?.type !== 'SYNC_REMINDERS') return;
+
+  const scheduled = syncReminders(message.reminders ?? []);
+
+  const result: ReminderMessageResult = { success: true, scheduled };
+  event.ports[0]?.postMessage(result);
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'close') return;
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if app is already open
+    (async () => {
+      const clientList = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+
+      // אם האפליקציה כבר פתוחה - מעבירים אליה פוקוס במקום לפתוח חלון נוסף
       for (const client of clientList) {
-        if (client.url.includes(self.registration.scope) && 'focus' in client) {
+        if (client.url.startsWith(self.registration.scope)) {
           return client.focus();
         }
       }
 
-      // Open new window if app is not open
-      if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
-      }
-    })
+      await self.clients.openWindow('/');
+    })()
   );
 });
 
-/**
- * Handle notification close
- */
-self.addEventListener('notificationclose', () => {
-  console.log('🔕 SW: Notification closed');
-});
+// ==================== מחזור חיים ====================
 
-// Activate immediately
 self.addEventListener('install', () => {
-  console.log('🔧 SW: Installing...');
-  self.skipWaiting();
+  void self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('✅ SW: Activated');
   event.waitUntil(self.clients.claim());
 });
 

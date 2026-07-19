@@ -1,167 +1,146 @@
 /**
  * Zustand Store לניהול מצב הפתקים
+ *
+ * ניהול המנוי:
+ * הרבה קומפוננטות (כל `CategoryItem`, וכן דפים שונים) צורכות את אותה רשימת
+ * פתקים. לכן המנוי ל-Firestore הוא יחיד וגלובלי, עם ספירת מנויים: המאזין
+ * נפתח כשהצרכן הראשון נרשם ונסגר רק כשהאחרון עוזב. בלי זה כל קומפוננטה
+ * הייתה סוגרת את המאזין המשותף ומרוקנת את הרשימה לכולם.
  */
 
 import { create } from 'zustand';
+import { Unsubscribe } from 'firebase/firestore';
 import { Note, NoteInput } from '@/types/note';
 import * as noteAPI from '@/services/api/notes';
-import { Unsubscribe } from 'firebase/firestore';
+import { getErrorMessage } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 interface NoteState {
-  // State
+  // מצב
   notes: Note[];
   isLoading: boolean;
   error: string | null;
-  unsubscribe: Unsubscribe | null;
 
-  // Actions
-  subscribeToNotes: (userId: string) => void;
-  subscribeToNotesByCategory: (categoryId: string) => void;
-  unsubscribeFromNotes: () => void;
+  // ניהול מנוי פנימי - לא לשימוש ישיר מקומפוננטות
+  _unsubscribe: Unsubscribe | null;
+  _subscribedUserId: string | null;
+  _subscriberCount: number;
+
+  // מנוי
+  subscribe: (userId: string) => void;
+  unsubscribe: () => void;
+
+  // פעולות
   createNote: (noteInput: NoteInput) => Promise<string>;
   updateNote: (noteId: string, updates: Partial<NoteInput>) => Promise<void>;
-  deleteNote: (noteId: string) => Promise<void>;
-  reorderNote: (noteId: string, newOrder: number) => Promise<void>;
+  archiveNote: (noteId: string) => Promise<void>;
+  reorderNotes: (orderedIds: string[]) => Promise<void>;
   togglePinNote: (noteId: string, isPinned: boolean) => Promise<void>;
-  getNotesByCategory: (categoryId: string) => Note[];
   clearError: () => void;
+  reset: () => void;
 }
 
-export const useNoteStore = create<NoteState>((set, get) => ({
-  // Initial state
-  notes: [],
-  isLoading: false,
-  error: null,
-  unsubscribe: null,
-
+export const useNoteStore = create<NoteState>((set, get) => {
   /**
-   * מנוי לכל הפתקים של משתמש
+   * עוטף פעולת כתיבה: מנקה שגיאה קודמת, ובכישלון שומר הודעה קריאה
+   * ומעביר את השגיאה הלאה כדי שהקורא יוכל להגיב.
    */
-  subscribeToNotes: (userId: string) => {
-    // ניקוי מנוי קודם אם קיים
-    const { unsubscribe } = get();
-    if (unsubscribe) {
-      unsubscribe();
-    }
-
-    set({ isLoading: true });
-
-    const newUnsubscribe = noteAPI.subscribeToNotes(userId, (notes) => {
-      set({ notes, isLoading: false, error: null });
-    });
-
-    set({ unsubscribe: newUnsubscribe });
-  },
-
-  /**
-   * מנוי לפתקים של קטגוריה ספציפית
-   */
-  subscribeToNotesByCategory: (categoryId: string) => {
-    const { unsubscribe } = get();
-    if (unsubscribe) {
-      unsubscribe();
-    }
-
-    set({ isLoading: true });
-
-    const newUnsubscribe = noteAPI.subscribeToNotesByCategory(categoryId, (notes) => {
-      set({ notes, isLoading: false, error: null });
-    });
-
-    set({ unsubscribe: newUnsubscribe });
-  },
-
-  /**
-   * ביטול מנוי
-   */
-  unsubscribeFromNotes: () => {
-    const { unsubscribe } = get();
-    if (unsubscribe) {
-      unsubscribe();
-      set({ unsubscribe: null, notes: [] });
-    }
-  },
-
-  /**
-   * יצירת פתק חדש
-   */
-  createNote: async (noteInput: NoteInput) => {
+  const runWrite = async <T>(action: () => Promise<T>): Promise<T> => {
+    set({ error: null });
     try {
-      set({ error: null });
-      const noteId = await noteAPI.createNote(noteInput);
-      return noteId;
+      return await action();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create note';
-      set({ error: errorMessage });
+      set({ error: getErrorMessage(error) });
       throw error;
     }
-  },
+  };
 
-  /**
-   * עדכון פתק
-   */
-  updateNote: async (noteId: string, updates: Partial<NoteInput>) => {
-    try {
-      set({ error: null });
-      await noteAPI.updateNote(noteId, updates);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update note';
-      set({ error: errorMessage });
-      throw error;
-    }
-  },
+  return {
+    notes: [],
+    isLoading: false,
+    error: null,
 
-  /**
-   * מחיקת פתק (העברה לארכיון)
-   */
-  deleteNote: async (noteId: string) => {
-    try {
-      set({ error: null });
-      await noteAPI.archiveNote(noteId);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to archive note';
-      set({ error: errorMessage });
-      throw error;
-    }
-  },
+    _unsubscribe: null,
+    _subscribedUserId: null,
+    _subscriberCount: 0,
 
-  /**
-   * שינוי סדר פתק
-   */
-  reorderNote: async (noteId: string, newOrder: number) => {
-    try {
-      set({ error: null });
-      await noteAPI.reorderNote(noteId, newOrder);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reorder note';
-      set({ error: errorMessage });
-      throw error;
-    }
-  },
+    subscribe: (userId: string) => {
+      const { _subscribedUserId, _subscriberCount, _unsubscribe } = get();
 
-  /**
-   * הצמדה/ביטול הצמדה של פתק
-   */
-  togglePinNote: async (noteId: string, isPinned: boolean) => {
-    try {
-      set({ error: null });
-      await noteAPI.togglePinNote(noteId, isPinned);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to toggle pin note';
-      set({ error: errorMessage });
-      throw error;
-    }
-  },
+      // כבר מנויים לאותו משתמש - רק מעדכנים את מונה הצרכנים
+      if (_subscribedUserId === userId && _unsubscribe) {
+        set({ _subscriberCount: _subscriberCount + 1 });
+        return;
+      }
 
-  /**
-   * קבלת פתקים לפי קטגוריה (מהסטייט המקומי)
-   */
-  getNotesByCategory: (categoryId: string) => {
-    return get().notes.filter(note => note.categoryId === categoryId);
-  },
+      // החליף משתמש (התחברות מחדש) - סוגרים את המאזין הישן
+      if (_unsubscribe) {
+        _unsubscribe();
+      }
 
-  /**
-   * ניקוי שגיאות
-   */
-  clearError: () => set({ error: null }),
-}));
+      logger.debug('Subscribing to notes for user:', userId);
+      set({
+        isLoading: true,
+        notes: [],
+        _subscribedUserId: userId,
+        _subscriberCount: 1,
+      });
+
+      const unsubscribe = noteAPI.subscribeToNotes(userId, (notes) => {
+        set({ notes, isLoading: false, error: null });
+      });
+
+      set({ _unsubscribe: unsubscribe });
+    },
+
+    unsubscribe: () => {
+      const { _subscriberCount, _unsubscribe } = get();
+      const remaining = Math.max(0, _subscriberCount - 1);
+
+      if (remaining > 0) {
+        set({ _subscriberCount: remaining });
+        return;
+      }
+
+      // הצרכן האחרון עזב - סוגרים את המאזין בפועל
+      if (_unsubscribe) {
+        logger.debug('Last subscriber left, closing notes subscription');
+        _unsubscribe();
+      }
+
+      set({
+        notes: [],
+        isLoading: false,
+        _unsubscribe: null,
+        _subscribedUserId: null,
+        _subscriberCount: 0,
+      });
+    },
+
+    createNote: (noteInput) => runWrite(() => noteAPI.createNote(noteInput)),
+
+    updateNote: (noteId, updates) => runWrite(() => noteAPI.updateNote(noteId, updates)),
+
+    archiveNote: (noteId) => runWrite(() => noteAPI.archiveNote(noteId)),
+
+    reorderNotes: (orderedIds) => runWrite(() => noteAPI.reorderNotes(orderedIds)),
+
+    togglePinNote: (noteId, isPinned) =>
+      runWrite(() => noteAPI.togglePinNote(noteId, isPinned)),
+
+    clearError: () => set({ error: null }),
+
+    reset: () => {
+      const { _unsubscribe } = get();
+      if (_unsubscribe) _unsubscribe();
+      set({
+        notes: [],
+        isLoading: false,
+        error: null,
+        _unsubscribe: null,
+        _subscribedUserId: null,
+        _subscriberCount: 0,
+      });
+    },
+  };
+});

@@ -1,5 +1,7 @@
 /**
  * קבועים גלובליים לאפליקציה
+ *
+ * הגדרות התבניות (שמות, אייקונים) נמצאות ב-`utils/templates.ts`.
  */
 
 // צבעים זמינים לבחירה
@@ -20,36 +22,12 @@ export const DEFAULT_COLORS = {
   note: null,
 } as const;
 
-// סוגי תבניות
-export const TEMPLATE_TYPES = {
-  PLAIN: 'plain',
-  CHECKLIST: 'checklist',
-  RECIPE: 'recipe',
-  SHOPPING: 'shopping',
-  WORKPLAN: 'workplan',
-} as const;
-
-// שמות תבניות בעברית
-export const TEMPLATE_NAMES_HE = {
-  plain: 'טקסט חופשי',
-  checklist: 'רשימת משימות',
-  recipe: 'מתכון בישול',
-  shopping: 'רשימת קניות',
-  workplan: 'תכנית עבודה',
-} as const;
-
-// שמות תבניות באנגלית
-export const TEMPLATE_NAMES_EN = {
-  plain: 'Plain Text',
-  checklist: 'Checklist',
-  recipe: 'Cooking Recipe',
-  shopping: 'Shopping List',
-  workplan: 'Work Plan',
-} as const;
-
 // הגבלות אורך
 export const LENGTH_LIMITS = {
-  NOTE_TITLE: 50, // תווים מקסימליים לכותרת פתק
-  CATEGORY_NAME: 30, // תווים מקסימליים לשם קטגוריה
-  TAG_NAME: 20, // תווים מקסימליים לתג
+  NOTE_TITLE: 50,
+  CATEGORY_NAME: 30,
+  TAG_NAME: 20,
 } as const;
+
+/** השהיה לפני שמירה אוטומטית בעריכה inline (מילישניות) */
+export const AUTOSAVE_DELAY_MS = 600;

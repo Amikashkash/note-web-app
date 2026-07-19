@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchLinkPreview, type LinkPreviewData } from '@/services/api/linkPreview';
+import { logger } from '@/utils/logger';
 
 interface LinkPreviewProps {
   url: string;
@@ -27,7 +28,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({ url, className = '' })
           setPreview(data);
         }
       } catch (err) {
-        console.error('Failed to load link preview:', err);
+        logger.error('Failed to load link preview:', err);
         if (mounted) {
           setError(true);
         }

@@ -34,8 +34,10 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
         return [];
       }
       // Validate each item has required properties
+      // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
+      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי
       return parsed.map((item, index) => ({
-        id: item.id || `item-${Date.now()}-${index}`,
+        id: item.id || `item-${index}`,
         name: item.name || '',
         quantity: item.quantity || '',
         checked: item.checked || false,

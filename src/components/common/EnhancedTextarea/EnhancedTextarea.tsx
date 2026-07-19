@@ -8,6 +8,7 @@
  */
 
 import React, { useRef, KeyboardEvent } from 'react';
+import { logger } from '@/utils/logger';
 
 interface EnhancedTextareaProps {
   value: string;
@@ -140,7 +141,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       }
 
       // אם השורה הנוכחית היא רק מספור/bullet ללא תוכן - בטל אותה
-      if (currentLine.match(/^(\d+\.|[\*-])\s*$/)) {
+      if (currentLine.match(/^(\d+\.|[*-])\s*$/)) {
         e.preventDefault();
         const lineStartPos = cursorPos - currentLine.length;
         const newText = value.substring(0, lineStartPos) + '\n' + value.substring(cursorPos);
@@ -224,11 +225,11 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         textarea.focus();
       }, 0);
     } catch (err) {
-      console.error('Failed to read clipboard:', err);
+      logger.error('Failed to read clipboard:', err);
       // אם אין הרשאה, נסה להשתמש ב-execCommand (fallback ישן)
       try {
         document.execCommand('paste');
-      } catch (e) {
+      } catch {
         alert('לא ניתן להדביק. אנא נסה שוב או השתמש בתפריט ההדבקה של הדפדפן.');
       }
     }

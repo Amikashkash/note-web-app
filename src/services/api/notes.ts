@@ -3,256 +3,90 @@
  */
 
 import {
-  collection,
   addDoc,
-  updateDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
   deleteDoc,
   doc,
-  query,
-  where,
-  onSnapshot,
-  Timestamp,
-  Unsubscribe,
+  getDoc,
   getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  Unsubscribe,
+  updateDoc,
+  where,
+  writeBatch,
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db } from '@/services/firebase/config';
 import { Note, NoteInput } from '@/types/note';
+import { byPinnedThenOrder, toNote } from './mappers';
+import { findUserIdByEmail } from './users';
+import { logger } from '@/utils/logger';
+import { wrapError } from '@/utils/errors';
 
 const NOTES_COLLECTION = 'notes';
+
+const noteRef = (noteId: string) => doc(db, NOTES_COLLECTION, noteId);
+const notesRef = () => collection(db, NOTES_COLLECTION);
+
+/**
+ * שדות שלא מתעדכנים בעדכון תוכן רגיל.
+ *
+ * `userId` ו-`sharedWith` הם שדות בעלות - חוקי Firestore חוסמים שינוי שלהם
+ * ע"י משתמש משותף. הסינון כאן מונע דחיות מיותרות כשקומפוננטה שולחת בטעות
+ * אובייקט פתק שלם, ומוודא ש-`updatedAt` נקבע רק ע"י השרת.
+ */
+const IMMUTABLE_FIELDS: readonly string[] = [
+  'id',
+  'userId',
+  'sharedWith',
+  'createdAt',
+  'updatedAt',
+];
+
+const stripImmutableFields = (updates: Partial<NoteInput>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(updates).filter(([key]) => !IMMUTABLE_FIELDS.includes(key))
+  );
 
 /**
  * יצירת פתק חדש
  */
 export const createNote = async (noteInput: NoteInput): Promise<string> => {
   try {
-    const noteData = {
+    const docRef = await addDoc(notesRef(), {
       ...noteInput,
       isArchived: false,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    };
-
-    const docRef = await addDoc(collection(db, NOTES_COLLECTION), noteData);
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
     return docRef.id;
   } catch (error) {
-    console.error('Error creating note:', error);
-    throw error;
+    logger.error('Error creating note:', error);
+    throw wrapError('שגיאה ביצירת הפתק', error);
   }
 };
 
 /**
- * עדכון פתק קיים
+ * עדכון פתק קיים.
+ *
+ * מקבל רק את השדות שהשתנו - לא אובייקט פתק שלם. שליחת אובייקט שלם
+ * דורסת שינויים מקבילים של משתמשים אחרים וכותבת שדות מיותרים למסמך.
  */
 export const updateNote = async (
   noteId: string,
   updates: Partial<NoteInput>
 ): Promise<void> => {
   try {
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    await updateDoc(noteRef, {
-      ...updates,
-      updatedAt: Timestamp.now(),
+    await updateDoc(noteRef(noteId), {
+      ...stripImmutableFields(updates),
+      updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Error updating note:', error);
-    throw error;
-  }
-};
-
-/**
- * מחיקת פתק
- */
-export const deleteNote = async (noteId: string): Promise<void> => {
-  try {
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    await deleteDoc(noteRef);
-  } catch (error) {
-    console.error('Error deleting note:', error);
-    throw error;
-  }
-};
-
-/**
- * קבלת כל הפתקים של קטגוריה ספציפית
- */
-export const getNotesByCategory = async (categoryId: string): Promise<Note[]> => {
-  try {
-    const q = query(
-      collection(db, NOTES_COLLECTION),
-      where('categoryId', '==', categoryId)
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Note))
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-  } catch (error) {
-    console.error('Error getting notes by category:', error);
-    throw error;
-  }
-};
-
-/**
- * מנוי לשינויים בפתקים של משתמש ספציפי (ללא מאורכבים)
- * כולל גם פתקים משותפים
- */
-export const subscribeToNotes = (
-  userId: string,
-  callback: (notes: Note[]) => void
-): Unsubscribe => {
-  // Query for owned notes
-  const ownedQuery = query(
-    collection(db, NOTES_COLLECTION),
-    where('userId', '==', userId)
-  );
-
-  // Query for shared notes
-  const sharedQuery = query(
-    collection(db, NOTES_COLLECTION),
-    where('sharedWith', 'array-contains', userId)
-  );
-
-  // Combine both queries using two listeners
-  let ownedNotes: Note[] = [];
-  let sharedNotes: Note[] = [];
-
-  const mergeAndCallback = () => {
-    // Combine and deduplicate
-    const allNotes = [...ownedNotes, ...sharedNotes];
-    const uniqueNotes = Array.from(
-      new Map(allNotes.map(note => [note.id, note])).values()
-    )
-      .filter(note => !note.isArchived) // Filter archived notes
-      .sort((a, b) => {
-        // Sort by categoryId first, then by order
-        if (a.categoryId !== b.categoryId) {
-          return a.categoryId.localeCompare(b.categoryId);
-        }
-        return (a.order || 0) - (b.order || 0);
-      });
-
-    callback(uniqueNotes);
-  };
-
-  const unsubscribeOwned = onSnapshot(
-    ownedQuery,
-    (snapshot) => {
-      ownedNotes = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Note));
-      mergeAndCallback();
-    },
-    (error) => {
-      console.error('Error in owned notes subscription:', error);
-    }
-  );
-
-  const unsubscribeShared = onSnapshot(
-    sharedQuery,
-    (snapshot) => {
-      sharedNotes = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Note));
-      mergeAndCallback();
-    },
-    (error) => {
-      console.error('Error in shared notes subscription:', error);
-    }
-  );
-
-  // Return a combined unsubscribe function
-  return () => {
-    unsubscribeOwned();
-    unsubscribeShared();
-  };
-};
-
-/**
- * מנוי לשינויים בפתקים של קטגוריה ספציפית (ללא מאורכבים)
- */
-export const subscribeToNotesByCategory = (
-  categoryId: string,
-  callback: (notes: Note[]) => void
-): Unsubscribe => {
-  const q = query(
-    collection(db, NOTES_COLLECTION),
-    where('categoryId', '==', categoryId)
-  );
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const notes = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        } as Note))
-        .filter(note => !note.isArchived) // סינון בצד לקוח - תומך בפתקים ישנים
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-      callback(notes);
-    },
-    (error) => {
-      console.error('Error in category notes subscription:', error);
-    }
-  );
-};
-
-/**
- * עדכון סדר פתק (לגרירה)
- */
-export const reorderNote = async (
-  noteId: string,
-  newOrder: number
-): Promise<void> => {
-  return updateNote(noteId, { order: newOrder });
-};
-
-/**
- * הצמדת/ביטול הצמדת פתק
- */
-export const togglePinNote = async (
-  noteId: string,
-  isPinned: boolean
-): Promise<void> => {
-  return updateNote(noteId, { isPinned });
-};
-
-/**
- * העברת פתק לארכיון (מחיקה רכה)
- */
-export const archiveNote = async (noteId: string): Promise<void> => {
-  try {
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    await updateDoc(noteRef, {
-      isArchived: true,
-      archivedAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-  } catch (error) {
-    console.error('Error archiving note:', error);
-    throw error;
-  }
-};
-
-/**
- * שחזור פתק מהארכיון
- */
-export const restoreNote = async (noteId: string): Promise<void> => {
-  try {
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    await updateDoc(noteRef, {
-      isArchived: false,
-      archivedAt: null,
-      updatedAt: Timestamp.now(),
-    });
-  } catch (error) {
-    console.error('Error restoring note:', error);
-    throw error;
+    logger.error('Error updating note:', error);
+    throw wrapError('שגיאה בעדכון הפתק', error);
   }
 };
 
@@ -260,7 +94,91 @@ export const restoreNote = async (noteId: string): Promise<void> => {
  * מחיקה סופית של פתק
  */
 export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
-  return deleteNote(noteId);
+  try {
+    await deleteDoc(noteRef(noteId));
+  } catch (error) {
+    logger.error('Error deleting note:', error);
+    throw wrapError('שגיאה במחיקת הפתק', error);
+  }
+};
+
+/**
+ * קבלת כל הפתקים של קטגוריה ספציפית (שליפה חד-פעמית)
+ */
+export const getNotesByCategory = async (categoryId: string): Promise<Note[]> => {
+  try {
+    const snapshot = await getDocs(query(notesRef(), where('categoryId', '==', categoryId)));
+    return snapshot.docs.map(toNote).sort(byPinnedThenOrder);
+  } catch (error) {
+    logger.error('Error getting notes by category:', error);
+    throw wrapError('שגיאה בטעינת הפתקים', error);
+  }
+};
+
+/**
+ * מנוי לשינויים בפתקים של משתמש (בבעלותו + משותפים איתו, ללא מאורכבים).
+ *
+ * Firestore לא תומך ב-OR בין שדות שונים, ולכן נדרשים שני מאזינים
+ * שתוצאותיהם ממוזגות. `callback` נקרא בכל פעם שאחד מהם מתעדכן.
+ */
+export const subscribeToNotes = (
+  userId: string,
+  callback: (notes: Note[]) => void
+): Unsubscribe => {
+  let ownedNotes: Note[] = [];
+  let sharedNotes: Note[] = [];
+  let ownedLoaded = false;
+  let sharedLoaded = false;
+
+  const emit = () => {
+    // ממתינים לתוצאה ראשונה משני המאזינים כדי לא להבהב רשימה חלקית
+    if (!ownedLoaded || !sharedLoaded) return;
+
+    const unique = Array.from(
+      new Map([...ownedNotes, ...sharedNotes].map((note) => [note.id, note])).values()
+    )
+      .filter((note) => !note.isArchived)
+      .sort((a, b) => {
+        if (a.categoryId !== b.categoryId) return a.categoryId.localeCompare(b.categoryId);
+        return byPinnedThenOrder(a, b);
+      });
+
+    callback(unique);
+  };
+
+  const unsubscribeOwned = onSnapshot(
+    query(notesRef(), where('userId', '==', userId)),
+    (snapshot) => {
+      ownedNotes = snapshot.docs.map(toNote);
+      ownedLoaded = true;
+      emit();
+    },
+    (error) => {
+      logger.error('Error in owned notes subscription:', error);
+      // מסמנים כ"נטען" כדי שכישלון של מאזין אחד לא יתקע את השני
+      ownedLoaded = true;
+      emit();
+    }
+  );
+
+  const unsubscribeShared = onSnapshot(
+    query(notesRef(), where('sharedWith', 'array-contains', userId)),
+    (snapshot) => {
+      sharedNotes = snapshot.docs.map(toNote);
+      sharedLoaded = true;
+      emit();
+    },
+    (error) => {
+      logger.error('Error in shared notes subscription:', error);
+      sharedLoaded = true;
+      emit();
+    }
+  );
+
+  return () => {
+    unsubscribeOwned();
+    unsubscribeShared();
+  };
 };
 
 /**
@@ -269,103 +187,116 @@ export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
 export const subscribeToArchivedNotes = (
   userId: string,
   callback: (notes: Note[]) => void
-): Unsubscribe => {
-  const q = query(
-    collection(db, NOTES_COLLECTION),
-    where('userId', '==', userId),
-    where('isArchived', '==', true)
-  );
-
-  return onSnapshot(
-    q,
+): Unsubscribe =>
+  onSnapshot(
+    query(notesRef(), where('userId', '==', userId), where('isArchived', '==', true)),
     (snapshot) => {
       const notes = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        } as Note))
-        .sort((a, b) => {
-          // Sort by archivedAt descending (newest first)
-          const aTime = a.archivedAt?.toMillis() || 0;
-          const bTime = b.archivedAt?.toMillis() || 0;
-          return bTime - aTime;
-        });
+        .map(toNote)
+        .sort((a, b) => (b.archivedAt?.toMillis() ?? 0) - (a.archivedAt?.toMillis() ?? 0));
       callback(notes);
     },
-    (error) => {
-      console.error('Error in archived notes subscription:', error);
-    }
+    (error) => logger.error('Error in archived notes subscription:', error)
   );
+
+/**
+ * עדכון סדר הפתקים בכתיבה אטומית אחת.
+ *
+ * `orderedIds` הוא סדר הפתקים הרצוי; המיקום במערך הופך לערך `order`.
+ */
+export const reorderNotes = async (orderedIds: string[]): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    orderedIds.forEach((noteId, index) => {
+      batch.update(noteRef(noteId), { order: index, updatedAt: serverTimestamp() });
+    });
+    await batch.commit();
+  } catch (error) {
+    logger.error('Error reordering notes:', error);
+    throw wrapError('שגיאה בשינוי סדר הפתקים', error);
+  }
 };
 
 /**
- * שיתוף פתק עם משתמש אחר לפי email
+ * הצמדת/ביטול הצמדת פתק
  */
-export const shareNoteWithUser = async (
-  noteId: string,
-  userEmail: string
-): Promise<void> => {
+export const togglePinNote = (noteId: string, isPinned: boolean): Promise<void> =>
+  updateNote(noteId, { isPinned });
+
+/**
+ * העברת פתק לארכיון (מחיקה רכה)
+ */
+export const archiveNote = async (noteId: string): Promise<void> => {
   try {
-    // Get user ID from email
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userEmail));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      throw new Error('משתמש לא נמצא במערכת');
-    }
-
-    const targetUserId = snapshot.docs[0].id;
-
-    // Get current note data
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    const noteSnapshot = await getDocs(query(collection(db, NOTES_COLLECTION), where('__name__', '==', noteId)));
-
-    if (noteSnapshot.empty) {
-      throw new Error('פתק לא נמצא');
-    }
-
-    const noteData = noteSnapshot.docs[0].data() as Note;
-    const currentSharedWith = noteData.sharedWith || [];
-
-    if (currentSharedWith.includes(targetUserId)) {
-      throw new Error('הפתק כבר משותף עם משתמש זה');
-    }
-
-    await updateDoc(noteRef, {
-      sharedWith: [...currentSharedWith, targetUserId],
-      updatedAt: Timestamp.now(),
+    await updateDoc(noteRef(noteId), {
+      isArchived: true,
+      archivedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
-  } catch (error: any) {
-    console.error('Error sharing note:', error);
-    throw error;
+  } catch (error) {
+    logger.error('Error archiving note:', error);
+    throw wrapError('שגיאה בהעברת הפתק לארכיון', error);
+  }
+};
+
+/**
+ * שחזור פתק מהארכיון
+ */
+export const restoreNote = async (noteId: string): Promise<void> => {
+  try {
+    await updateDoc(noteRef(noteId), {
+      isArchived: false,
+      archivedAt: null,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    logger.error('Error restoring note:', error);
+    throw wrapError('שגיאה בשחזור הפתק', error);
+  }
+};
+
+/**
+ * שיתוף פתק עם משתמש אחר לפי אימייל.
+ *
+ * `arrayUnion` הוא אטומי - שני שיתופים במקביל לא ידרסו זה את זה.
+ */
+export const shareNoteWithUser = async (noteId: string, userEmail: string): Promise<void> => {
+  const targetUserId = await findUserIdByEmail(userEmail);
+  if (!targetUserId) {
+    throw new Error('משתמש לא נמצא במערכת');
+  }
+
+  const snapshot = await getDoc(noteRef(noteId));
+  if (!snapshot.exists()) {
+    throw new Error('פתק לא נמצא');
+  }
+
+  if (toNote(snapshot).sharedWith.includes(targetUserId)) {
+    throw new Error('הפתק כבר משותף עם משתמש זה');
+  }
+
+  try {
+    await updateDoc(noteRef(noteId), {
+      sharedWith: arrayUnion(targetUserId),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    logger.error('Error sharing note:', error);
+    throw wrapError('שגיאה בשיתוף הפתק', error);
   }
 };
 
 /**
  * הסרת משתמש משיתוף פתק
  */
-export const unshareNoteWithUser = async (
-  noteId: string,
-  userId: string
-): Promise<void> => {
+export const unshareNoteWithUser = async (noteId: string, userId: string): Promise<void> => {
   try {
-    const noteRef = doc(db, NOTES_COLLECTION, noteId);
-    const noteSnapshot = await getDocs(query(collection(db, NOTES_COLLECTION), where('__name__', '==', noteId)));
-
-    if (noteSnapshot.empty) {
-      throw new Error('פתק לא נמצא');
-    }
-
-    const noteData = noteSnapshot.docs[0].data() as Note;
-    const currentSharedWith = noteData.sharedWith || [];
-
-    await updateDoc(noteRef, {
-      sharedWith: currentSharedWith.filter(id => id !== userId),
-      updatedAt: Timestamp.now(),
+    await updateDoc(noteRef(noteId), {
+      sharedWith: arrayRemove(userId),
+      updatedAt: serverTimestamp(),
     });
-  } catch (error: any) {
-    console.error('Error unsharing note:', error);
-    throw new Error('Failed to remove user from note');
+  } catch (error) {
+    logger.error('Error unsharing note:', error);
+    throw wrapError('שגיאה בהסרת השיתוף', error);
   }
 };

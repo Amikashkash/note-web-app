@@ -11,11 +11,16 @@ This file contains important guidelines for Claude when working on this project.
 When making changes, ALWAYS increment the version so the user can verify they have the latest code.
 
 **Version Update Checklist:**
-- [ ] Update `package.json` version
-- [ ] Update `src/pages/Home/Home.tsx` version display
-- [ ] Update `src/pages/Login/Login.tsx` version display
+- [ ] Update `package.json` version — this is the ONLY place the number lives
+- [ ] Add an entry to `src/pages/WhatsNew/WhatsNew.tsx`
 - [ ] Version number should be HIGHER than previous (e.g., 1.0.4 → 1.0.5)
 - [ ] Commit message should mention the new version
+
+**Note:** The version displayed in the UI is injected at build time from
+`package.json` via the `__APP_VERSION__` global (see `vite.config.ts`).
+Home and Login read it automatically — do NOT hardcode version strings in
+components. Previously the number was copy-pasted into each screen, and it
+drifted (package.json said 1.4.6 while the UI showed 1.4.4).
 
 **Example:**
 ```
@@ -68,11 +73,17 @@ For this project, increment patch version for each change.
 ## Testing Changes
 
 ### Before Committing
-1. **Build check**: Run `npx vite build` (NOT `npm run build`)
-   - ALWAYS use `npx vite build` to skip pre-existing TypeScript errors
-   - `npm run build` will fail due to TypeScript errors in Firebase code
-2. **Visual check**: Verify in browser if possible
-3. **Version check**: Confirm version number is updated and visible
+1. **Type check**: `npx tsc --noEmit` — must be clean
+2. **Lint**: `npm run lint` — must be clean (zero warnings; `--max-warnings 0`)
+3. **Build check**: `npm run build` — this runs `tsc && vite build` and must pass
+4. **Visual check**: Verify in browser if possible
+5. **Version check**: Confirm version number is updated
+
+> Historical note: earlier versions of this file instructed using `npx vite build`
+> to bypass TypeScript errors. Those errors came from `services/firebase/config.ts`
+> exporting `db`/`auth` as possibly-`null`, and have been fixed. Do not reintroduce
+> the bypass — it was hiding real bugs, including a broken sign-out button and a
+> ref callback that TypeScript rejected.
 
 ### After Pushing
 1. Instruct user to pull with clear commands
@@ -116,18 +127,25 @@ For this project, increment patch version for each change.
 
 ## Code Quality
 
-### TypeScript Errors
-- Pre-existing TypeScript errors exist in Firebase API code
-- **ALWAYS use `npx vite build`** - never use `npm run build`
-- These errors don't affect runtime or production builds
-- Don't introduce new TypeScript errors
-- GitHub Actions workflow uses `npx vite build` to skip TS checks
+### TypeScript
+- The project type-checks cleanly. Keep it that way.
+- `strict`, `noUnusedLocals` and `noUnusedParameters` are all on.
+- Avoid `any` — the lint config warns on it. For caught errors use `unknown`
+  plus the helpers in `src/utils/errors.ts`.
 
-### Console Logs
-- Use for debugging during development
-- Remove before final version (keep version incremental)
-- Use descriptive emojis for categorization
-- Include version number in debug logs
+### Logging
+- **Never call `console.*` directly** in app code — use `logger` from
+  `src/utils/logger.ts`. It silences debug/info/warn in production so user
+  data (emails, note contents) doesn't leak into the browser console.
+- `logger.error` always logs, in every environment.
+- The lint rule `no-console` enforces this.
+
+### Error Handling
+- Services throw `Error` objects with a Hebrew message for the user and the
+  original error attached as `cause` — never swallow the underlying error,
+  it's what tells you a failure was actually `permission-denied`.
+- Components surface errors inline where practical; `window.alert` is still
+  used in a few places and is fair game to replace with a toast.
 
 ## File Organization
 
@@ -156,22 +174,68 @@ For this project, increment patch version for each change.
 - `src/components/category/CategoryItem/CategoryItem.tsx` - Note filtering
 - `package.json` - Version number
 
+### Architecture Rules (added in v1.5.0)
+
+**Firestore subscriptions** — `noteStore` and `categoryStore` each own a
+single listener with a subscriber count. Components subscribe via `useNotes`
+/ `useCategories`, never by calling the store's `subscribe` directly. Adding
+a second listener per component was the original bug: every `CategoryItem`
+tore down the shared subscription and blanked the list for all the others.
+
+**Document normalization** — every Firestore document goes through
+`src/services/api/mappers.ts`. Firestore doesn't guarantee fields exist, so
+older documents arrive missing `tags`, `sharedWith` or `updatedAt`. Normalize
+once there instead of scattering `?.` and `|| []` through components.
+
+**Partial updates** — `updateNote` takes only the fields that changed. Never
+spread a whole note object into it: it overwrites concurrent edits from other
+users and writes junk fields into the document.
+
+**Array fields** — `sharedWith` is only ever modified with `arrayUnion` /
+`arrayRemove`. Read-modify-write loses concurrent shares.
+
+**Template metadata** — labels and icons live only in `src/utils/templates.ts`.
+There used to be four separate copies of that map and one had already fallen
+out of sync (`aisummary` was missing).
+
 ### Known Issues
-- TypeScript errors in `src/services/api/categories.ts` (pre-existing)
 - Search requires notes to load asynchronously from Firebase
-- Build works with `npx vite build` even with TS errors
+- Service Worker reminders rely on `setTimeout`; a browser may evict an idle
+  worker and drop a pending timer. Reminders re-sync on every app load, so it
+  self-corrects, but a long-range reminder can be missed if the app is never
+  opened. A real fix needs server-side Push.
+- Any signed-in user can read the `userLookup` collection, which allows
+  checking whether an email is registered. Closing that requires moving the
+  email lookup into a Cloud Function.
+- The main JS bundle is ~986 kB (257 kB gzipped) — worth code-splitting.
 
 ## Session Context
 
-### Current State (as of v1.4.6)
-- Responsive note cards fixed for small screens (w-52 instead of w-full)
-- Checklist template improved with inline date/time icons
-- Dark mode fully supported in checklist template
-- Auto-focus on new task when pressing Enter
-- README updated with complete feature list
+### Current State (as of v1.5.0)
+- `npm run build`, `npx tsc --noEmit` and `npm run lint` are all clean
+- ESLint migrated to flat config (`eslint.config.js`); the old
+  `.eslintrc.cjs` was silently not being loaded by ESLint 9 at all,
+  so linting had effectively been off
+- Firestore rules hardened: shared users can edit content but not take
+  ownership; full user documents are owner-only
+- Reminders are actually wired up end to end (`useNoteReminders` → SW)
 - Working branch: `main`
 
-### Recent Changes (v1.4.6)
+### Recent Changes (v1.5.0)
+- **Correctness**: debounced inline editing; shared subscription with
+  reference counting; atomic reorder via `writeBatch`; `arrayUnion`/
+  `arrayRemove` for sharing; document normalization layer
+- **Security**: Firestore rules rewritten; `userLookup` collection split out
+  so `users/{uid}` is no longer world-readable
+- **Bugs fixed**: sign-out button (referenced a store field that never
+  existed), markdown parser dropping formatting before a link, crash on
+  notes missing `tags`/`updatedAt`, template label map missing `aisummary`
+- **Cleanup**: central `logger`, `errors`, `templates`, `search`,
+  `notePreview` modules; removed dead code (`Template` type, unused
+  template constants, duplicate `DEFAULT_USER_SETTINGS`, vestigial
+  `getRedirectResult` handling — Google sign-in uses a popup, not redirect)
+
+### Previous Changes (v1.4.6)
 - **Note Cards**: Fixed width issue on screens below 640px - cards now display with horizontal scroll
 - **Checklist Template**:
   - Removed accordion date card, replaced with icon-based date/time pickers

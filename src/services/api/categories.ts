@@ -1,29 +1,42 @@
 /**
- * Firestore API for Categories
- * CRUD operations for category management
+ * שירות API לניהול קטגוריות ב-Firestore
  */
 
 import {
-  collection,
-  doc,
   addDoc,
-  updateDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
   deleteDoc,
+  doc,
   getDocs,
-  query,
-  where,
-  serverTimestamp,
   onSnapshot,
+  query,
+  serverTimestamp,
   Unsubscribe,
+  updateDoc,
+  where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
 import { getDefaultCategory } from '@/utils/defaults';
 import type { Category, CategoryInput } from '@/types';
+import { toCategory } from './mappers';
+import { findUserIdByEmail } from './users';
+import { logger } from '@/utils/logger';
+import { wrapError } from '@/utils/errors';
 
 const CATEGORIES_COLLECTION = 'categories';
+const NOTES_COLLECTION = 'notes';
+
+/** מגבלת הפעולות ב-batch יחיד של Firestore */
+const BATCH_LIMIT = 500;
+
+const categoryRef = (categoryId: string) => doc(db, CATEGORIES_COLLECTION, categoryId);
+const categoriesRef = () => collection(db, CATEGORIES_COLLECTION);
 
 /**
- * Create a new category
+ * יצירת קטגוריה חדשה
  */
 export const createCategory = async (
   userId: string,
@@ -31,148 +44,118 @@ export const createCategory = async (
   color?: string
 ): Promise<string> => {
   try {
-    console.log('Creating category:', { userId, name, color });
-    const categoryData = {
+    const docRef = await addDoc(categoriesRef(), {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    };
-
-    console.log('Category data:', categoryData);
-    const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), categoryData);
-    console.log('Category created with ID:', docRef.id);
+    });
     return docRef.id;
-  } catch (error: any) {
-    console.error('Error creating category:', error);
-    throw new Error('Failed to create category');
+  } catch (error) {
+    logger.error('Error creating category:', error);
+    throw wrapError('שגיאה ביצירת הקטגוריה', error);
   }
 };
 
 /**
- * Update an existing category
+ * עדכון קטגוריה קיימת
  */
 export const updateCategory = async (
   categoryId: string,
   updates: Partial<CategoryInput>
 ): Promise<void> => {
   try {
-    const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
-    await updateDoc(categoryRef, {
-      ...updates,
+    // `sharedWith` מתעדכן רק דרך פונקציות השיתוף הייעודיות, שמשתמשות
+    // בפעולות מערך אטומיות. עדכון ישיר שלו כאן היה דורס שיתופים מקבילים.
+    const { sharedWith: _ignored, ...safeUpdates } = updates;
+
+    await updateDoc(categoryRef(categoryId), {
+      ...safeUpdates,
       updatedAt: serverTimestamp(),
     });
-  } catch (error: any) {
-    console.error('Error updating category:', error);
-    throw new Error('Failed to update category');
+  } catch (error) {
+    logger.error('Error updating category:', error);
+    throw wrapError('שגיאה בעדכון הקטגוריה', error);
   }
 };
 
 /**
- * Delete a category
+ * מחיקת קטגוריה
  */
 export const deleteCategory = async (categoryId: string): Promise<void> => {
   try {
-    const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
-    await deleteDoc(categoryRef);
-  } catch (error: any) {
-    console.error('Error deleting category:', error);
-    throw new Error('Failed to delete category');
+    await deleteDoc(categoryRef(categoryId));
+  } catch (error) {
+    logger.error('Error deleting category:', error);
+    throw wrapError('שגיאה במחיקת הקטגוריה', error);
   }
 };
 
 /**
- * Get all categories for a user (one-time fetch)
+ * קבלת כל הקטגוריות של משתמש (שליפה חד-פעמית)
  */
 export const getUserCategories = async (userId: string): Promise<Category[]> => {
   try {
-    const q = query(
-      collection(db, CATEGORIES_COLLECTION),
-      where('userId', '==', userId)
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Category))
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-  } catch (error: any) {
-    console.error('Error getting categories:', error);
-    throw new Error('Failed to get categories');
+    const snapshot = await getDocs(query(categoriesRef(), where('userId', '==', userId)));
+    return snapshot.docs.map(toCategory).sort((a, b) => a.order - b.order);
+  } catch (error) {
+    logger.error('Error getting categories:', error);
+    throw wrapError('שגיאה בטעינת הקטגוריות', error);
   }
 };
 
 /**
- * Subscribe to categories changes (real-time)
- * Includes both owned categories and categories shared with the user
+ * מנוי לשינויים בקטגוריות (בבעלות המשתמש + משותפות איתו).
+ *
+ * כמו בפתקים - שני מאזינים שממוזגים, כי Firestore לא תומך ב-OR בין שדות.
  */
 export const subscribeToCategories = (
   userId: string,
   callback: (categories: Category[]) => void
 ): Unsubscribe => {
-  console.log('Setting up categories subscription for user:', userId);
+  let owned: Category[] = [];
+  let shared: Category[] = [];
+  let ownedLoaded = false;
+  let sharedLoaded = false;
 
-  // Query for owned categories
-  const ownedQuery = query(
-    collection(db, CATEGORIES_COLLECTION),
-    where('userId', '==', userId)
-  );
+  const emit = () => {
+    if (!ownedLoaded || !sharedLoaded) return;
 
-  // Query for shared categories
-  const sharedQuery = query(
-    collection(db, CATEGORIES_COLLECTION),
-    where('sharedWith', 'array-contains', userId)
-  );
+    const unique = Array.from(
+      new Map([...owned, ...shared].map((category) => [category.id, category])).values()
+    ).sort((a, b) => a.order - b.order);
 
-  // We need to combine both queries
-  // Firestore doesn't support OR queries directly, so we'll use two listeners
-  let ownedCategories: Category[] = [];
-  let sharedCategories: Category[] = [];
-
-  const mergeAndCallback = () => {
-    // Combine and deduplicate
-    const allCategories = [...ownedCategories, ...sharedCategories];
-    const uniqueCategories = Array.from(
-      new Map(allCategories.map(cat => [cat.id, cat])).values()
-    ).sort((a, b) => (a.order || 0) - (b.order || 0));
-
-    console.log('Merged categories:', uniqueCategories.length);
-    callback(uniqueCategories);
+    callback(unique);
   };
 
   const unsubscribeOwned = onSnapshot(
-    ownedQuery,
+    query(categoriesRef(), where('userId', '==', userId)),
     (snapshot) => {
-      console.log('Owned categories subscription fired, doc count:', snapshot.docs.length);
-      ownedCategories = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Category));
-      mergeAndCallback();
+      owned = snapshot.docs.map(toCategory);
+      ownedLoaded = true;
+      emit();
     },
     (error) => {
-      console.error('Error in owned categories subscription:', error);
+      logger.error('Error in owned categories subscription:', error);
+      ownedLoaded = true;
+      emit();
     }
   );
 
   const unsubscribeShared = onSnapshot(
-    sharedQuery,
+    query(categoriesRef(), where('sharedWith', 'array-contains', userId)),
     (snapshot) => {
-      console.log('Shared categories subscription fired, doc count:', snapshot.docs.length);
-      sharedCategories = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Category));
-      mergeAndCallback();
+      shared = snapshot.docs.map(toCategory);
+      sharedLoaded = true;
+      emit();
     },
     (error) => {
-      console.error('Error in shared categories subscription:', error);
+      logger.error('Error in shared categories subscription:', error);
+      sharedLoaded = true;
+      emit();
     }
   );
 
-  // Return a combined unsubscribe function
   return () => {
     unsubscribeOwned();
     unsubscribeShared();
@@ -180,123 +163,63 @@ export const subscribeToCategories = (
 };
 
 /**
- * Share a category with another user by email
+ * מחיל פעולת מערך על שדה `sharedWith` של הקטגוריה ושל כל הפתקים שבתוכה,
+ * בכתיבות אטומיות. `arrayUnion`/`arrayRemove` הן idempotent, ולכן אין
+ * צורך לבדוק מראש מי כבר נמצא ברשימה.
+ */
+const applySharingToCategoryTree = async (
+  categoryId: string,
+  operation: ReturnType<typeof arrayUnion> | ReturnType<typeof arrayRemove>
+): Promise<void> => {
+  const notesSnapshot = await getDocs(
+    query(collection(db, NOTES_COLLECTION), where('categoryId', '==', categoryId))
+  );
+
+  const targets = [categoryRef(categoryId), ...notesSnapshot.docs.map((noteDoc) => noteDoc.ref)];
+
+  // מחלקים ל-batches כדי לא לעבור את מגבלת הפעולות של Firestore
+  for (let i = 0; i < targets.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    for (const ref of targets.slice(i, i + BATCH_LIMIT)) {
+      batch.update(ref, { sharedWith: operation, updatedAt: serverTimestamp() });
+    }
+    await batch.commit();
+  }
+
+  logger.debug(`Updated sharing for category ${categoryId} and ${notesSnapshot.size} notes`);
+};
+
+/**
+ * שיתוף קטגוריה (וכל הפתקים שבה) עם משתמש אחר לפי אימייל
  */
 export const shareCategoryWithUser = async (
   categoryId: string,
   userEmail: string
 ): Promise<void> => {
+  const targetUserId = await findUserIdByEmail(userEmail);
+  if (!targetUserId) {
+    throw new Error('משתמש לא נמצא במערכת');
+  }
+
   try {
-    // Get user ID from email
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userEmail));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      throw new Error('משתמש לא נמצא במערכת');
-    }
-
-    const targetUserId = snapshot.docs[0].id;
-
-    // Update category to add user to sharedWith array
-    const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
-    const categorySnapshot = await getDocs(query(collection(db, CATEGORIES_COLLECTION), where('__name__', '==', categoryId)));
-
-    if (categorySnapshot.empty) {
-      throw new Error('קטגוריה לא נמצאה');
-    }
-
-    const categoryData = categorySnapshot.docs[0].data() as Category;
-    const currentSharedWith = categoryData.sharedWith || [];
-
-    if (currentSharedWith.includes(targetUserId)) {
-      throw new Error('הקטגוריה כבר משותפת עם משתמש זה');
-    }
-
-    // Share the category
-    await updateDoc(categoryRef, {
-      sharedWith: [...currentSharedWith, targetUserId],
-      updatedAt: serverTimestamp(),
-    });
-
-    // Share all notes in this category
-    const notesRef = collection(db, 'notes');
-    const notesQuery = query(notesRef, where('categoryId', '==', categoryId));
-    const notesSnapshot = await getDocs(notesQuery);
-
-    console.log(`Sharing ${notesSnapshot.size} notes in category ${categoryId} with user ${targetUserId}`);
-
-    // Update all notes in this category to add the user to sharedWith
-    const updatePromises = notesSnapshot.docs.map(async (noteDoc) => {
-      const noteData = noteDoc.data();
-      const noteSharedWith = noteData.sharedWith || [];
-
-      if (!noteSharedWith.includes(targetUserId)) {
-        const noteRef = doc(db, 'notes', noteDoc.id);
-        await updateDoc(noteRef, {
-          sharedWith: [...noteSharedWith, targetUserId],
-          updatedAt: serverTimestamp(),
-        });
-      }
-    });
-
-    await Promise.all(updatePromises);
-    console.log(`Successfully shared category and all notes with ${userEmail}`);
-  } catch (error: any) {
-    console.error('Error sharing category:', error);
-    throw error;
+    await applySharingToCategoryTree(categoryId, arrayUnion(targetUserId));
+  } catch (error) {
+    logger.error('Error sharing category:', error);
+    throw wrapError('שגיאה בשיתוף הקטגוריה', error);
   }
 };
 
 /**
- * Remove a user from shared category
+ * הסרת משתמש משיתוף קטגוריה (וכל הפתקים שבה)
  */
 export const unshareCategoryWithUser = async (
   categoryId: string,
   userId: string
 ): Promise<void> => {
   try {
-    const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
-    const categorySnapshot = await getDocs(query(collection(db, CATEGORIES_COLLECTION), where('__name__', '==', categoryId)));
-
-    if (categorySnapshot.empty) {
-      throw new Error('קטגוריה לא נמצאה');
-    }
-
-    const categoryData = categorySnapshot.docs[0].data() as Category;
-    const currentSharedWith = categoryData.sharedWith || [];
-
-    // Unshare the category
-    await updateDoc(categoryRef, {
-      sharedWith: currentSharedWith.filter((id: string) => id !== userId),
-      updatedAt: serverTimestamp(),
-    });
-
-    // Unshare all notes in this category
-    const notesRef = collection(db, 'notes');
-    const notesQuery = query(notesRef, where('categoryId', '==', categoryId));
-    const notesSnapshot = await getDocs(notesQuery);
-
-    console.log(`Unsharing ${notesSnapshot.size} notes in category ${categoryId} from user ${userId}`);
-
-    // Update all notes in this category to remove the user from sharedWith
-    const updatePromises = notesSnapshot.docs.map(async (noteDoc) => {
-      const noteData = noteDoc.data();
-      const noteSharedWith = noteData.sharedWith || [];
-
-      if (noteSharedWith.includes(userId)) {
-        const noteRef = doc(db, 'notes', noteDoc.id);
-        await updateDoc(noteRef, {
-          sharedWith: noteSharedWith.filter((id: string) => id !== userId),
-          updatedAt: serverTimestamp(),
-        });
-      }
-    });
-
-    await Promise.all(updatePromises);
-    console.log(`Successfully unshared category and all notes from user ${userId}`);
-  } catch (error: any) {
-    console.error('Error unsharing category:', error);
-    throw new Error('Failed to remove user from category');
+    await applySharingToCategoryTree(categoryId, arrayRemove(userId));
+  } catch (error) {
+    logger.error('Error unsharing category:', error);
+    throw wrapError('שגיאה בהסרת השיתוף', error);
   }
 };

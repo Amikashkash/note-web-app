@@ -1,77 +1,60 @@
 /**
- * Custom Hook for Category Management
- * Provides easy access to category operations
+ * Hook לניהול קטגוריות
+ *
+ * נרשם למנוי המשותף כל עוד הקומפוננטה חיה; המנוי עצמו מנוהל
+ * ב-`categoryStore` עם ספירת צרכנים.
  */
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useCategoryStore } from '@/store/categoryStore';
-import { useAuth } from './useAuth';
+import { useAuthStore } from '@/store/authStore';
+import type { CategoryInput } from '@/types';
 
 export const useCategories = () => {
-  const { user } = useAuth();
-  const {
-    categories,
-    isLoading,
-    error,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    subscribeToCategories,
-    unsubscribeFromCategories,
-  } = useCategoryStore();
+  const userId = useAuthStore((state) => state.user?.uid);
 
-  /**
-   * Subscribe to categories when user is authenticated
-   */
+  const categories = useCategoryStore((state) => state.categories);
+  const isLoading = useCategoryStore((state) => state.isLoading);
+  const error = useCategoryStore((state) => state.error);
+  const subscribe = useCategoryStore((state) => state.subscribe);
+  const unsubscribe = useCategoryStore((state) => state.unsubscribe);
+  const createCategory = useCategoryStore((state) => state.createCategory);
+  const updateCategory = useCategoryStore((state) => state.updateCategory);
+  const deleteCategory = useCategoryStore((state) => state.deleteCategory);
+
   useEffect(() => {
-    if (user?.uid) {
-      subscribeToCategories(user.uid);
-    }
+    if (!userId) return;
 
-    return () => {
-      unsubscribeFromCategories();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+    subscribe(userId);
+    return () => unsubscribe();
+  }, [userId, subscribe, unsubscribe]);
 
-  /**
-   * Create a new category
-   */
-  const addCategory = async (name: string, color?: string) => {
-    if (!user?.uid) {
-      throw new Error('User not authenticated');
-    }
-    await createCategory(user.uid, name, color);
-  };
+  const addCategory = useCallback(
+    async (name: string, color?: string) => {
+      if (!userId) throw new Error('משתמש לא מחובר');
+      await createCategory(userId, name, color);
+    },
+    [createCategory, userId]
+  );
 
-  /**
-   * Update a category
-   */
-  const editCategory = async (categoryId: string, name?: string, color?: string, icon?: string) => {
-    const updates: any = {};
-    if (name !== undefined) updates.name = name;
-    if (color !== undefined) updates.color = color;
-    if (icon !== undefined) updates.icon = icon;
+  const editCategory = useCallback(
+    async (categoryId: string, name?: string, color?: string, icon?: string) => {
+      const updates: Partial<CategoryInput> = {};
+      if (name !== undefined) updates.name = name;
+      if (color !== undefined) updates.color = color;
+      if (icon !== undefined) updates.icon = icon;
 
-    await updateCategory(categoryId, updates);
-  };
-
-  /**
-   * Delete a category
-   */
-  const removeCategory = async (categoryId: string) => {
-    await deleteCategory(categoryId);
-  };
+      await updateCategory(categoryId, updates);
+    },
+    [updateCategory]
+  );
 
   return {
-    // State
     categories,
     isLoading,
     error,
-
-    // Actions
     addCategory,
     editCategory,
-    removeCategory,
+    removeCategory: deleteCategory,
   };
 };

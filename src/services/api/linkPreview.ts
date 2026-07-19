@@ -2,6 +2,8 @@
  * Link Preview Service - Fetch metadata from URLs
  */
 
+import { logger } from '@/utils/logger';
+
 export interface LinkPreviewData {
   url: string;
   title?: string;
@@ -97,7 +99,7 @@ export const fetchLinkPreview = async (url: string): Promise<LinkPreviewData> =>
     return extractMetadata(html, url);
 
   } catch (error) {
-    console.error('Link preview fetch error:', error);
+    logger.error('Link preview fetch error:', error);
 
     // Return minimal data if fetch fails
     return {

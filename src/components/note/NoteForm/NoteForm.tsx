@@ -3,13 +3,14 @@
  */
 
 import { useState } from 'react';
-import { Note, TemplateType } from '@/types/note';
+import { Note, NoteFormData, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { ReminderPicker } from '@/components/common/ReminderPicker';
 import { AVAILABLE_COLORS, LENGTH_LIMITS } from '@/utils/constants';
+import { SELECTABLE_TEMPLATES, getTemplateLabel } from '@/utils/templates';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -17,31 +18,14 @@ import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { AISummaryTemplate } from '@/components/note/templates/AISummaryTemplate';
 import type { AIExtractionResult } from '@/services/ai/gemini';
+import { logger } from '@/utils/logger';
 
 interface NoteFormProps {
   categoryId: string;
   note?: Note | null;
   onClose: () => void;
-  onSubmit: (data: {
-    title: string;
-    content: string;
-    templateType: TemplateType;
-    tags: string[];
-    color: string | null;
-    reminderTime?: Date | null;
-    reminderEnabled?: boolean;
-  }) => void;
+  onSubmit: (data: NoteFormData) => void;
 }
-
-const TEMPLATE_OPTIONS: { value: TemplateType; label: string; icon: string }[] = [
-  { value: 'aisummary', label: 'סיכום AI', icon: '🤖' },
-  { value: 'plain', label: 'טקסט חופשי', icon: '📝' },
-  { value: 'checklist', label: 'רשימת משימות', icon: '✅' },
-  // { value: 'recipe', label: 'מתכון', icon: '🍳' }, // Removed - AI formats recipes well in plain text
-  { value: 'shopping', label: 'רשימת קניות', icon: '🛒' },
-  { value: 'workplan', label: 'תכנית עבודה', icon: '📋' },
-  { value: 'accounting', label: 'חשבונאות', icon: '💰' },
-];
 
 export const NoteForm: React.FC<NoteFormProps> = ({
   note,
@@ -63,6 +47,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   const [reminderEnabled, setReminderEnabled] = useState(note?.reminderEnabled || false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [aiResult, setAiResult] = useState<AIExtractionResult | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const isEditMode = !!note;
 
@@ -79,8 +64,8 @@ export const NoteForm: React.FC<NoteFormProps> = ({
     if (!resultToUse) return;
 
     switch (targetTemplate) {
-      case 'recipe':
-        // Support both 'steps' and 'instructions' from AI
+      case 'recipe': {
+        // ה-AI מחזיר לעיתים 'steps' ולעיתים 'instructions'
         const steps = resultToUse.content.steps || resultToUse.content.instructions || [];
         const ingredients = resultToUse.content.ingredients || [];
 
@@ -92,28 +77,31 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           instructions: Array.isArray(steps) ? steps : [],
         }));
         break;
+      }
       case 'shopping':
         if (resultToUse.type === 'shopping' && resultToUse.content.items) {
           setContent(JSON.stringify(resultToUse.content.items));
         }
         break;
       case 'plain':
-      default:
-        // Convert to plain text
-        let plainText = '';
+      default: {
+        let plainText: string;
+
         if (resultToUse.type === 'recipe') {
-          plainText += `מרכיבים:\n${resultToUse.content.ingredients?.join('\n') || ''}\n\n`;
-          plainText += `הוראות הכנה:\n${resultToUse.content.steps?.join('\n') || ''}`;
+          const ingredients = resultToUse.content.ingredients?.join('\n') || '';
+          const steps = resultToUse.content.steps?.join('\n') || '';
+          plainText = `מרכיבים:\n${ingredients}\n\nהוראות הכנה:\n${steps}`;
         } else if (resultToUse.type === 'article') {
           plainText = resultToUse.content.summary || resultToUse.content.text || '';
         } else if (resultToUse.type === 'general' && resultToUse.content.text) {
-          // Text summary - use the text field directly
           plainText = resultToUse.content.text;
         } else {
           plainText = JSON.stringify(resultToUse.content, null, 2);
         }
+
         setContent(plainText);
         break;
+      }
     }
 
     setTemplateType(targetTemplate);
@@ -123,9 +111,11 @@ export const NoteForm: React.FC<NoteFormProps> = ({
     e.preventDefault();
 
     if (!title.trim()) {
-      alert('נא להזין כותרת לפתק');
+      setValidationError('נא להזין כותרת לפתק');
       return;
     }
+
+    setValidationError(null);
 
     // המרת תגיות ממחרוזת למערך
     const tags = tagsInput
@@ -174,7 +164,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             סוג פתק
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {TEMPLATE_OPTIONS.map((template) => (
+            {SELECTABLE_TEMPLATES.map((template) => (
               <button
                 key={template.value}
                 type="button"
@@ -200,7 +190,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           {templateType === 'aisummary' ? (
             <AISummaryTemplate
               onContentExtracted={handleAIContentExtracted}
-              onError={(error) => console.error('AI Error:', error)}
+              onError={(error) => logger.error('AI Error:', error)}
             />
           ) : templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={setContent} />
@@ -216,7 +206,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             <EnhancedTextarea
               value={content}
               onChange={setContent}
-              placeholder={`הזן ${TEMPLATE_OPTIONS.find(t => t.value === templateType)?.label.toLowerCase()}...`}
+              placeholder={`הזן ${getTemplateLabel(templateType)}...`}
               rows={8}
             />
           )}
@@ -308,6 +298,16 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             </div>
           )}
         </div>
+
+        {/* שגיאת ולידציה */}
+        {validationError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <p className="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{validationError}</span>
+            </p>
+          </div>
+        )}
 
         {/* כפתורי פעולה */}
         <div className="flex gap-3 pt-4">

@@ -8,6 +8,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { Modal } from '@/components/common/Modal/Modal';
 import { Input } from '@/components/common/Input/Input';
 import { Button } from '@/components/common/Button/Button';
+import { getErrorMessage } from '@/utils/errors';
 import { AVAILABLE_COLORS } from '@/utils/constants';
 import type { Category } from '@/types';
 
@@ -51,8 +52,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
         await addCategory(name, color);
       }
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'שגיאה בשמירת הקטגוריה');
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }

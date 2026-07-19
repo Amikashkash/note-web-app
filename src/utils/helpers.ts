@@ -2,6 +2,8 @@
  * פונקציות עזר כלליות
  */
 
+import { Timestamp } from 'firebase/firestore';
+
 /**
  * יוצר מזהה ייחודי
  */
@@ -10,12 +12,12 @@ export const generateId = (): string => {
 };
 
 /**
- * ממיר Timestamp של Firebase לתאריך קריא
+ * ממיר Timestamp של Firebase (או תאריך רגיל) לטקסט קריא
  */
-export const formatDate = (timestamp: any): string => {
+export const formatDate = (timestamp: Timestamp | Date | string | number | null): string => {
   if (!timestamp) return '';
 
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
   return new Intl.DateTimeFormat('he-IL', {
     year: 'numeric',
     month: 'long',

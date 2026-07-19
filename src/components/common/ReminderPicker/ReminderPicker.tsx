@@ -4,6 +4,10 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/common/Button';
+import {
+  isNotificationSupported,
+  requestNotificationPermission,
+} from '@/services/notifications/notificationService';
 
 interface ReminderPickerProps {
   value: Date | null;
@@ -19,6 +23,36 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
   onToggle,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
+  const [permissionWarning, setPermissionWarning] = useState<string | null>(null);
+
+  /**
+   * הפעלת תזכורת דורשת הרשאת התראות. מבקשים אותה ברגע שהמשתמש
+   * מסמן את התיבה - זו פעולת המשתמש שמצדיקה את בקשת ההרשאה.
+   */
+  const handleToggle = async (checked: boolean) => {
+    onToggle(checked);
+
+    if (!checked) {
+      setPermissionWarning(null);
+      return;
+    }
+
+    if (!value) {
+      setShowPicker(true);
+    }
+
+    if (!isNotificationSupported()) {
+      setPermissionWarning('הדפדפן שלך לא תומך בהתראות. התזכורת תישמר אך לא תוצג התראה.');
+      return;
+    }
+
+    const permission = await requestNotificationPermission();
+    setPermissionWarning(
+      permission === 'granted'
+        ? null
+        : 'ההתראות חסומות בדפדפן. התזכורת תישמר, אך כדי לקבל התראה יש לאפשר התראות בהגדרות האתר.'
+    );
+  };
 
   const formatDateTime = (date: Date | null): string => {
     if (!date) return '';
@@ -70,12 +104,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
           <input
             type="checkbox"
             checked={enabled}
-            onChange={(e) => {
-              onToggle(e.target.checked);
-              if (e.target.checked && !value) {
-                setShowPicker(true);
-              }
-            }}
+            onChange={(e) => void handleToggle(e.target.checked)}
             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
           />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -161,9 +190,13 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
           )}
 
           {/* Info */}
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            💡 תקבל התראה בדפדפן במועד שנבחר
-          </p>
+          {permissionWarning ? (
+            <p className="text-xs text-amber-700 dark:text-amber-400">⚠️ {permissionWarning}</p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              💡 תקבל התראה בדפדפן במועד שנבחר
+            </p>
+          )}
         </div>
       )}
     </div>

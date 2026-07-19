@@ -27,3 +27,17 @@ export interface Note {
 }
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;
+
+/**
+ * הנתונים שטופס הפתק מחזיר.
+ * שדות הבעלות והסדר נקבעים ע"י שכבת השמירה ולא ע"י הטופס.
+ */
+export interface NoteFormData {
+  title: string;
+  content: string;
+  templateType: TemplateType;
+  tags: string[];
+  color: string | null;
+  reminderTime?: Date | null;
+  reminderEnabled?: boolean;
+}

@@ -4,6 +4,7 @@
 
 import { Note } from '@/types/note';
 import { Button } from '@/components/common/Button';
+import { getNotePreview } from '@/utils/notePreview';
 
 interface NoteCardProps {
   note: Note;
@@ -75,67 +76,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     }
   };
 
-  // פונקציה לעיבוד תוכן הפתק לפי סוג התבנית
-  const getDisplayContent = (): string => {
-    try {
-      // בדיקה אם זה JSON
-      if (note.content.trim().startsWith('{') || note.content.trim().startsWith('[')) {
-        const parsed = JSON.parse(note.content);
-
-        // טיפול במשימות (Checklist)
-        if (Array.isArray(parsed) && parsed.length > 0 && 'text' in parsed[0]) {
-          const tasks = parsed.slice(0, 3); // עד 3 משימות ראשונות
-          return tasks.map((task: any) =>
-            `${task.completed ? '✓' : '○'} ${task.text}`
-          ).join('\n');
-        }
-
-        // טיפול בתכנית עבודה (WorkPlan)
-        if (Array.isArray(parsed) && parsed.length > 0 && 'header' in parsed[0] && 'content' in parsed[0]) {
-          const sections = parsed.slice(0, 2); // עד 2 סעיפים ראשונים
-          return sections.map((section: any) => {
-            const content = section.content.substring(0, 30);
-            return `▸ ${section.header}\n  ${content}...`;
-          }).join('\n');
-        }
-
-        // טיפול בהתחשבנות (Accounting)
-        if (Array.isArray(parsed) && parsed.length > 0 && 'description' in parsed[0] && 'amount' in parsed[0]) {
-          const total = parsed.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
-          const lastItems = parsed.slice(-2); // 2 פריטים אחרונים
-          return lastItems.map((item: any) =>
-            `${item.description}: ${item.amount > 0 ? '+' : ''}₪${item.amount}`
-          ).join('\n') + `\nסה"כ: ₪${total.toFixed(2)}`;
-        }
-
-        // טיפול במתכון (Recipe)
-        if (parsed.ingredients || parsed.instructions) {
-          let preview = '';
-          if (parsed.ingredients && parsed.ingredients.length > 0) {
-            preview += `🥘 ${parsed.ingredients.slice(0, 2).join(', ')}`;
-          }
-          return preview || note.content.substring(0, 50);
-        }
-
-        // טיפול ברשימת קניות (Shopping)
-        if (parsed.sections && Array.isArray(parsed.sections)) {
-          const items = parsed.sections.flatMap((s: any) => s.items || []).slice(0, 3);
-          return items.map((item: any) =>
-            `${item.checked ? '✓' : '○'} ${item.name}`
-          ).join('\n');
-        }
-      }
-    } catch (e) {
-      // אם זה לא JSON תקין, נציג טקסט רגיל
-    }
-
-    // טקסט רגיל - קיצור ל-50 תווים
-    return note.content.length > 50
-      ? note.content.substring(0, 50) + '...'
-      : note.content;
-  };
-
-  const displayContent = getDisplayContent();
+  const displayContent = getNotePreview(note.content);
 
   return (
     <div

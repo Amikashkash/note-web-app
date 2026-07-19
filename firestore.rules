@@ -3,74 +3,79 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to check if user owns the resource
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Categories collection
+    // קריאת מערך השיתוף בצורה בטוחה.
+    // מסמכים שנוצרו לפני שהשדה נוסף לא מכילים אותו, וגישה ישירה
+    // אליהם הייתה מכשילה את כל הביטוי ולא רק את התנאי הזה.
+    function sharedUsers(data) {
+      return data.get('sharedWith', []);
+    }
+
+    function isSharedWithMe(data) {
+      return isAuthenticated() && request.auth.uid in sharedUsers(data);
+    }
+
+    // האם העדכון משאיר את שדות הבעלות ללא שינוי.
+    // משתמש ששותפו איתו רשאי לערוך תוכן בלבד - לא להשתלט על הפריט
+    // ולא לשנות עם מי הוא משותף.
+    function ownershipUnchanged() {
+      return request.resource.data.userId == resource.data.userId
+        && request.resource.data.get('sharedWith', []) == sharedUsers(resource.data);
+    }
+
     match /categories/{categoryId} {
-      // Allow read if user owns the category or it's shared with them
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        request.auth.uid in resource.data.sharedWith
-      );
+      allow read: if isOwner(resource.data.userId) || isSharedWithMe(resource.data);
 
-      // Allow create if user is authenticated and is the owner
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
 
-      // Allow update if user owns the category OR if updating sharedWith array (for sharing)
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        // Allow if only sharedWith is being updated and user is the owner
-        (resource.data.userId == request.auth.uid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sharedWith', 'updatedAt']))
-      );
+      allow update: if isOwner(resource.data.userId)
+        || (isSharedWithMe(resource.data) && ownershipUnchanged());
 
-      // Allow delete only if user owns the category
       allow delete: if isOwner(resource.data.userId);
     }
 
-    // Notes collection
     match /notes/{noteId} {
-      // Allow read if user owns the note or it's shared with them
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        request.auth.uid in resource.data.sharedWith
-      );
+      allow read: if isOwner(resource.data.userId) || isSharedWithMe(resource.data);
 
-      // Allow create if user is authenticated and is the owner
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
 
-      // Allow update if user owns the note OR if shared with the user
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        request.auth.uid in resource.data.sharedWith
-      );
+      allow update: if isOwner(resource.data.userId)
+        || (isSharedWithMe(resource.data) && ownershipUnchanged());
 
-      // Allow delete only if user owns the note
       allow delete: if isOwner(resource.data.userId);
     }
 
-    // User settings collection
     match /userSettings/{userId} {
       allow read, write: if isOwner(userId);
     }
 
-    // Users collection - needed for sharing functionality
+    // מסמך המשתמש המלא - כולל הגדרות אישיות. נגיש לבעליו בלבד.
     match /users/{userId} {
-      // Allow authenticated users to read any user document (to look up by email for sharing)
+      allow read, write: if isOwner(userId);
+    }
+
+    // אינדקס מינימלי לחיפוש משתמש לפי אימייל, לצורך שיתוף.
+    // מכיל רק אימייל ושם תצוגה - בלי הגדרות או מידע אישי אחר.
+    //
+    // הערה: כל משתמש מחובר יכול לקרוא כאן, וזה מאפשר בדיקה אם אימייל
+    // מסוים רשום למערכת. זה המחיר של חיפוש לפי אימייל ישירות מהלקוח.
+    // כדי לסגור גם את זה צריך להעביר את החיפוש ל-Cloud Function
+    // ולחסום קריאה ישירה לקולקציה.
+    match /userLookup/{userId} {
       allow read: if isAuthenticated();
 
-      // Only allow writing to own user document
-      allow write: if isOwner(userId);
+      allow write: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['email', 'displayName'])
+        && request.resource.data.email is string;
     }
   }
 }

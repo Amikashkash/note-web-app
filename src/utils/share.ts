@@ -1,202 +1,154 @@
 /**
- * פונקציות עזר לשיתוף תוכן
+ * המרת פתק לטקסט ושיתופו בערוצים חיצוניים
  */
 
-import { Note } from '@/types/note';
-import { AccountingRow } from '@/components/note/templates/AccountingTemplate';
-import { WorkPlanSection } from '@/components/note/templates/WorkPlanTemplate';
+import type { Note } from '@/types/note';
+import type { AccountingRow, WorkPlanSection } from '@/types/template';
+import { getTemplateIcon, getTemplateLabel } from './templates';
+import { logger } from './logger';
+
+/** רוחב קו המפריד בטבלת החשבונאות */
+const TABLE_WIDTH = 45;
+const DESCRIPTION_WIDTH = 25;
 
 /**
- * המרת חשבונאות ל-JSON לטקסט טבלה קריא (ללא עמודת יתרה)
+ * ניסיון לפרש תוכן כ-JSON של תבנית.
+ * מחזיר `null` אם התוכן אינו JSON תקין - ואז מוצג הטקסט הגולמי.
+ */
+const parseTemplateContent = <T>(content: string): T | null => {
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as T) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * המרת טבלת חשבונאות לטקסט קריא
  */
 const formatAccountingContent = (content: string): string => {
-  try {
-    const rows: AccountingRow[] = JSON.parse(content);
-    if (!rows || rows.length === 0) {
-      return 'אין נתונים';
-    }
+  const rows = parseTemplateContent<AccountingRow[]>(content);
+  if (!rows) return content;
 
-    let text = '';
-    let total = 0;
+  const divider = '─'.repeat(TABLE_WIDTH);
+  const lines = [
+    '📊 טבלת חשבונאות:',
+    divider,
+    'תאריך       | תיאור                    | סכום',
+    divider,
+  ];
 
-    // כותרת טבלה
-    text += '📊 טבלת חשבונאות:\n';
-    text += '─'.repeat(45) + '\n';
-    text += 'תאריך       | תיאור                    | סכום\n';
-    text += '─'.repeat(45) + '\n';
-
-    // שורות
-    rows.forEach((row) => {
-      total += row.amount;
-      const dateStr = row.date.padEnd(12);
-      const descStr = row.description.padEnd(25).substring(0, 25);
-      const amountStr = row.amount.toFixed(2).padStart(9);
-
-      text += `${dateStr}| ${descStr}| ${amountStr}\n`;
-    });
-
-    text += '─'.repeat(45) + '\n';
-    text += `💵 סה"כ: ${total.toFixed(2)} ₪\n`;
-
-    return text;
-  } catch (error) {
-    return content; // אם זה לא JSON תקין, החזר את התוכן כמו שהוא
+  let total = 0;
+  for (const row of rows) {
+    total += row.amount;
+    const date = row.date.padEnd(12);
+    const description = row.description.padEnd(DESCRIPTION_WIDTH).slice(0, DESCRIPTION_WIDTH);
+    const amount = row.amount.toFixed(2).padStart(9);
+    lines.push(`${date}| ${description}| ${amount}`);
   }
+
+  lines.push(divider, `💵 סה"כ: ${total.toFixed(2)} ₪`);
+  return lines.join('\n') + '\n';
 };
 
 /**
- * המרת תכנית עבודה ל-JSON לטקסט מעוצב
+ * המרת תכנית עבודה לטקסט מעוצב
  */
 const formatWorkPlanContent = (content: string): string => {
-  try {
-    const sections: WorkPlanSection[] = JSON.parse(content);
-    if (!sections || sections.length === 0) {
-      return 'אין סעיפים בתכנית';
-    }
+  const sections = parseTemplateContent<WorkPlanSection[]>(content);
+  if (!sections) return content;
 
-    let text = '';
-
-    sections.forEach((section, index) => {
-      // כותרת הסעיף
-      text += `\n▸ ${section.header || 'ללא כותרת'}\n`;
-      text += '─'.repeat(Math.min(section.header?.length || 10, 40)) + '\n';
-
-      // תוכן הסעיף
-      if (section.content) {
-        text += `${section.content}\n`;
-      } else {
-        text += '(אין תוכן)\n';
-      }
-
-      // מפריד בין סעיפים (חוץ מהאחרון)
-      if (index < sections.length - 1) {
-        text += '\n';
-      }
-    });
-
-    return text;
-  } catch (error) {
-    return content; // אם זה לא JSON תקין, החזר את התוכן כמו שהוא
-  }
+  return sections
+    .map((section) => {
+      const header = section.header || 'ללא כותרת';
+      const underline = '─'.repeat(Math.min(header.length, 40));
+      const body = section.content || '(אין תוכן)';
+      return `\n▸ ${header}\n${underline}\n${body}\n`;
+    })
+    .join('\n');
 };
 
 /**
- * המרת תוכן הפתק לטקסט רגיל לצורך שיתוף
+ * המרת פתק לטקסט לשיתוף
  */
 export const formatNoteForSharing = (note: Note): string => {
-  let text = `${note.title}\n`;
-  text += `${'='.repeat(note.title.length)}\n\n`;
+  const parts = [`${note.title}`, '='.repeat(note.title.length), ''];
 
-  // הוספת סוג הפתק
-  const typeEmoji = {
-    plain: '📝',
-    checklist: '✅',
-    recipe: '🍳',
-    shopping: '🛒',
-    workplan: '📋',
-    accounting: '💰',
-    aisummary: '🤖',
-  }[note.templateType] || '📝';
+  parts.push(`${getTemplateIcon(note.templateType)} סוג: ${getTemplateLabel(note.templateType)}`);
 
-  text += `${typeEmoji} סוג: ${getTemplateLabel(note.templateType)}\n`;
-
-  // תאריך עדכון
-  const date = new Date(note.updatedAt.toDate()).toLocaleDateString('he-IL', {
+  const date = note.updatedAt.toDate().toLocaleDateString('he-IL', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
-  text += `📅 תאריך: ${date}\n\n`;
+  parts.push(`📅 תאריך: ${date}`, '');
 
-  // תוכן - טיפול מיוחד לפי סוג תבנית
   if (note.templateType === 'accounting') {
-    text += formatAccountingContent(note.content);
+    parts.push(formatAccountingContent(note.content));
   } else if (note.templateType === 'workplan') {
-    text += formatWorkPlanContent(note.content);
+    parts.push(formatWorkPlanContent(note.content));
   } else {
-    text += `${note.content}\n`;
+    parts.push(note.content);
   }
 
-  // תגיות
   if (note.tags.length > 0) {
-    text += `\n🏷️ תגיות: ${note.tags.map(tag => `#${tag}`).join(' ')}\n`;
+    parts.push('', `🏷️ תגיות: ${note.tags.map((tag) => `#${tag}`).join(' ')}`);
   }
 
-  return text;
+  return parts.join('\n');
 };
 
 /**
- * קבלת תווית של סוג תבנית
- */
-const getTemplateLabel = (templateType: string): string => {
-  const labels: Record<string, string> = {
-    plain: 'פתק רגיל',
-    checklist: 'רשימת משימות',
-    recipe: 'מתכון',
-    shopping: 'רשימת קניות',
-    workplan: 'תכנית עבודה',
-    accounting: 'חשבונאות',
-  };
-  return labels[templateType] || 'פתק';
-};
-
-/**
- * שיתוף פתק בוואטסאפ
+ * שיתוף בוואטסאפ
  */
 export const shareViaWhatsApp = (note: Note): void => {
-  const text = formatNoteForSharing(note);
-  const encodedText = encodeURIComponent(text);
-
-  // פתיחת WhatsApp Web או האפליקציה במובייל
-  const url = `https://wa.me/?text=${encodedText}`;
-  window.open(url, '_blank');
+  const url = `https://wa.me/?text=${encodeURIComponent(formatNoteForSharing(note))}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
 };
 
 /**
- * שיתוף פתק באימייל
+ * שיתוף באימייל
  */
 export const shareViaEmail = (note: Note): void => {
-  const text = formatNoteForSharing(note);
   const subject = encodeURIComponent(note.title);
-  const body = encodeURIComponent(text);
-
-  // פתיחת לקוח האימייל
-  const url = `mailto:?subject=${subject}&body=${body}`;
-  window.location.href = url;
+  const body = encodeURIComponent(formatNoteForSharing(note));
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
 };
 
 /**
- * העתקת תוכן הפתק ללוח (clipboard)
+ * העתקת תוכן הפתק ללוח
  */
 export const copyToClipboard = async (note: Note): Promise<boolean> => {
   try {
-    const text = formatNoteForSharing(note);
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(formatNoteForSharing(note));
     return true;
   } catch (error) {
-    console.error('Failed to copy to clipboard:', error);
+    logger.error('Failed to copy to clipboard:', error);
     return false;
   }
 };
 
 /**
- * שיתוף באמצעות Web Share API (אם נתמך)
+ * שיתוף דרך Web Share API של המכשיר.
+ *
+ * מחזיר `false` אם ה-API לא נתמך או שהמשתמש ביטל - ואז הקורא
+ * מציג את תפריט השיתוף הפנימי כחלופה.
  */
 export const shareViaNative = async (note: Note): Promise<boolean> => {
-  if (!navigator.share) {
-    return false;
-  }
+  if (!navigator.share) return false;
 
   try {
-    const text = formatNoteForSharing(note);
     await navigator.share({
       title: note.title,
-      text: text,
+      text: formatNoteForSharing(note),
     });
     return true;
   } catch (error) {
-    // המשתמש ביטל את השיתוף או שהיתה שגיאה
-    console.error('Share failed:', error);
+    // ביטול ע"י המשתמש מגיע כ-AbortError ואינו תקלה
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      logger.error('Share failed:', error);
+    }
     return false;
   }
 };

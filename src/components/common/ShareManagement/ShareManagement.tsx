@@ -2,11 +2,13 @@
  * רכיב לניהול שיתוף קטגוריות ופתקים
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { useAuthStore } from '@/store/authStore';
+import { getUserLookupEntries } from '@/services/api/users';
+import { getErrorMessage } from '@/utils/errors';
 
 interface ShareManagementProps {
   itemType: 'category' | 'note';
@@ -31,8 +33,36 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
 
   const itemTypeLabel = itemType === 'category' ? 'קטגוריה' : 'פתק';
+
+  // תרגום מזהי משתמשים לאימיילים, כדי שהרשימה תהיה קריאה.
+  // אם השליפה נכשלת נשאר המזהה הגולמי - עדיף מאשר שורה ריקה.
+  const sharedWithKey = currentSharedWith.join(',');
+  useEffect(() => {
+    if (currentSharedWith.length === 0) {
+      setDisplayNames({});
+      return;
+    }
+
+    let cancelled = false;
+
+    getUserLookupEntries(currentSharedWith).then((entries) => {
+      if (cancelled) return;
+
+      setDisplayNames(
+        Object.fromEntries(entries.map((entry) => [entry.uid, entry.email || entry.displayName]))
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // `sharedWithKey` מייצג את תוכן המערך; שימוש במערך עצמו היה
+    // מפעיל את ה-effect בכל רינדור בגלל זהות אובייקט חדשה.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedWithKey]);
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,8 +93,8 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
       await onShare(email.trim());
       setSuccess(`ה${itemTypeLabel} שותף בהצלחה עם ${email}`);
       setEmail('');
-    } catch (error: any) {
-      setError(error.message || 'שגיאה בשיתוף');
+    } catch (error) {
+      setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -78,8 +108,8 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
     try {
       await onUnshare(userId);
       setSuccess('המשתמש הוסר מהשיתוף בהצלחה');
-    } catch (error: any) {
-      setError(error.message || 'שגיאה בהסרת משתמש');
+    } catch (error) {
+      setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -150,10 +180,10 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
                   key={userId}
                   className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-3"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="text-2xl">👤</span>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {userId}
+                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate" dir="ltr">
+                      {displayNames[userId] ?? userId}
                     </span>
                   </div>
                   <Button

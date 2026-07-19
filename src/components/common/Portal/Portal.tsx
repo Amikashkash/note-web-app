@@ -1,22 +1,16 @@
 /**
  * Portal Component
- * Renders children into a DOM node that exists outside the parent component's DOM hierarchy
+ * מרנדר את הילדים אל מחוץ להיררכיית ה-DOM של ההורה
  */
 
-import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface PortalProps {
   children: React.ReactNode;
 }
 
-export const Portal: React.FC<PortalProps> = ({ children }) => {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
-
-  return mounted ? createPortal(children, document.body) : null;
-};
+// האפליקציה רצה בדפדפן בלבד (אין רינדור בצד שרת), ולכן `document.body`
+// זמין כבר ברינדור הראשון. הגרסה הקודמת השתמשה ב-state ו-effect כדי
+// "להמתין לטעינה", מה שגרם לרינדור מיותר בכל פתיחת מודאל.
+export const Portal: React.FC<PortalProps> = ({ children }) =>
+  createPortal(children, document.body);

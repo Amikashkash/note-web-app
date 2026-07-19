@@ -3,11 +3,61 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/errors';
+
+/** הודעת השגיאה שמוחזרת כשלא ניתן להגיע לתוכן האתר */
+const FETCH_BLOCKED_MESSAGE =
+  'לא ניתן לגשת לתוכן האתר. אתרים כמו פייסבוק, אינסטגרם ואתרי מניות חוסמים גישה אוטומטית. נסה להעתיק ידנית את התוכן.';
+
+/**
+ * המרת שגיאה מ-Gemini להודעה בעברית.
+ *
+ * `context` מתאר את הפעולה שנכשלה ומופיע בהודעת ברירת המחדל.
+ */
+const toGeminiError = (error: unknown, context: string): Error => {
+  // שגיאת שליפת התוכן כבר מנוסחת בעברית ומועברת כמות שהיא
+  if (error instanceof Error && error.message === FETCH_BLOCKED_MESSAGE) {
+    return error;
+  }
+
+  const message = getErrorMessage(error);
+
+  if (message.includes('API key')) {
+    return new Error('מפתח API של Gemini לא מוגדר. אנא הגדר מפתח API בהגדרות.', { cause: error });
+  }
+
+  if (message.includes('quota') || message.includes('limit')) {
+    return new Error('הגעת למגבלת השימוש ב-API של Gemini. נסה שוב מאוחר יותר.', { cause: error });
+  }
+
+  if (message.includes('JSON')) {
+    return new Error('הבינה המלאכותית החזירה תשובה לא תקינה. נסה שוב.', { cause: error });
+  }
+
+  return new Error(`${context}: ${message}`, { cause: error });
+};
+
+/**
+ * תוכן שחזר מה-AI. המבנה משתנה לפי `type` ואינו מובטח,
+ * ולכן כל השדות אופציונליים ונבדקים לפני שימוש.
+ */
+export interface AIExtractedContent {
+  text?: string;
+  summary?: string;
+  ingredients?: string[];
+  steps?: string[];
+  instructions?: string[];
+  items?: unknown[];
+  servings?: string;
+  prepTime?: string;
+  cookTime?: string;
+}
 
 export interface AIExtractionResult {
   type: 'recipe' | 'shopping' | 'article' | 'stock' | 'general';
   title: string;
-  content: any; // Will be structured based on type
+  content: AIExtractedContent;
   rawText?: string;
 }
 
@@ -60,7 +110,7 @@ const fetchUrlContent = async (url: string): Promise<string> => {
   // Try each proxy until one works
   for (const proxy of proxies) {
     try {
-      console.log(`Trying ${proxy.name} proxy...`);
+      logger.debug(`Trying ${proxy.name} proxy...`);
       const proxyUrl = proxy.getUrl(url);
       const response = await fetch(proxyUrl);
 
@@ -116,18 +166,17 @@ const fetchUrlContent = async (url: string): Promise<string> => {
         throw new Error('Content appears to be mostly navigation/boilerplate');
       }
 
-      console.log(`✓ Successfully fetched content using ${proxy.name}`);
+      logger.debug(`Successfully fetched content using ${proxy.name}`);
       return finalText;
 
     } catch (error) {
-      console.error(`${proxy.name} failed:`, error);
+      logger.warn(`${proxy.name} proxy failed:`, error);
       continue; // Try next proxy
     }
   }
 
-  // If all proxies failed, provide a helpful error message
-  console.error('All proxies failed to fetch content');
-  throw new Error('לא ניתן לגשת לתוכן האתר. אתרים כמו פייסבוק, אינסטגרם ואתרי מניות חוסמים גישה אוטומטית. נסה להעתיק ידנית את התוכן.');
+  logger.error('All proxies failed to fetch content');
+  throw new Error(FETCH_BLOCKED_MESSAGE);
 };
 
 /**
@@ -237,29 +286,8 @@ Important rules:
 
     return extracted;
   } catch (error) {
-    console.error('Gemini AI Error:', error);
-
-    // Check if error is from URL fetching
-    if (error instanceof Error && error.message.includes('לא ניתן לגשת לתוכן האתר')) {
-      throw error; // Re-throw the Hebrew error as-is
-    }
-
-    // For other errors, provide Hebrew error messages
-    const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
-
-    if (errorMessage.includes('API key')) {
-      throw new Error('מפתח API של Gemini לא מוגדר. אנא הגדר מפתח API בהגדרות.');
-    }
-
-    if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
-      throw new Error('הגעת למגבלת השימוש ב-API של Gemini. נסה שוב מאוחר יותר.');
-    }
-
-    if (errorMessage.includes('JSON')) {
-      throw new Error('הבינה המלאכותית החזירה תשובה לא תקינה. נסה שוב.');
-    }
-
-    throw new Error(`שגיאה בחילוץ תוכן: ${errorMessage}`);
+    logger.error('Gemini AI Error:', error);
+    throw toGeminiError(error, 'שגיאה בחילוץ תוכן');
   }
 };
 
@@ -283,22 +311,9 @@ Summary:
 
   try {
     const result = await model.generateContent(prompt);
-    const response = result.response;
-    return response.text();
+    return result.response.text();
   } catch (error) {
-    console.error('Gemini AI Error:', error);
-
-    // Provide Hebrew error messages
-    const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
-
-    if (errorMessage.includes('API key')) {
-      throw new Error('מפתח API של Gemini לא מוגדר. אנא הגדר מפתח API בהגדרות.');
-    }
-
-    if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
-      throw new Error('הגעת למגבלת השימוש ב-API של Gemini. נסה שוב מאוחר יותר.');
-    }
-
-    throw new Error(`שגיאה בסיכום טקסט: ${errorMessage}`);
+    logger.error('Gemini AI Error:', error);
+    throw toGeminiError(error, 'שגיאה בסיכום טקסט');
   }
 };

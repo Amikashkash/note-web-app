@@ -4,12 +4,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
+import { useAuth } from '@/hooks/useAuth';
 
 export const ProfileMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { user, signOut } = useAuthStore();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   // סגירת התפריט בלחיצה מחוץ לתפריט

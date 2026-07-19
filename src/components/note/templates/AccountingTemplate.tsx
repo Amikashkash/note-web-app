@@ -4,13 +4,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/common/Button';
+import type { AccountingRow } from '@/types/template';
 
-export interface AccountingRow {
-  id: string;
-  description: string;
-  amount: number;
-  date: string;
-}
+export type { AccountingRow };
 
 interface AccountingTemplateProps {
   value: string;
@@ -35,13 +31,15 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   }, [value]);
 
   // חישוב יתרה רצה
-  const rowsWithBalance = useMemo(() => {
-    let balance = 0;
-    return rows.map((row) => {
-      balance += row.amount;
-      return { ...row, balance };
-    });
-  }, [rows]);
+  const rowsWithBalance = useMemo(
+    () =>
+      rows.reduce<(AccountingRow & { balance: number })[]>((accumulated, row) => {
+        const previousBalance = accumulated.at(-1)?.balance ?? 0;
+        accumulated.push({ ...row, balance: previousBalance + row.amount });
+        return accumulated;
+      }, []),
+    [rows]
+  );
 
   // הצגת רק 5 שורות אחרונות כברירת מחדל
   const displayedRows = showAll ? rowsWithBalance : rowsWithBalance.slice(-5);

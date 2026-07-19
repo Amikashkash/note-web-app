@@ -9,6 +9,7 @@ import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { extractContentFromUrl, summarizeText, type AIExtractionResult } from '@/services/ai/gemini';
 import { getGeminiApiKey } from '@/services/api/userSettings';
 import { useAuthStore } from '@/store/authStore';
+import { logger } from '@/utils/logger';
 
 interface AISummaryTemplateProps {
   onContentExtracted?: (result: AIExtractionResult) => void;
@@ -52,7 +53,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
       let apiKey: string | undefined;
       try {
         apiKey = (await getGeminiApiKey(user.uid)) || undefined;
-      } catch (e) {
+      } catch {
         // Ignore - will use environment variable
       }
 
@@ -75,7 +76,7 @@ export const AISummaryTemplate: React.FC<AISummaryTemplateProps> = ({
         onContentExtracted?.(extracted);
       }
     } catch (error) {
-      console.error('AI Extraction Error:', error);
+      logger.error('AI Extraction Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'שגיאה בחילוץ התוכן';
       setError(errorMessage);
       onError?.(errorMessage);

@@ -1,111 +1,54 @@
 /**
- * Custom Hook לניהול אימות
- * מספק גישה נוחה לפעולות אימות ומצב המשתמש
+ * Hook לניהול אימות
+ *
+ * קריאה בלבד למצב + עטיפה לפעולות האימות. הקמת המאזין נעשית פעם אחת
+ * ב-`App` דרך `useAuthStore.initialize()`, ולא כאן - אחרת כל קומפוננטה
+ * שמשתמשת ב-hook הייתה מקימה מאזין נוסף.
  */
 
-import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/firebase/auth';
+import { getErrorMessage } from '@/utils/errors';
 
 export const useAuth = () => {
-  const {
-    firebaseUser,
-    user,
-    isLoading,
-    error,
-    setError,
-    initialize,
-    reset,
-  } = useAuthStore();
+  const firebaseUser = useAuthStore((state) => state.firebaseUser);
+  const user = useAuthStore((state) => state.user);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const error = useAuthStore((state) => state.error);
+  const setError = useAuthStore((state) => state.setError);
 
   /**
-   * אתחול המאזין למצב האימות
+   * מריץ פעולת אימות, שומר את הודעת השגיאה במצב ומעביר אותה הלאה.
    */
-  useEffect(() => {
-    const unsubscribe = initialize();
-    return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /**
-   * רישום עם אימייל וסיסמה
-   */
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const run = async <T>(action: () => Promise<T>): Promise<T> => {
+    setError(null);
     try {
-      setError(null);
-      await authService.signUpWithEmail(email, password, displayName);
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
-    }
-  };
-
-  /**
-   * התחברות עם אימייל וסיסמה
-   */
-  const signIn = async (email: string, password: string) => {
-    try {
-      setError(null);
-      await authService.signInWithEmail(email, password);
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
-    }
-  };
-
-  /**
-   * התחברות עם Google
-   */
-  const signInWithGoogle = async () => {
-    try {
-      setError(null);
-      await authService.signInWithGoogle();
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
-    }
-  };
-
-  /**
-   * התנתקות
-   */
-  const signOut = async () => {
-    try {
-      setError(null);
-      await authService.signOut();
-      reset();
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
-    }
-  };
-
-  /**
-   * איפוס סיסמה
-   */
-  const resetPassword = async (email: string) => {
-    try {
-      setError(null);
-      await authService.resetPassword(email);
-    } catch (error: any) {
-      setError(error.message);
+      return await action();
+    } catch (error) {
+      setError(getErrorMessage(error));
       throw error;
     }
   };
 
   return {
-    // State
     firebaseUser,
     user,
     isLoading,
     error,
     isAuthenticated: !!firebaseUser,
 
-    // Actions
-    signUp,
-    signIn,
-    signInWithGoogle,
-    signOut,
-    resetPassword,
+    signUp: (email: string, password: string, displayName: string) =>
+      run(() => authService.signUpWithEmail(email, password, displayName)),
+
+    signIn: (email: string, password: string) =>
+      run(() => authService.signInWithEmail(email, password)),
+
+    signInWithGoogle: () => run(() => authService.signInWithGoogle()),
+
+    // ניקוי המצב נעשה ע"י המאזין ב-`authStore` כשמתקבל משתמש `null`,
+    // וה-hooks של הפתקים והקטגוריות סוגרים את המנויים שלהם בתגובה.
+    signOut: () => run(() => authService.signOut()),
+
+    resetPassword: (email: string) => run(() => authService.resetPassword(email)),
   };
 };

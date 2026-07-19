@@ -7,31 +7,37 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common';
 import { subscribeToArchivedNotes, restoreNote, permanentlyDeleteNote } from '@/services/api/notes';
+import { getTemplateIcon } from '@/utils/templates';
+import { getErrorMessage } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 import { Note } from '@/types/note';
 
 export const Archive: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const userId = user?.uid;
   const [archivedNotes, setArchivedNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // תלוי במזהה ולא באובייקט המשתמש, כדי לא לפתוח מנוי מחדש
+  // בכל פעם שנתוני המשתמש מתעדכנים
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
-    const unsubscribe = subscribeToArchivedNotes(user.uid, (notes) => {
+    const unsubscribe = subscribeToArchivedNotes(userId, (notes) => {
       setArchivedNotes(notes);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [userId]);
 
   const handleRestore = async (noteId: string) => {
     try {
       await restoreNote(noteId);
     } catch (error) {
-      console.error('Error restoring note:', error);
-      alert('שגיאה בשחזור הפתק');
+      logger.error('Error restoring note:', error);
+      alert(getErrorMessage(error));
     }
   };
 
@@ -45,21 +51,9 @@ export const Archive: React.FC = () => {
     try {
       await permanentlyDeleteNote(noteId);
     } catch (error) {
-      console.error('Error permanently deleting note:', error);
-      alert('שגיאה במחיקת הפתק');
+      logger.error('Error permanently deleting note:', error);
+      alert(getErrorMessage(error));
     }
-  };
-
-  const getTemplateIcon = (templateType: string): string => {
-    const icons: Record<string, string> = {
-      plain: '📝',
-      checklist: '✅',
-      recipe: '🍳',
-      shopping: '🛒',
-      workplan: '📋',
-      accounting: '💰',
-    };
-    return icons[templateType] || '📝';
   };
 
   if (loading) {

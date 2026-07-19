@@ -1,6 +1,10 @@
 /**
- * קומפוננטה להצגת פתק מלא במודאל
- * תומכת בעריכה ישירה (inline editing) - כמו Google Keep
+ * הצגת פתק מלא במודאל, עם עריכה ישירה (inline)
+ *
+ * שמירה: העריכה משתמשת ב-debounce. בגרסה קודמת כל הקשה על מקש יצרה
+ * כתיבה נפרדת ל-Firestore - כלומר משפט אחד היה עולה עשרות כתיבות,
+ * ומרוץ מול המאזין בזמן אמת. כעת השינויים נצברים ונשמרים פעם אחת
+ * אחרי הפסקה בהקלדה, ובכל מקרה בסגירת המודאל.
  */
 
 import { useState } from 'react';
@@ -18,18 +22,28 @@ import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
-import { LENGTH_LIMITS } from '@/utils/constants';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
+import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
+import { getTemplateIcon, getTemplateLabel } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
+
+export interface NoteUpdates {
+  title?: string;
+  content?: string;
+}
 
 interface NoteViewProps {
   note: Note;
   onClose: () => void;
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
-  onUpdate?: (noteId: string, updates: { title?: string; content?: string }) => void;
+  onUpdate?: (noteId: string, updates: NoteUpdates) => void;
   onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
   categories?: Array<{ id: string; name: string; icon: string }>;
 }
+
+/** תבניות שהתוכן שלהן נערך כטקסט ולכן יש להן מתג צפייה/עריכה */
+const TOGGLEABLE_TEMPLATES = new Set(['plain', 'checklist', 'workplan']);
 
 export const NoteView: React.FC<NoteViewProps> = ({
   note,
@@ -40,7 +54,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onMoveToCategory,
   categories = [],
 }) => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showShareManagement, setShowShareManagement] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
@@ -48,91 +62,126 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [draftNoteId, setDraftNoteId] = useState(note.id);
 
-  // Check if user is the owner of the note
-  const isOwner = user && note.userId === user.uid;
-  const isShared = note.sharedWith && note.sharedWith.length > 0;
+  // כשמוצג פתק אחר - מאתחלים את הטיוטה המקומית.
+  // האיפוס נעשה בזמן הרינדור ולא ב-effect, כך שאין רינדור ביניים
+  // שמציג את הפתק החדש עם הטקסט של הקודם.
+  //
+  // מסתנכרנים לפי מזהה הפתק בלבד: עדכון שמגיע מהמאזין בזמן אמת
+  // לא אמור לדרוס טקסט שהמשתמש מקליד ברגע זה.
+  if (draftNoteId !== note.id) {
+    setDraftNoteId(note.id);
+    setTitle(note.title);
+    setContent(note.content);
+    setIsEditMode(false);
+  }
+
+  const isOwner = user !== null && note.userId === user.uid;
+  const isShared = note.sharedWith.length > 0;
+
+  const saveUpdates = useDebouncedCallback((updates: NoteUpdates) => {
+    onUpdate?.(note.id, updates);
+  }, AUTOSAVE_DELAY_MS);
+
+  const handleTitleChange = (newTitle: string) => {
+    const trimmed = newTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE);
+    setTitle(trimmed);
+    saveUpdates.call({ title: trimmed });
+  };
+
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+    saveUpdates.call({ content: newContent });
+  };
+
+  /** סוגר את המודאל אחרי ששמר שינוי שממתין */
+  const handleClose = () => {
+    saveUpdates.flush();
+    onClose();
+  };
 
   const handleDelete = () => {
-    if (window.confirm('האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.')) {
+    if (
+      window.confirm(
+        'האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.'
+      )
+    ) {
+      saveUpdates.cancel();
       onDelete(note.id);
       onClose();
     }
   };
 
-  const handleTogglePin = () => {
-    if (onTogglePin) {
-      onTogglePin(note.id, !note.isPinned);
-    }
-  };
-
-  const handleTitleChange = (newTitle: string) => {
-    setTitle(newTitle);
-    if (onUpdate) {
-      onUpdate(note.id, { title: newTitle });
-    }
-  };
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    if (onUpdate) {
-      onUpdate(note.id, { content: newContent });
-    }
-  };
-
   const handleShare = async () => {
-    // ניסיון להשתמש ב-Web Share API במובייל
-    const nativeShareSuccess = await shareViaNative(note);
-    if (nativeShareSuccess) {
-      return;
+    const sharedNatively = await shareViaNative(note);
+    if (!sharedNatively) {
+      setShowShareMenu((previous) => !previous);
     }
-
-    // אם לא עבד, הצג תפריט שיתוף
-    setShowShareMenu(!showShareMenu);
   };
 
   const handleCopy = async () => {
-    const success = await copyToClipboard(note);
-    if (success) {
+    if (await copyToClipboard(note)) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     }
   };
 
   const handleMoveToCategory = (newCategoryId: string) => {
-    if (onMoveToCategory && newCategoryId !== note.categoryId) {
-      onMoveToCategory(note.id, newCategoryId);
-      setShowMoveMenu(false);
-      onClose();
-    }
+    if (!onMoveToCategory || newCategoryId === note.categoryId) return;
+
+    saveUpdates.flush();
+    onMoveToCategory(note.id, newCategoryId);
+    setShowMoveMenu(false);
+    onClose();
   };
 
-  const handleShareNote = async (email: string) => {
-    try {
-      await noteAPI.shareNoteWithUser(note.id, email);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleUnshareNote = async (userId: string) => {
-    try {
-      await noteAPI.unshareNoteWithUser(note.id, userId);
-    } catch (error) {
-      throw error;
+  const renderContent = () => {
+    switch (note.templateType) {
+      case 'accounting':
+        return <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+      case 'checklist':
+        return <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />;
+      case 'recipe':
+        return <RecipeTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+      case 'shopping':
+        return <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+      case 'workplan':
+        return <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />;
+      default:
+        return isEditMode ? (
+          <EnhancedTextarea
+            value={content}
+            onChange={handleContentChange}
+            placeholder="הזן תוכן..."
+            rows={8}
+            className="min-h-[200px]"
+          />
+        ) : (
+          <FormattedText
+            content={content}
+            className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[200px]"
+          />
+        );
     }
   };
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={handleClose}>
       <div className="max-h-[80vh] overflow-y-auto">
-        {/* כפתור חזרה */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 z-10 bg-gradient-primary dark:bg-gradient-primary-dark text-white p-2.5 rounded-full shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 hover:scale-110"
           title="סגור"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -143,23 +192,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
             <Input
               type="text"
               value={title}
-              onChange={(e) => handleTitleChange(e.target.value.slice(0, LENGTH_LIMITS.NOTE_TITLE))}
+              onChange={(e) => handleTitleChange(e.target.value)}
               maxLength={LENGTH_LIMITS.NOTE_TITLE}
               className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 border-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 rounded px-2 dark:bg-gray-800"
               placeholder="כותרת הפתק..."
             />
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 px-2">
               <span>
-                {note.templateType === 'plain' && '📝 טקסט'}
-                {note.templateType === 'checklist' && '✅ משימות'}
-                {note.templateType === 'recipe' && '🍳 מתכון'}
-                {note.templateType === 'shopping' && '🛒 קניות'}
-                {note.templateType === 'workplan' && '📋 תכנית עבודה'}
-                {note.templateType === 'accounting' && '💰 חשבונאות'}
+                {getTemplateIcon(note.templateType)} {getTemplateLabel(note.templateType)}
               </span>
               <span>•</span>
               <span>
-                {new Date(note.updatedAt.toDate()).toLocaleDateString('he-IL', {
+                {note.updatedAt.toDate().toLocaleDateString('he-IL', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -171,7 +215,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
           {onTogglePin && (
             <button
-              onClick={handleTogglePin}
+              onClick={() => onTogglePin(note.id, !note.isPinned)}
               className="text-2xl hover:scale-110 transition-transform"
               title={note.isPinned ? 'ביטול הצמדה' : 'הצמדה'}
             >
@@ -184,36 +228,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">תוכן:</h3>
-            {(note.templateType === 'plain' || note.templateType === 'checklist' || note.templateType === 'workplan') && (
+            {TOGGLEABLE_TEMPLATES.has(note.templateType) && (
               <button
-                onClick={() => setIsEditMode(!isEditMode)}
+                onClick={() => setIsEditMode((previous) => !previous)}
                 className="text-sm px-4 py-2 rounded-xl bg-gradient-primary dark:bg-gradient-primary-dark text-white shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 font-semibold"
               >
                 {isEditMode ? '👁️ צפייה' : '✏️ עריכה'}
               </button>
             )}
           </div>
-          {note.templateType === 'accounting' ? (
-            <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />
-          ) : note.templateType === 'checklist' ? (
-            <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />
-          ) : note.templateType === 'recipe' ? (
-            <RecipeTemplate value={content} onChange={handleContentChange} readOnly={false} />
-          ) : note.templateType === 'shopping' ? (
-            <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />
-          ) : note.templateType === 'workplan' ? (
-            <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />
-          ) : isEditMode ? (
-            <EnhancedTextarea
-              value={content}
-              onChange={handleContentChange}
-              placeholder="הזן תוכן..."
-              rows={8}
-              className="min-h-[200px]"
-            />
-          ) : (
-            <FormattedText content={content} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[200px]" />
-          )}
+          {renderContent()}
         </div>
 
         {/* תגיות */}
@@ -221,9 +245,9 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">תגיות:</h3>
             <div className="flex flex-wrap gap-2">
-              {note.tags.map((tag, index) => (
+              {note.tags.map((tag) => (
                 <span
-                  key={index}
+                  key={tag}
                   className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-full"
                 >
                   #{tag}
@@ -233,7 +257,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
-        {/* כפתורי שיתוף */}
+        {/* תפריט שיתוף חיצוני */}
         {showShareMenu && (
           <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">שתף פתק:</h3>
@@ -262,12 +286,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 <span>📧</span>
                 אימייל
               </Button>
-              <Button
-                onClick={handleCopy}
-                size="sm"
-                variant="outline"
-                className="flex items-center gap-2"
-              >
+              <Button onClick={handleCopy} size="sm" variant="outline" className="flex items-center gap-2">
                 <span>{copySuccess ? '✓' : '📋'}</span>
                 {copySuccess ? 'הועתק!' : 'העתק'}
               </Button>
@@ -275,13 +294,15 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
-        {/* תפריט העברה לקטגוריה */}
+        {/* העברה לקטגוריה */}
         {showMoveMenu && categories.length > 0 && (
           <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">העבר לקטגוריה:</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              העבר לקטגוריה:
+            </h3>
             <div className="grid grid-cols-2 gap-2">
               {categories
-                .filter(cat => cat.id !== note.categoryId)
+                .filter((category) => category.id !== note.categoryId)
                 .map((category) => (
                   <Button
                     key={category.id}
@@ -298,7 +319,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
-        {/* כפתורי פעולה */}
+        {/* פעולות */}
         <div className="flex flex-col gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex gap-2">
             <Button onClick={handleShare} variant="outline" className="flex-1">
@@ -321,7 +342,11 @@ export const NoteView: React.FC<NoteViewProps> = ({
               </span>
             )}
             {onMoveToCategory && categories.length > 1 && (
-              <Button onClick={() => setShowMoveMenu(!showMoveMenu)} variant="outline" className="flex-1">
+              <Button
+                onClick={() => setShowMoveMenu((previous) => !previous)}
+                variant="outline"
+                className="flex-1"
+              >
                 📁 העבר
               </Button>
             )}
@@ -329,21 +354,20 @@ export const NoteView: React.FC<NoteViewProps> = ({
               🗑 מחק
             </Button>
           </div>
-          <Button variant="secondary" onClick={onClose} className="w-full">
+          <Button variant="secondary" onClick={handleClose} className="w-full">
             ✕ סגור
           </Button>
         </div>
       </div>
 
-      {/* ניהול שיתוף */}
       {showShareManagement && (
         <ShareManagement
           itemType="note"
           itemId={note.id}
           itemName={note.title}
-          currentSharedWith={note.sharedWith || []}
-          onShare={handleShareNote}
-          onUnshare={handleUnshareNote}
+          currentSharedWith={note.sharedWith}
+          onShare={(email) => noteAPI.shareNoteWithUser(note.id, email)}
+          onUnshare={(userId) => noteAPI.unshareNoteWithUser(note.id, userId)}
           onClose={() => setShowShareManagement(false)}
         />
       )}

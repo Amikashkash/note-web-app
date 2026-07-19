@@ -6,9 +6,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { useCategoryStore } from '@/store/categoryStore';
-import { useNoteStore } from '@/store/noteStore';
+import { useCategories } from '@/hooks/useCategories';
 import { useNotes } from '@/hooks/useNotes';
+import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/errors';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
@@ -22,10 +23,9 @@ type TemplateMode = 'ai' | 'plain' | 'workplan';
 export const Share: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuthStore();
-  const { categories, subscribeToCategories } = useCategoryStore();
-  const { createNote } = useNoteStore();
-  const { allNotes, updateNote } = useNotes();
+  const user = useAuthStore((state) => state.user);
+  const { categories } = useCategories();
+  const { allNotes, createNote, updateNote } = useNotes();
 
   const [sharedTitle, setSharedTitle] = useState('');
   const [sharedText, setSharedText] = useState('');
@@ -52,10 +52,8 @@ export const Share: React.FC = () => {
   // Check if Service Worker is ready on mount
   useEffect(() => {
     const checkServiceWorker = async () => {
-      console.log('🔍 Checking Service Worker status...');
-
       if (!('serviceWorker' in navigator)) {
-        console.error('❌ Service Worker not supported');
+        logger.warn('Service Worker not supported');
         setCheckingSW(false);
         setSwReady(false);
         return;
@@ -65,19 +63,14 @@ export const Share: React.FC = () => {
         const registration = await navigator.serviceWorker.ready;
         const isActive = registration.active !== null;
 
-        console.log('✅ Service Worker status:', {
-          active: isActive,
-          state: registration.active?.state,
-        });
-
         setSwReady(isActive);
         setCheckingSW(false);
 
         if (!isActive) {
-          console.warn('⚠️ Service Worker not active - share may fail with long content');
+          logger.warn('Service Worker not active - share may fail with long content');
         }
       } catch (error) {
-        console.error('❌ Error checking Service Worker:', error);
+        logger.error('Error checking Service Worker:', error);
         setCheckingSW(false);
         setSwReady(false);
       }
@@ -92,8 +85,7 @@ export const Share: React.FC = () => {
       const shareId = searchParams.get('shareId');
 
       if (shareId) {
-        // Load from cache (POST method via Service Worker)
-        console.log('🔍 Loading share data from cache with ID:', shareId);
+        // שיתוף שהגיע כ-POST ונשמר ב-cache ע"י ה-Service Worker
         try {
           const cache = await caches.open('share-data-cache');
           const response = await cache.match(`/share-data/${shareId}`);
@@ -103,42 +95,26 @@ export const Share: React.FC = () => {
             setSharedTitle(data.title || '');
             setSharedText(data.text || '');
             setSharedUrl(data.url || '');
-            console.log('✅ Loaded share data from cache:', {
-              titleLength: (data.title || '').length,
-              textLength: (data.text || '').length,
-              urlLength: (data.url || '').length,
-            });
 
-            // Clean up old cache entry
             await cache.delete(`/share-data/${shareId}`);
           } else {
-            console.warn('⚠️ Share data not found in cache:', shareId);
-            console.log('💡 This might happen if the Service Worker was not active during share');
+            logger.warn('Share data not found in cache:', shareId);
           }
         } catch (error) {
-          console.error('❌ Error loading share data from cache:', error);
+          logger.error('Error loading share data from cache:', error);
         }
       } else {
-        // Load from URL params (GET method - fallback for when SW is not active)
-        console.log('📄 Loading share data from URL params (GET fallback)');
+        // נפילה לפרמטרים ב-URL, למקרה שה-Service Worker לא היה פעיל
         const title = searchParams.get('title') || '';
         const text = searchParams.get('text') || '';
         const url = searchParams.get('url') || '';
-
-        console.log('📊 URL params data:', {
-          titleLength: title.length,
-          textLength: text.length,
-          urlLength: url.length,
-        });
 
         setSharedTitle(title);
         setSharedText(text);
         setSharedUrl(url);
 
-        // If all params are empty, might be arriving from direct POST that wasn't intercepted
         if (!title && !text && !url) {
-          console.warn('⚠️ No share data found in URL params or cache');
-          console.log('💡 Service Worker might not be active. Try refreshing the app first.');
+          logger.warn('No share data found in URL params or cache');
           setSwNotActive(true);
         }
       }
@@ -147,19 +123,16 @@ export const Share: React.FC = () => {
     loadSharedData();
   }, [searchParams]);
 
-  // Load categories when user is available
+  // המנוי לקטגוריות מנוהל ב-`useCategories`; כאן רק מסמנים סיום טעינה
   useEffect(() => {
     if (user) {
-      console.log('📂 Loading categories for user:', user.uid);
-      subscribeToCategories(user.uid);
       setLoading(false);
     }
-  }, [user, subscribeToCategories]);
+  }, [user]);
 
-  // Auto-select first category when categories load
+  // בחירה אוטומטית של הקטגוריה הראשונה
   useEffect(() => {
     if (categories.length > 0 && !selectedCategoryId) {
-      console.log('✅ Auto-selecting first category:', categories[0].name);
       setSelectedCategoryId(categories[0].id);
     }
   }, [categories, selectedCategoryId]);
@@ -217,7 +190,7 @@ export const Share: React.FC = () => {
       let apiKey: string | undefined;
       try {
         apiKey = (await getGeminiApiKey(user.uid)) || undefined;
-      } catch (e) {
+      } catch {
         // Use environment variable
       }
 
@@ -250,8 +223,8 @@ export const Share: React.FC = () => {
         setContent(summary);
       }
     } catch (error) {
-      console.error('AI processing error:', error);
-      setAiError(error instanceof Error ? error.message : 'שגיאה בעיבוד AI');
+      logger.error('AI processing error:', error);
+      setAiError(getErrorMessage(error));
       // Keep original content on error
       let combinedContent = '';
       if (sharedText) combinedContent += sharedText;
@@ -309,7 +282,7 @@ export const Share: React.FC = () => {
             };
             sections.push(newSection);
             updatedContent = JSON.stringify(sections);
-          } catch (e) {
+          } catch {
             // If parsing fails, treat as plain text
             updatedContent = existingNote.content + '\n\n' + content;
           }
@@ -318,10 +291,7 @@ export const Share: React.FC = () => {
           updatedContent = existingNote.content + '\n\n' + content;
         }
 
-        await updateNote(selectedNoteId, {
-          ...existingNote,
-          content: updatedContent,
-        });
+        await updateNote(selectedNoteId, { content: updatedContent });
       } else {
         // Create new note
         const templateType: TemplateType = templateMode === 'workplan' ? 'workplan' : 'plain';
@@ -358,8 +328,8 @@ export const Share: React.FC = () => {
       // Navigate to home after successful save
       navigate('/', { replace: true });
     } catch (error) {
-      console.error('Error saving shared note:', error);
-      alert('שגיאה בשמירת הפתק');
+      logger.error('Error saving shared note:', error);
+      alert(getErrorMessage(error));
       setSaving(false);
     }
   };

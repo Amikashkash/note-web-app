@@ -2,7 +2,7 @@
  * ערכי ברירת מחדל לאפליקציה
  */
 
-import { DEFAULT_COLORS, TEMPLATE_TYPES } from './constants';
+import { DEFAULT_COLORS } from './constants';
 import type { UserSettings } from '@/types';
 
 // הגדרות משתמש ברירת מחדל
@@ -22,18 +22,4 @@ export const getDefaultCategory = (userId: string, name: string) => ({
   order: 0,
   userId,
   sharedWith: [],
-});
-
-// ערכי ברירת מחדל לפתק חדש
-export const getDefaultNote = (userId: string, categoryId: string, title: string) => ({
-  title,
-  content: '',
-  categoryId,
-  templateType: TEMPLATE_TYPES.PLAIN as 'plain',
-  tags: [],
-  color: DEFAULT_COLORS.note,
-  order: 0,
-  userId,
-  sharedWith: [],
-  isPinned: false,
 });

@@ -2,7 +2,7 @@
  * תבנית רשימת משימות - To-Do List
  */
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/common/Button';
 
 export interface ChecklistItem {
@@ -24,7 +24,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   onChange,
   readOnly = false,
 }) => {
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+  // מזהה המשימה שצריכה לקבל פוקוס אחרי הרינדור הבא.
+  // ref ולא state: זו פעולת DOM בלבד ואינה משפיעה על מה שמוצג,
+  // ולכן אין סיבה לגרור בגללה רינדור נוסף.
+  const pendingFocusIdRef = useRef<string | null>(null);
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const items = useMemo<ChecklistItem[]>(() => {
@@ -35,8 +38,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
         return [];
       }
       // Validate each item has required properties
+      // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
+      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי
       return parsed.map((item, index) => ({
-        id: item.id || `item-${Date.now()}-${index}`,
+        id: item.id || `item-${index}`,
         text: item.text || '',
         completed: item.completed || false,
         dueDate: item.dueDate,
@@ -47,12 +52,17 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   }, [value]);
 
+  // רץ אחרי כל רינדור, כי אי אפשר לדעת מראש מתי שדה המשימה החדשה יצורף ל-DOM
   useEffect(() => {
-    if (lastAddedId && inputRefs.current[lastAddedId]) {
-      inputRefs.current[lastAddedId]?.focus();
-      setLastAddedId(null);
+    const pendingId = pendingFocusIdRef.current;
+    if (!pendingId) return;
+
+    const input = inputRefs.current[pendingId];
+    if (input) {
+      input.focus();
+      pendingFocusIdRef.current = null;
     }
-  }, [lastAddedId, items]);
+  });
 
   const handleAddItem = () => {
     const newId = Date.now().toString();
@@ -63,7 +73,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     };
     const updatedItems = [...items, newItem];
     onChange(JSON.stringify(updatedItems));
-    setLastAddedId(newId);
+    pendingFocusIdRef.current = newId;
   };
 
   const handleToggleItem = (id: string) => {
@@ -192,7 +202,9 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       </span>
                     ) : (
                       <input
-                        ref={(el) => (inputRefs.current[item.id] = el)}
+                        ref={(el) => {
+                          inputRefs.current[item.id] = el;
+                        }}
                         type="text"
                         value={item.text}
                         onChange={(e) => handleUpdateText(item.id, e.target.value)}
