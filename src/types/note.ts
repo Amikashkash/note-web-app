@@ -4,7 +4,13 @@
 
 import { Timestamp } from 'firebase/firestore';
 
-export type TemplateType = 'plain' | 'checklist' | 'recipe' | 'shopping' | 'workplan' | 'accounting' | 'aisummary';
+/**
+ * סוגי התבניות שהאפליקציה יודעת ליצור.
+ *
+ * ב-Firestore עשויים לשבת פתקים עם סוג שכבר לא קיים כאן (למשל
+ * `aisummary` שהוסר) - `getTemplateMeta` מטפל בהם דרך ברירת המחדל.
+ */
+export type TemplateType = 'plain' | 'checklist' | 'recipe' | 'shopping' | 'workplan' | 'accounting';
 
 export interface Note {
   id: string;

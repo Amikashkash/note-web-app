@@ -1,6 +1,6 @@
 {
   "name": "notes-app",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "אפליקציית פתקים מאורגנים בקטגוריות",
   "type": "module",
   "scripts": {
@@ -39,7 +39,6 @@
     "vite-plugin-pwa": "^1.1.0"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "firebase": "^12.4.0",
     "i18next": "^25.6.0",
     "react-i18next": "^16.2.1",

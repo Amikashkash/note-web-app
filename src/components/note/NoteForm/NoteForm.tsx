@@ -16,9 +16,6 @@ import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
-import { AISummaryTemplate } from '@/components/note/templates/AISummaryTemplate';
-import type { AIExtractionResult } from '@/services/ai/gemini';
-import { logger } from '@/utils/logger';
 
 interface NoteFormProps {
   categoryId: string;
@@ -46,66 +43,9 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   );
   const [reminderEnabled, setReminderEnabled] = useState(note?.reminderEnabled || false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [aiResult, setAiResult] = useState<AIExtractionResult | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const isEditMode = !!note;
-
-  const handleAIContentExtracted = (result: AIExtractionResult) => {
-    setAiResult(result);
-    setTitle(result.title);
-    // Auto-convert to plain text immediately - pass result directly
-    convertAIResultToTemplate('plain', result);
-  };
-
-  const convertAIResultToTemplate = (targetTemplate: TemplateType, extractionResult?: AIExtractionResult) => {
-    // Use provided result or fall back to state
-    const resultToUse = extractionResult || aiResult;
-    if (!resultToUse) return;
-
-    switch (targetTemplate) {
-      case 'recipe': {
-        // ה-AI מחזיר לעיתים 'steps' ולעיתים 'instructions'
-        const steps = resultToUse.content.steps || resultToUse.content.instructions || [];
-        const ingredients = resultToUse.content.ingredients || [];
-
-        setContent(JSON.stringify({
-          servings: resultToUse.content.servings || '',
-          prepTime: resultToUse.content.prepTime || '',
-          cookTime: resultToUse.content.cookTime || '',
-          ingredients: Array.isArray(ingredients) ? ingredients : [],
-          instructions: Array.isArray(steps) ? steps : [],
-        }));
-        break;
-      }
-      case 'shopping':
-        if (resultToUse.type === 'shopping' && resultToUse.content.items) {
-          setContent(JSON.stringify(resultToUse.content.items));
-        }
-        break;
-      case 'plain':
-      default: {
-        let plainText: string;
-
-        if (resultToUse.type === 'recipe') {
-          const ingredients = resultToUse.content.ingredients?.join('\n') || '';
-          const steps = resultToUse.content.steps?.join('\n') || '';
-          plainText = `מרכיבים:\n${ingredients}\n\nהוראות הכנה:\n${steps}`;
-        } else if (resultToUse.type === 'article') {
-          plainText = resultToUse.content.summary || resultToUse.content.text || '';
-        } else if (resultToUse.type === 'general' && resultToUse.content.text) {
-          plainText = resultToUse.content.text;
-        } else {
-          plainText = JSON.stringify(resultToUse.content, null, 2);
-        }
-
-        setContent(plainText);
-        break;
-      }
-    }
-
-    setTemplateType(targetTemplate);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,12 +127,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             תוכן
           </label>
-          {templateType === 'aisummary' ? (
-            <AISummaryTemplate
-              onContentExtracted={handleAIContentExtracted}
-              onError={(error) => logger.error('AI Error:', error)}
-            />
-          ) : templateType === 'accounting' ? (
+          {templateType === 'accounting' ? (
             <AccountingTemplate value={content} onChange={setContent} />
           ) : templateType === 'checklist' ? (
             <ChecklistTemplate value={content} onChange={setContent} />
@@ -211,16 +146,6 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             />
           )}
         </div>
-
-        {/* AI Success Message */}
-        {aiResult && content && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-            <p className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
-              <span>✓</span>
-              <span>התוכן חולץ וסודר בהצלחה! מוכן לשמירה</span>
-            </p>
-          </div>
-        )}
 
         {/* תזכורת */}
         <div className="border-t pt-3">

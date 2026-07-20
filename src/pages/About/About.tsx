@@ -48,7 +48,7 @@ export const About: React.FC = () => {
             </h3>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
               אפליקציית פתקים חכמה ומאורגנת עם תמיכה מלאה בעברית RTL, ניהול קטגוריות צבעוניות,
-              תבניות מגוונות לפתקים, אינטגרציה עם Gemini AI לסיכום חכם, ושיתוף חכם של תוכן -
+              תבניות מגוונות לפתקים, גיבוי לקובץ ושיתוף חכם של תוכן -
               הכל במסגרת חוויית משתמש נעימה ומהירה.
             </p>
           </div>
@@ -69,8 +69,8 @@ export const About: React.FC = () => {
                 <span>תבניות מגוונות: רגיל, רשימת משימות, מתכון, רשימת קניות, ועוד</span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-xl flex-shrink-0">🤖</span>
-                <span>אינטגרציה עם Gemini AI לסיכום חכם של טקסטים</span>
+                <span className="text-xl flex-shrink-0">💾</span>
+                <span>גיבוי כל הפתקים לקובץ להורדה</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-xl flex-shrink-0">🔗</span>
@@ -162,7 +162,6 @@ export const About: React.FC = () => {
                 'Tailwind CSS',
                 'Zustand',
                 'React Router',
-                'Gemini AI',
                 'PWA',
               ].map((tech) => (
                 <span

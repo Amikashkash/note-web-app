@@ -13,12 +13,10 @@ import { getErrorMessage } from '@/utils/errors';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
-import { extractContentFromUrl, summarizeText } from '@/services/ai/gemini';
-import { getGeminiApiKey } from '@/services/api/userSettings';
 import type { TemplateType } from '@/types/note';
 
 type ActionMode = 'new' | 'append';
-type TemplateMode = 'ai' | 'plain' | 'workplan';
+type TemplateMode = 'plain' | 'workplan';
 
 export const Share: React.FC = () => {
   const navigate = useNavigate();
@@ -34,20 +32,17 @@ export const Share: React.FC = () => {
   const [content, setContent] = useState('');
   const [workplanMainTitle, setWorkplanMainTitle] = useState(''); // For work plan library name
   const [actionMode, setActionMode] = useState<ActionMode>('new');
-  const [templateMode, setTemplateMode] = useState<TemplateMode>('ai');
+  const [templateMode, setTemplateMode] = useState<TemplateMode>('plain');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedNoteId, setSelectedNoteId] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [aiProcessing, setAiProcessing] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
   const [swNotActive, setSwNotActive] = useState(false);
   const [checkingSW, setCheckingSW] = useState(true);
   const [swReady, setSwReady] = useState(false);
 
   // Detect content type
   const hasUrl = !!sharedUrl;
-  const hasText = !!sharedText;
 
   // Check if Service Worker is ready on mount
   useEffect(() => {
@@ -150,13 +145,6 @@ export const Share: React.FC = () => {
       setTitle(sharedTitle);
     }
 
-    // Smart default: If URL provided, default to AI mode
-    if (hasUrl) {
-      setTemplateMode('ai');
-    } else if (hasText) {
-      setTemplateMode('plain');
-    }
-
     // Build initial content
     let combinedContent = '';
     if (sharedText) {
@@ -169,74 +157,7 @@ export const Share: React.FC = () => {
       combinedContent += sharedUrl;
     }
     setContent(combinedContent);
-  }, [user, navigate, sharedTitle, sharedText, sharedUrl, hasUrl, hasText]);
-
-  // Smart AI processing when template changes to AI
-  useEffect(() => {
-    if (templateMode === 'ai' && content && !aiProcessing && !aiError) {
-      handleAIProcess();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateMode]);
-
-  const handleAIProcess = async () => {
-    if (!user) return;
-
-    setAiProcessing(true);
-    setAiError(null);
-
-    try {
-      // Get API key
-      let apiKey: string | undefined;
-      try {
-        apiKey = (await getGeminiApiKey(user.uid)) || undefined;
-      } catch {
-        // Use environment variable
-      }
-
-      if (hasUrl) {
-        // Process URL with AI
-        const result = await extractContentFromUrl(sharedUrl, apiKey);
-        setTitle(result.title || sharedTitle || 'סיכום מקישור');
-
-        // Format content based on type
-        if (result.type === 'general' && result.content.text) {
-          setContent(result.content.text);
-        } else if (result.type === 'recipe') {
-          let recipeText = '';
-          if (result.content.ingredients) {
-            recipeText += `מרכיבים:\n${result.content.ingredients.join('\n')}\n\n`;
-          }
-          if (result.content.steps) {
-            recipeText += `הוראות הכנה:\n${result.content.steps.join('\n')}`;
-          }
-          setContent(recipeText);
-        } else if (result.type === 'article' && result.content.summary) {
-          setContent(result.content.summary);
-        } else {
-          setContent(JSON.stringify(result.content, null, 2));
-        }
-      } else if (hasText) {
-        // Process text with AI
-        const summary = await summarizeText(sharedText, apiKey);
-        setTitle(sharedTitle || 'סיכום טקסט');
-        setContent(summary);
-      }
-    } catch (error) {
-      logger.error('AI processing error:', error);
-      setAiError(getErrorMessage(error));
-      // Keep original content on error
-      let combinedContent = '';
-      if (sharedText) combinedContent += sharedText;
-      if (sharedUrl) {
-        if (combinedContent) combinedContent += '\n\n';
-        combinedContent += sharedUrl;
-      }
-      setContent(combinedContent);
-    } finally {
-      setAiProcessing(false);
-    }
-  };
+  }, [user, navigate, sharedTitle, sharedText, sharedUrl]);
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {
@@ -411,7 +332,7 @@ export const Share: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setActionMode('new')}
-                disabled={saving || aiProcessing}
+                disabled={saving}
                 className={`p-3 rounded-lg border-2 transition-all ${
                   actionMode === 'new'
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
@@ -423,7 +344,7 @@ export const Share: React.FC = () => {
               </button>
               <button
                 onClick={() => setActionMode('append')}
-                disabled={saving || aiProcessing}
+                disabled={saving}
                 className={`p-3 rounded-lg border-2 transition-all ${
                   actionMode === 'append'
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
@@ -442,22 +363,10 @@ export const Share: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 תבנית:
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setTemplateMode('ai')}
-                  disabled={saving || aiProcessing}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    templateMode === 'ai'
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">🤖</div>
-                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300">AI סיכום</div>
-                </button>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setTemplateMode('plain')}
-                  disabled={saving || aiProcessing}
+                  disabled={saving}
                   className={`p-3 rounded-lg border-2 transition-all ${
                     templateMode === 'plain'
                       ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
@@ -469,7 +378,7 @@ export const Share: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setTemplateMode('workplan')}
-                  disabled={saving || aiProcessing}
+                  disabled={saving}
                   className={`p-3 rounded-lg border-2 transition-all ${
                     templateMode === 'workplan'
                       ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30'
@@ -505,31 +414,6 @@ export const Share: React.FC = () => {
             </div>
           )}
 
-          {/* AI Processing Status */}
-          {aiProcessing && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="animate-spin text-2xl">🤖</div>
-                <div>
-                  <p className="font-medium text-blue-800 dark:text-blue-300">מעבד עם AI...</p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400">
-                    {hasUrl ? 'מנתח קישור ומסכם' : 'מסכם טקסט'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* AI Error */}
-          {aiError && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-sm text-red-700 dark:text-red-300">⚠️ {aiError}</p>
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                התוכן המקורי נשמר למטה
-              </p>
-            </div>
-          )}
-
           {/* Work Plan Main Title (only for new work plan notes) */}
           {actionMode === 'new' && templateMode === 'workplan' && (
             <div>
@@ -541,7 +425,7 @@ export const Share: React.FC = () => {
                 value={workplanMainTitle}
                 onChange={(e) => setWorkplanMainTitle(e.target.value)}
                 placeholder='לדוגמה: "📚 מדריכי React" או "🎬 סרטוני הדרכה"'
-                disabled={saving || aiProcessing}
+                disabled={saving}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 💡 זו הכותרת הראשית של הספרייה - תוכל להוסיף עוד קישורים לאותה ספרייה מאוחר יותר
@@ -563,7 +447,7 @@ export const Share: React.FC = () => {
                   ? 'כותרת הקישור/סעיף הראשון...'
                   : 'הזן כותרת לפתק...'
               }
-              disabled={saving || aiProcessing}
+              disabled={saving}
             />
           </div>
 
@@ -576,7 +460,7 @@ export const Share: React.FC = () => {
               value={content}
               onChange={setContent}
               placeholder="תוכן הפתק..."
-              disabled={saving || aiProcessing}
+              disabled={saving}
               rows={10}
             />
           </div>
@@ -593,7 +477,7 @@ export const Share: React.FC = () => {
                     key={category.id}
                     onClick={() => setSelectedCategoryId(category.id)}
                     variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
-                    disabled={saving || aiProcessing}
+                    disabled={saving}
                     className="justify-start"
                   >
                     <span className="text-lg">{category.icon || '📁'}</span>
@@ -620,7 +504,7 @@ export const Share: React.FC = () => {
                         setSelectedNoteId('');
                       }}
                       variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
-                      disabled={saving || aiProcessing}
+                      disabled={saving}
                       className="justify-start text-sm"
                     >
                       <span>{category.icon || '📁'}</span>
@@ -641,7 +525,7 @@ export const Share: React.FC = () => {
                         <button
                           key={note.id}
                           onClick={() => setSelectedNoteId(note.id)}
-                          disabled={saving || aiProcessing}
+                          disabled={saving}
                           className={`p-3 rounded-lg border-2 text-right transition-all ${
                             selectedNoteId === note.id
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
@@ -674,7 +558,6 @@ export const Share: React.FC = () => {
               onClick={handleSave}
               disabled={
                 saving ||
-                aiProcessing ||
                 (actionMode === 'new' && !selectedCategoryId) ||
                 (actionMode === 'append' && !selectedNoteId) ||
                 (!title.trim() && !content.trim()) ||
@@ -687,7 +570,7 @@ export const Share: React.FC = () => {
             <Button
               onClick={handleCancel}
               variant="secondary"
-              disabled={saving || aiProcessing}
+              disabled={saving}
             >
               ביטול
             </Button>
@@ -714,10 +597,9 @@ export const Share: React.FC = () => {
         {/* Info */}
         <div className="mt-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
           <p className="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">
-            ✨ שיתוף חכם עם AI!
+            ✨ שיתוף מהיר
           </p>
           <ul className="text-xs text-purple-700 dark:text-purple-400 space-y-1">
-            <li>🤖 סיכום AI - מסכם קישורים וטקסטים באופן אוטומטי</li>
             <li>📝 טקסט חופשי - שמירה ישירה ללא עיבוד</li>
             <li>📋 תכנית עבודה - מושלם לספריית קישורים</li>
             <li>➕ הוסף לפתק קיים - צבור קישורים באותו פתק</li>

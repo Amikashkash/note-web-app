@@ -16,6 +16,30 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.7.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'תבנית "סיכום AI" והשילוב עם Gemini הוסרו מהאפליקציה. הרעיון ייבנה מחדש בהמשך',
+      },
+      {
+        type: 'improvement',
+        description:
+          'פתקים קיימים מסוג "סיכום AI" נפתחים כטקסט חופשי - התוכן שלהם נשמר במלואו',
+      },
+      {
+        type: 'improvement',
+        description: 'מסך השיתוף פשוט יותר: טקסט חופשי או תכנית עבודה, בלי עיבוד אוטומטי',
+      },
+      {
+        type: 'improvement',
+        description: 'מסך ההגדרות מוקדש כעת לגיבוי הפתקים',
+      },
+    ],
+  },
+  {
     version: '1.6.1',
     date: 'יולי 2026',
     changes: [

@@ -141,8 +141,7 @@ export const Privacy: React.FC = () => {
               </p>
               <ul className="list-disc list-inside space-y-2 mr-4 mt-2">
                 <li>
-                  <strong>ספקי שירות:</strong> Google Firebase (אחסון), Google Gemini AI (סיכום
-                  טקסטים)
+                  <strong>ספקי שירות:</strong> Google Firebase (אחסון)
                 </li>
                 <li>
                   <strong>דרישות חוק:</strong> כאשר נדרש על פי חוק או בקשה משפטית

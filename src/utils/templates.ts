@@ -19,10 +19,6 @@ export interface TemplateMeta {
 }
 
 export const TEMPLATES: Record<TemplateType, TemplateMeta> = {
-  // סיכום AI הוסר מהבורר - בצורתו הנוכחית הוא לא שימושי מספיק,
-  // והרעיון ממתין לחשיבה מחדש. הערך נשמר כדי שפתקים קיימים
-  // מסוג זה ימשיכו להיפתח ולהיערך כרגיל.
-  aisummary: { label: 'סיכום AI', icon: '🤖', selectable: false, freeText: false },
   plain: { label: 'טקסט חופשי', icon: '📝', selectable: true, freeText: true },
   checklist: { label: 'רשימת משימות', icon: '✅', selectable: true, freeText: false },
   shopping: { label: 'רשימת קניות', icon: '🛒', selectable: true, freeText: false },
@@ -33,7 +29,12 @@ export const TEMPLATES: Record<TemplateType, TemplateMeta> = {
   recipe: { label: 'מתכון', icon: '🍳', selectable: false, freeText: false },
 };
 
-/** ברירת מחדל לסוג תבנית שלא מוכר (למשל פתק שנוצר בגרסה עתידית) */
+/**
+ * ברירת מחדל לסוג תבנית שלא מוכר.
+ *
+ * חלה גם על פתקים ישנים מסוג `aisummary`, שהתבנית שלהם הוסרה: הם
+ * נפתחים כטקסט חופשי במקום לקרוס, והתוכן שלהם נשאר כפי שהוא.
+ */
 const FALLBACK: TemplateMeta = {
   label: 'פתק',
   icon: '📝',
