@@ -1,10 +1,22 @@
 /**
  * תבנית רשימת משימות - To-Do List
+ *
+ * המשימות נשמרות כ-JSON במחרוזת אחת (`value`), ולכן כל שינוי בונה מחדש
+ * את כל הרשימה ומוסר אותה ב-`onChange`. חשוב: `items` נגזר מ-`value`
+ * ולכן הוא מתעדכן רק ברינדור הבא - שתי קריאות עדכון באותו אירוע היו
+ * מתבססות על אותו מצב ישן, והשנייה הייתה דורסת את הראשונה. לכן כל
+ * פעולה חייבת להסתכם בקריאה אחת ל-`updateItem`.
  */
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
+import {
+  getDateStatus,
+  formatDueLabel,
+  DATE_STATUS_TEXT_CLASS,
+  DATE_STATUS_BORDER_CLASS,
+} from './dueDate';
 
 export interface ChecklistItem {
   id: string;
@@ -19,6 +31,63 @@ interface ChecklistTemplateProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
 }
+
+interface DuePickerProps {
+  inputId: string;
+  type: 'date' | 'time';
+  value: string;
+  icon: string;
+  colorClass: string;
+  title: string;
+  onChange: (value: string) => void;
+  onClear: () => void;
+}
+
+/**
+ * בורר תאריך/שעה: הקלט עצמו שקוף ופרוס מעל האייקון, כדי שלחיצה על
+ * האייקון תפתח את בורר המערכת. אותו מבנה שימש פעמיים - לתאריך ולשעה.
+ */
+const DuePicker: React.FC<DuePickerProps> = ({
+  inputId,
+  type,
+  value,
+  icon,
+  colorClass,
+  title,
+  onChange,
+  onClear,
+}) => (
+  <div className="relative flex-shrink-0 flex items-center gap-1">
+    <input
+      id={inputId}
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
+      style={{ zIndex: 10 }}
+    />
+    <label
+      htmlFor={inputId}
+      className={`cursor-pointer text-lg pointer-events-none ${colorClass}`}
+      title={title}
+    >
+      {icon}
+    </label>
+    {value && (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClear();
+        }}
+        className="text-xs text-gray-400 hover:text-red-600 relative z-20"
+        title={type === 'date' ? 'הסר תאריך' : 'הסר שעה'}
+      >
+        ✕
+      </button>
+    )}
+  </div>
+);
 
 export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   value,
@@ -35,11 +104,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const items = useMemo<ChecklistItem[]>(() => {
     try {
       const parsed = value ? JSON.parse(value) : [];
-      // Ensure it's an array
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-      // Validate each item has required properties
+      if (!Array.isArray(parsed)) return [];
+
       // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
       // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי
       return parsed.map((item, index) => ({
@@ -66,44 +132,36 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   });
 
+  const commit = (updated: ChecklistItem[]) => onChange(JSON.stringify(updated));
+
+  /**
+   * עדכון משימה בודדת. נקודת המעבר היחידה לשינוי פריט - קריאה אחת
+   * לאירוע, כדי שלא ייווצר מצב שבו עדכון שני מתבסס על מצב שכבר התיישן.
+   */
+  const updateItem = (id: string, patch: Partial<ChecklistItem>) => {
+    commit(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
   const handleAddItem = () => {
     const newId = Date.now().toString();
-    const newItem: ChecklistItem = {
-      id: newId,
-      text: '',
-      completed: false,
-    };
-    const updatedItems = [...items, newItem];
-    onChange(JSON.stringify(updatedItems));
+    commit([...items, { id: newId, text: '', completed: false }]);
     pendingFocusIdRef.current = newId;
   };
 
-  const handleToggleItem = (id: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    );
-    onChange(JSON.stringify(updatedItems));
+  const handleToggleItem = (id: string, completed: boolean) => {
+    updateItem(id, { completed: !completed });
   };
 
   const handleUpdateText = (id: string, text: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, text } : item
-    );
-    onChange(JSON.stringify(updatedItems));
+    updateItem(id, { text });
   };
 
   const handleUpdateDueDate = (id: string, dueDate: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, dueDate: dueDate || undefined } : item
-    );
-    onChange(JSON.stringify(updatedItems));
+    updateItem(id, { dueDate: dueDate || undefined });
   };
 
   const handleUpdateDueTime = (id: string, dueTime: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, dueTime: dueTime || undefined } : item
-    );
-    onChange(JSON.stringify(updatedItems));
+    updateItem(id, { dueTime: dueTime || undefined });
 
     // שעה היא מה שהופך תאריך יעד לתזכורת אמיתית, ולכן זו הנקודה לבקש
     // הרשאה. תאריך לבדו נשאר ויזואלי ולא מצדיק בקשה.
@@ -112,31 +170,18 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   };
 
-  const handleDeleteItem = (id: string) => {
-    const updatedItems = items.filter((item) => item.id !== id);
-    onChange(JSON.stringify(updatedItems));
+  /** ניקוי התאריך מסיר גם את השעה - שעה בלי תאריך היא חסרת משמעות */
+  const handleClearDue = (id: string) => {
+    updateItem(id, { dueDate: undefined, dueTime: undefined });
   };
 
-  // פונקציה לקבוע את מצב התאריך (עבר/קרוב/עתידי)
-  const getDateStatus = (dueDate?: string): 'overdue' | 'soon' | 'future' | null => {
-    if (!dueDate) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-
-    const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return 'overdue'; // עבר
-    if (diffDays <= 1) return 'soon'; // היום או מחר
-    return 'future'; // עתידי
+  const handleDeleteItem = (id: string) => {
+    commit(items.filter((item) => item.id !== id));
   };
 
   const completedCount = items.filter((item) => item.completed).length;
   const totalCount = items.length;
+  const completedPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   return (
     <div className="space-y-3">
@@ -146,13 +191,13 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">התקדמות:</span>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-300">
-              {completedCount} / {totalCount} ({Math.round((completedCount / totalCount) * 100)}%)
+              {completedCount} / {totalCount} ({Math.round(completedPercent)}%)
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(completedCount / totalCount) * 100}%` }}
+              style={{ width: `${completedPercent}%` }}
             />
           </div>
         </div>
@@ -166,14 +211,18 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
           </div>
         ) : (
           items.map((item) => {
-            const dateStatus = getDateStatus(item.dueDate);
-            const borderColor = !item.completed && dateStatus === 'overdue'
-              ? 'border-red-300 dark:border-red-700'
-              : !item.completed && dateStatus === 'soon'
-              ? 'border-yellow-300 dark:border-yellow-700'
-              : item.completed
+            const dateStatus = getDateStatus(item.dueDate, item.dueTime);
+            const dueLabel = formatDueLabel(item.dueDate, item.dueTime);
+
+            const borderColor = item.completed
               ? 'border-green-200 dark:border-green-800'
+              : dateStatus
+              ? DATE_STATUS_BORDER_CLASS[dateStatus]
               : 'border-gray-200 dark:border-gray-600';
+
+            const dateColor = item.dueDate && dateStatus
+              ? DATE_STATUS_TEXT_CLASS[dateStatus]
+              : 'text-gray-400';
 
             return (
               <div
@@ -181,14 +230,16 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                 className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-all ${
                   item.completed
                     ? 'bg-green-50 dark:bg-green-900/20 ' + borderColor
-                    : 'bg-white dark:bg-gray-700 ' + borderColor + ' hover:border-gray-300 dark:hover:border-gray-500'
+                    : 'bg-white dark:bg-gray-700 ' +
+                      borderColor +
+                      ' hover:border-gray-300 dark:hover:border-gray-500'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {/* Checkbox */}
                   <button
                     type="button"
-                    onClick={() => handleToggleItem(item.id)}
+                    onClick={() => handleToggleItem(item.id, item.completed)}
                     className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                       item.completed
                         ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600'
@@ -202,9 +253,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                   <div className="flex-1">
                     {readOnly ? (
                       <span
-                        className={`${
-                          item.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'
-                        }`}
+                        className={
+                          item.completed
+                            ? 'line-through text-gray-500 dark:text-gray-400'
+                            : 'text-gray-700 dark:text-gray-200'
+                        }
                       >
                         {item.text}
                       </span>
@@ -224,104 +277,46 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                         }}
                         placeholder="הזן משימה..."
                         className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
-                          item.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'
+                          item.completed
+                            ? 'line-through text-gray-500 dark:text-gray-400'
+                            : 'text-gray-700 dark:text-gray-200'
                         }`}
                       />
                     )}
                   </div>
 
                   {/* תאריך */}
-                  {readOnly ? (
-                    item.dueDate && (
-                      <span
-                        className={`flex-shrink-0 text-sm ${
-                          dateStatus === 'overdue'
-                            ? 'text-red-600'
-                            : dateStatus === 'soon'
-                            ? 'text-yellow-600'
-                            : 'text-blue-600'
-                        }`}
-                        title={`יעד: ${new Date(item.dueDate).toLocaleDateString('he-IL')}${item.dueTime ? ` ${item.dueTime}` : ''}`}
-                      >
-                        📅
-                      </span>
-                    )
-                  ) : (
-                    <div className="relative flex-shrink-0 flex items-center gap-1">
-                      <input
-                        id={`date-${item.id}`}
+                  {readOnly
+                    ? item.dueDate && (
+                        <span className={`flex-shrink-0 text-sm ${dateColor}`} title={dueLabel}>
+                          📅
+                        </span>
+                      )
+                    : (
+                      <DuePicker
+                        inputId={`date-${item.id}`}
                         type="date"
                         value={item.dueDate || ''}
-                        onChange={(e) => handleUpdateDueDate(item.id, e.target.value)}
-                        className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
-                        style={{ zIndex: 10 }}
+                        icon="📅"
+                        colorClass={dateColor}
+                        title={dueLabel}
+                        onChange={(next) => handleUpdateDueDate(item.id, next)}
+                        onClear={() => handleClearDue(item.id)}
                       />
-                      <label
-                        htmlFor={`date-${item.id}`}
-                        className={`cursor-pointer text-lg pointer-events-none ${
-                          item.dueDate
-                            ? dateStatus === 'overdue'
-                              ? 'text-red-600'
-                              : dateStatus === 'soon'
-                              ? 'text-yellow-600'
-                              : 'text-blue-600'
-                            : 'text-gray-400'
-                        }`}
-                        title={item.dueDate ? `יעד: ${new Date(item.dueDate).toLocaleDateString('he-IL')}${item.dueTime ? ` ${item.dueTime}` : ''}` : 'הוסף תאריך יעד'}
-                      >
-                        📅
-                      </label>
-                      {item.dueDate && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateDueDate(item.id, '');
-                            handleUpdateDueTime(item.id, '');
-                          }}
-                          className="text-xs text-gray-400 hover:text-red-600 relative z-20"
-                          title="הסר תאריך"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    )}
 
-                  {/* שעה (מוצג רק אם יש תאריך ובמצב עריכה) */}
+                  {/* שעה - רלוונטית רק כשיש תאריך, והיא זו שמפעילה תזכורת */}
                   {!readOnly && item.dueDate && (
-                    <div className="relative flex-shrink-0 flex items-center gap-1">
-                      <input
-                        id={`time-${item.id}`}
-                        type="time"
-                        value={item.dueTime || ''}
-                        onChange={(e) => handleUpdateDueTime(item.id, e.target.value)}
-                        className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
-                        style={{ zIndex: 10 }}
-                      />
-                      <label
-                        htmlFor={`time-${item.id}`}
-                        className={`cursor-pointer text-lg pointer-events-none ${
-                          item.dueTime ? 'text-blue-600' : 'text-gray-400'
-                        }`}
-                        title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
-                      >
-                        🕐
-                      </label>
-                      {item.dueTime && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateDueTime(item.id, '');
-                          }}
-                          className="text-xs text-gray-400 hover:text-red-600 relative z-20"
-                          title="הסר שעה"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+                    <DuePicker
+                      inputId={`time-${item.id}`}
+                      type="time"
+                      value={item.dueTime || ''}
+                      icon="🕐"
+                      colorClass={item.dueTime ? 'text-blue-600' : 'text-gray-400'}
+                      title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
+                      onChange={(next) => handleUpdateDueTime(item.id, next)}
+                      onClear={() => handleUpdateDueTime(item.id, '')}
+                    />
                   )}
 
                   {/* כפתור מחיקה */}

@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'הסרת תאריך יעד ממשימה לא עבדה - התאריך היה נשאר במקומו ורק השעה נמחקה',
+      },
+      {
+        type: 'improvement',
+        description:
+          'משימה שהשעה שנקבעה לה כבר חלפה מסומנת באדום כמשימה באיחור, ולא בצהוב כמשימה קרובה',
+      },
+    ],
+  },
+  {
     version: '1.9.0',
     date: 'יולי 2026',
     changes: [
