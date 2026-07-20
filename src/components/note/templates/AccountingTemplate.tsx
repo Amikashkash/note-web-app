@@ -2,11 +2,21 @@
  * תבנית חשבונאות - מעקב אחר תנועות כספיות בין שני אנשים
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/common/Button';
 import type { AccountingRow } from '@/types/template';
 
 export type { AccountingRow };
+
+/**
+ * שדה התאריך והסכום הם קלטים מובנים של הדפדפן, שמגיעים עם עיטורים
+ * רחבים: אייקון לוח שנה וחיצי הגדלה/הקטנה. במסך נייד הם גזלו את רוב
+ * הרוחב מעמודת התיאור, ולכן הם מוסתרים בנייד ומוחזרים ממסך sm ומעלה.
+ */
+const DATE_INPUT_CHROME =
+  '[&::-webkit-calendar-picker-indicator]:hidden sm:[&::-webkit-calendar-picker-indicator]:block';
+const NUMBER_INPUT_CHROME =
+  '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
 interface AccountingTemplateProps {
   value: string;
@@ -20,6 +30,11 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   readOnly = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
+
+  // מזהה השורה שצריכה לקבל פוקוס אחרי הרינדור הבא.
+  // ref ולא state: זו פעולת DOM בלבד ואינה משפיעה על מה שמוצג.
+  const pendingFocusIdRef = useRef<string | null>(null);
+  const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // המרת JSON ממחרוזת למערך
   const rows = useMemo<AccountingRow[]>(() => {
@@ -44,6 +59,18 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   // הצגת רק 5 שורות אחרונות כברירת מחדל
   const displayedRows = showAll ? rowsWithBalance : rowsWithBalance.slice(-5);
 
+  // רץ אחרי כל רינדור, כי אי אפשר לדעת מראש מתי שדה השורה החדשה יצורף ל-DOM
+  useEffect(() => {
+    const pendingId = pendingFocusIdRef.current;
+    if (!pendingId) return;
+
+    const input = descriptionRefs.current[pendingId];
+    if (input) {
+      input.focus();
+      pendingFocusIdRef.current = null;
+    }
+  });
+
   const handleAddRow = () => {
     const newRow: AccountingRow = {
       id: Date.now().toString(),
@@ -51,8 +78,19 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
       amount: 0,
       date: new Date().toISOString().split('T')[0],
     };
+    // בלי זה המקלדת בנייד נשארת על השורה הקודמת, והמשתמש לא רואה
+    // ששורה נוספה בכלל
+    pendingFocusIdRef.current = newRow.id;
     const updatedRows = [...rows, newRow];
     onChange(JSON.stringify(updatedRows));
+  };
+
+  /** Enter מוסיף תנועה חדשה, כדי לא לחייב סגירת מקלדת ולחיצה על הכפתור */
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleAddRow();
+    }
   };
 
   const handleUpdateRow = (id: string, field: keyof AccountingRow, newValue: string | number) => {
@@ -89,13 +127,18 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
 
       {/* טבלת תנועות */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        {/* table-fixed: בפריסה האוטומטית רוחב העמודה נקבע לפי רוחב התוכן
+            המובנה של הקלט, ומחלקות ה-w-* לא נאכפות. עם פריסה קבועה הן
+            כן, ועמודת התיאור מקבלת את כל מה שנשאר. */}
+        <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-2 py-1 text-right w-24 sm:w-28">📅 תאריך</th>
+              <th className="border border-gray-300 px-1 py-1 text-right w-[74px] sm:w-28">
+                📅<span className="hidden sm:inline"> תאריך</span>
+              </th>
               <th className="border border-gray-300 px-2 py-1 text-right">תיאור</th>
-              <th className="border border-gray-300 px-2 py-1 text-center w-20 sm:w-24">סכום</th>
-              {!readOnly && <th className="border border-gray-300 px-1 py-1 w-10"></th>}
+              <th className="border border-gray-300 px-1 py-1 text-center w-[58px] sm:w-24">סכום</th>
+              {!readOnly && <th className="border border-gray-300 px-0 py-1 w-7 sm:w-10"></th>}
             </tr>
           </thead>
           <tbody>
@@ -125,7 +168,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                         type="date"
                         value={row.date}
                         onChange={(e) => handleUpdateRow(row.id, 'date', e.target.value)}
-                        className="w-full px-1 py-0.5 text-xs sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
+                        className={`w-full px-0.5 py-0.5 text-[11px] sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${DATE_INPUT_CHROME}`}
                       />
                     )}
                   </td>
@@ -138,15 +181,13 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                       <input
                         type="text"
                         value={row.description}
-                        onChange={(e) => handleUpdateRow(row.id, 'description', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddRow();
-                          }
+                        ref={(element) => {
+                          descriptionRefs.current[row.id] = element;
                         }}
-                        placeholder="הזן תיאור..."
-                        className="w-full px-2 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
+                        onChange={(e) => handleUpdateRow(row.id, 'description', e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="תיאור..."
+                        className="w-full px-1 py-1 text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded"
                       />
                     )}
                   </td>
@@ -174,19 +215,20 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                         onChange={(e) =>
                           handleUpdateRow(row.id, 'amount', parseFloat(e.target.value) || 0)
                         }
+                        onKeyDown={handleKeyDown}
                         placeholder="0"
-                        className="w-full px-1 py-0.5 text-xs sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded text-center"
+                        className={`w-full px-0.5 py-0.5 text-xs sm:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-300 rounded text-center ${NUMBER_INPUT_CHROME}`}
                       />
                     )}
                   </td>
 
                   {/* כפתור מחיקה */}
                   {!readOnly && (
-                    <td className="border border-gray-300 px-0.5 py-0.5 text-center">
+                    <td className="border border-gray-300 px-0 py-0.5 text-center">
                       <button
                         type="button"
                         onClick={() => handleDeleteRow(row.id)}
-                        className="text-red-600 hover:text-red-800 text-base"
+                        className="text-red-600 hover:text-red-800 text-sm sm:text-base leading-none"
                         title="מחק שורה"
                       >
                         🗑
@@ -200,11 +242,17 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
             {/* שורת סיכום */}
             {displayedRows.length > 0 && (
               <tr className="bg-blue-100 font-bold">
-                <td className="border border-gray-300 px-3 py-2" colSpan={readOnly ? 2 : 3}>
+                {/* התווית פורשת על תאריך+תיאור בלבד. קודם היא פרשה על שלוש
+                    עמודות ואחריה עוד שני תאים - חמישה בטבלה של ארבע, מה
+                    שיצר עמודה עודפת שגזלה רוחב מעמודת התיאור. */}
+                <td className="border border-gray-300 px-2 py-2" colSpan={2}>
                   יתרה סופית
                 </td>
+                {/* היתרה פורשת גם על עמודת המחיקה: עמודת הסכום לבדה צרה
+                    מדי בנייד, והמספר גלש אל מחוץ לטבלה */}
                 <td
-                  className={`border border-gray-300 px-3 py-2 text-center text-lg ${
+                  colSpan={readOnly ? 1 : 2}
+                  className={`border border-gray-300 px-1 py-2 text-center whitespace-nowrap text-sm sm:text-lg ${
                     totalBalance > 0
                       ? 'text-green-700'
                       : totalBalance < 0
@@ -215,7 +263,6 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                   {totalBalance > 0 ? '+' : ''}
                   {totalBalance.toFixed(2)} ₪
                 </td>
-                {!readOnly && <td className="border border-gray-300"></td>}
               </tr>
             )}
           </tbody>

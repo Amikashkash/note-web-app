@@ -16,6 +16,26 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.7.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'פתק חשבונאות בנייד: עמודת התיאור הוכפלה ברוחבה על חשבון עמודות התאריך, הסכום והמחיקה',
+      },
+      {
+        type: 'improvement',
+        description:
+          'לחיצה על Enter בפתק חשבונאות מוסיפה תנועה חדשה ומעבירה אליה את הסמן, בלי לסגור את המקלדת',
+      },
+      {
+        type: 'fix',
+        description: 'תיקון שורת "יתרה סופית" בטבלת החשבונאות, שיצרה עמודה עודפת וגלשה מחוץ לטבלה',
+      },
+    ],
+  },
+  {
     version: '1.7.0',
     date: 'יולי 2026',
     changes: [
