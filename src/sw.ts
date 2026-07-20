@@ -177,8 +177,13 @@ self.addEventListener('notificationclick', (event) => {
   if (event.action === 'close') return;
 
   const data = event.notification.data as ReminderPushData | undefined;
-  // בלי קטגוריה אין לאן לנווט חוץ מהבית - פתק תמיד מוצג בתוך קטגוריה
-  const targetPath = data?.categoryId ? `/category/${data.categoryId}` : '/';
+
+  // הפתק מועבר כפרמטר ולא כנתיב: אין מסלול ייעודי לפתק בודד, והוא נפתח
+  // כחלונית בתוך תצוגת הקטגוריה. בלי קטגוריה אין לאן לנווט חוץ מהבית.
+  const targetPath = data?.categoryId
+    ? `/category/${data.categoryId}` +
+      (data.noteId ? `?note=${encodeURIComponent(data.noteId)}` : '')
+    : '/';
 
   event.waitUntil(
     (async () => {

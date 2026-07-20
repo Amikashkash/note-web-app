@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCategoryStore } from '@/store/categoryStore';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useTheme } from '@/hooks/useTheme';
@@ -17,6 +17,7 @@ import type { Note } from '@/types/note';
 export const CategoryView: React.FC = () => {
   const navigate = useNavigate();
   const { categoryId = '' } = useParams<{ categoryId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const categories = useCategoryStore((state) => state.categories);
   const { theme } = useTheme();
 
@@ -59,9 +60,40 @@ export const CategoryView: React.FC = () => {
     }
   }, [categories.length, category, navigate]);
 
-  const activeNote = viewingNote
-    ? notes.find((note) => note.id === viewingNote.id) ?? viewingNote
-    : null;
+  /**
+   * הפתק המוצג נגזר משני מקורות: לחיצה בתוך הדף (`viewingNote`), או
+   * פרמטר בכתובת (`?note=<id>`) שמגיע מלחיצה על התראת תזכורת.
+   *
+   * הפרמטר נקרא ישירות ולא מועתק ל-state: העתקה הייתה מחייבת effect
+   * שממתין לטעינת הפתקים ואז קורא ל-setState, כלומר רינדור מדורג מיותר.
+   * כך הפתק נפתח מעצמו ברגע שהרשימה נטענת.
+   */
+  const requestedNoteId = searchParams.get('note');
+
+  const activeNote = useMemo(() => {
+    if (viewingNote) {
+      return notes.find((note) => note.id === viewingNote.id) ?? viewingNote;
+    }
+    if (requestedNoteId) {
+      return notes.find((note) => note.id === requestedNoteId) ?? null;
+    }
+    return null;
+  }, [viewingNote, requestedNoteId, notes]);
+
+  /** סגירה מנקה גם את הפרמטר, אחרת הפתק היה נפתח מיד מחדש */
+  const handleCloseNoteView = () => {
+    setViewingNote(null);
+
+    if (requestedNoteId) {
+      setSearchParams(
+        (params) => {
+          params.delete('note');
+          return params;
+        },
+        { replace: true }
+      );
+    }
+  };
 
   const handleSubmitNote = async (data: Parameters<typeof saveNote>[0]) => {
     const saved = await saveNote(data, editingNote);
@@ -178,7 +210,7 @@ export const CategoryView: React.FC = () => {
       {activeNote && (
         <NoteView
           note={activeNote}
-          onClose={() => setViewingNote(null)}
+          onClose={handleCloseNoteView}
           onDelete={deleteNote}
           onTogglePin={pinNote}
           onUpdate={updateNoteFields}

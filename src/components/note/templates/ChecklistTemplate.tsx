@@ -135,6 +135,21 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const commit = (updated: ChecklistItem[]) => onChange(JSON.stringify(updated));
 
   /**
+   * רשימת משימות ריקה מקבלת שורה ראשונה אוטומטית.
+   *
+   * רשימה בלי משימה אחת לפחות היא חסרת משמעות, ולכן הלחיצה על "הוסף
+   * משימה" רק כדי להתחיל הייתה מיותרת. בכוונה בלי פוקוס: פתיחת פתק
+   * קיים הייתה מקפיצה את המקלדת בנייד בכל פעם.
+   */
+  useEffect(() => {
+    if (readOnly || items.length > 0) return;
+
+    onChange(
+      JSON.stringify([{ id: Date.now().toString(), text: '', completed: false }])
+    );
+  }, [readOnly, items.length, onChange]);
+
+  /**
    * עדכון משימה בודדת. נקודת המעבר היחידה לשינוי פריט - קריאה אחת
    * לאירוע, כדי שלא ייווצר מצב שבו עדכון שני מתבסס על מצב שכבר התיישן.
    */

@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.2',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'לחיצה על "פתח פתק" בהתראת תזכורת פותחת עכשיו את הפתק עצמו. קודם היא פתחה את הקטגוריה בלבד, כי מזהה הפתק לא נכלל בכתובת',
+      },
+      {
+        type: 'improvement',
+        description:
+          'פתק רשימת משימות נפתח עם משימה ראשונה מוכנה, בלי הלחיצה המיותרת על "הוסף משימה"',
+      },
+    ],
+  },
+  {
     version: '1.9.1',
     date: 'יולי 2026',
     changes: [
