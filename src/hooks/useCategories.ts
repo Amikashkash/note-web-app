@@ -15,6 +15,7 @@ export const useCategories = () => {
 
   const categories = useCategoryStore((state) => state.categories);
   const isLoading = useCategoryStore((state) => state.isLoading);
+  const hasLoaded = useCategoryStore((state) => state.hasLoaded);
   const error = useCategoryStore((state) => state.error);
   const subscribe = useCategoryStore((state) => state.subscribe);
   const unsubscribe = useCategoryStore((state) => state.unsubscribe);
@@ -52,6 +53,7 @@ export const useCategories = () => {
   return {
     categories,
     isLoading,
+    hasLoaded,
     error,
     addCategory,
     editCategory,

@@ -16,6 +16,8 @@ import type { Category, CategoryInput } from '@/types';
 interface CategoryState {
   categories: Category[];
   isLoading: boolean;
+  /** האם התקבלה כבר תשובה ראשונה מהשרת */
+  hasLoaded: boolean;
   error: string | null;
 
   _unsubscribe: Unsubscribe | null;
@@ -45,6 +47,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
   return {
     categories: [],
     isLoading: false,
+    // האם התקבלה כבר תשובה מהשרת. נחוץ בנפרד מ-`isLoading`, שמתחיל
+    // כ-false לפני שהמנוי בכלל קם: בלעדיו אי אפשר להבחין בין "עוד לא
+    // ביקשנו" לבין "ביקשנו ואין קטגוריות", והמסך נתקע על "טוען".
+    hasLoaded: false,
     error: null,
 
     _unsubscribe: null,
@@ -72,7 +78,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       });
 
       const unsubscribe = categoryAPI.subscribeToCategories(userId, (categories) => {
-        set({ categories, isLoading: false, error: null });
+        set({ categories, isLoading: false, hasLoaded: true, error: null });
       });
 
       set({ _unsubscribe: unsubscribe });

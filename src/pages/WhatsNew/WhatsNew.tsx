@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.3',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'כניסה ישירה לקטגוריה - למשל מלחיצה על התראת תזכורת - נתקעה על מסך "טוען". הקטגוריות לא נטענו כלל כשלא הגיעו מדף הבית',
+      },
+    ],
+  },
+  {
     version: '1.9.2',
     date: 'יולי 2026',
     changes: [

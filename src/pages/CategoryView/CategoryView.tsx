@@ -4,7 +4,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useCategoryStore } from '@/store/categoryStore';
+import { useCategories } from '@/hooks/useCategories';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common';
@@ -18,7 +18,11 @@ export const CategoryView: React.FC = () => {
   const navigate = useNavigate();
   const { categoryId = '' } = useParams<{ categoryId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const categories = useCategoryStore((state) => state.categories);
+  // דרך `useCategories` ולא ישירות מה-store: ההוק הוא שמקים את המנוי.
+  // קריאה ישירה עבדה רק כשהגיעו לכאן מדף הבית, שכבר טען אותן. כניסה
+  // ישירה לכתובת - למשל מלחיצה על התראת תזכורת - השאירה את הרשימה
+  // ריקה לנצח ואת המסך תקוע על "טוען".
+  const { categories, hasLoaded: categoriesLoaded } = useCategories();
   const { theme } = useTheme();
 
   const {
@@ -53,12 +57,13 @@ export const CategoryView: React.FC = () => {
   );
 
   // הקטגוריה נמחקה או שהקישור שגוי - חזרה לדף הבית.
-  // ממתינים לטעינת הקטגוריות כדי לא לנווט בזמן הטעינה הראשונית.
+  // ממתינים לתשובה מהשרת ולא לרשימה לא-ריקה: למשתמש בלי קטגוריות כלל
+  // התנאי הישן לא היה מתקיים לעולם, והמסך היה נשאר תקוע.
   useEffect(() => {
-    if (categories.length > 0 && !category) {
+    if (categoriesLoaded && !category) {
       navigate('/', { replace: true });
     }
-  }, [categories.length, category, navigate]);
+  }, [categoriesLoaded, category, navigate]);
 
   /**
    * הפתק המוצג נגזר משני מקורות: לחיצה בתוך הדף (`viewingNote`), או
