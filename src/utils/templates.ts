@@ -19,7 +19,10 @@ export interface TemplateMeta {
 }
 
 export const TEMPLATES: Record<TemplateType, TemplateMeta> = {
-  aisummary: { label: 'סיכום AI', icon: '🤖', selectable: true, freeText: false },
+  // סיכום AI הוסר מהבורר - בצורתו הנוכחית הוא לא שימושי מספיק,
+  // והרעיון ממתין לחשיבה מחדש. הערך נשמר כדי שפתקים קיימים
+  // מסוג זה ימשיכו להיפתח ולהיערך כרגיל.
+  aisummary: { label: 'סיכום AI', icon: '🤖', selectable: false, freeText: false },
   plain: { label: 'טקסט חופשי', icon: '📝', selectable: true, freeText: true },
   checklist: { label: 'רשימת משימות', icon: '✅', selectable: true, freeText: false },
   shopping: { label: 'רשימת קניות', icon: '🛒', selectable: true, freeText: false },

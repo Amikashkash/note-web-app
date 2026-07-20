@@ -16,6 +16,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.6.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'תבנית "סיכום AI" הוסרה מרשימת התבניות לפתק חדש. פתקים קיימים מסוג זה ממשיכים לעבוד כרגיל',
+      },
+      {
+        type: 'fix',
+        description: 'תיקון הפריסה האוטומטית של חוקי האבטחה, שנכשלה בשתי הגרסאות האחרונות',
+      },
+    ],
+  },
+  {
     version: '1.6.0',
     date: 'יולי 2026',
     changes: [
