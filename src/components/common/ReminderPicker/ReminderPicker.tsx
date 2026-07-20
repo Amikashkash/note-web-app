@@ -32,18 +32,15 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
    * הפעלת תזכורת דורשת הרשאת התראות. מבקשים אותה ברגע שהמשתמש
    * מסמן את התיבה - זו פעולת המשתמש שמצדיקה את בקשת ההרשאה.
    */
-  const handleToggle = async (checked: boolean) => {
-    onToggle(checked);
-
-    if (!checked) {
-      setPermissionWarning(null);
-      return;
-    }
-
-    if (!value) {
-      setShowPicker(true);
-    }
-
+  /**
+   * מבקש הרשאת התראות ורושם את המכשיר.
+   *
+   * חייב להיקרא מכל מסלול שמפעיל תזכורת, לא רק מסימון התיבה: כפתורי
+   * הקיצור מפעילים תזכורת בעצמם, וכשהם דילגו על השלב הזה נוצר מצב שבו
+   * למשתמש יש תזכורת פעילה, אין הרשאה, והמכשיר לא רשום בשרת - כלומר
+   * תזכורת שלא הייתה מגיעה לשום מקום, בלי שום סימן בממשק.
+   */
+  const ensurePermissionAndRegister = async () => {
     if (!isNotificationSupported()) {
       setPermissionWarning('הדפדפן שלך לא תומך בהתראות. התזכורת תישמר אך לא תוצג התראה.');
       return;
@@ -70,6 +67,21 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
     }
   };
 
+  const handleToggle = async (checked: boolean) => {
+    onToggle(checked);
+
+    if (!checked) {
+      setPermissionWarning(null);
+      return;
+    }
+
+    if (!value) {
+      setShowPicker(true);
+    }
+
+    await ensurePermissionAndRegister();
+  };
+
   const formatDateTime = (date: Date | null): string => {
     if (!date) return '';
     return new Intl.DateTimeFormat('he-IL', {
@@ -85,11 +97,21 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
     }
   };
 
-  const handleQuickSet = (hours: number) => {
+  const handleQuickSet = async (hours: number) => {
     const now = new Date();
     now.setHours(now.getHours() + hours);
     onChange(now);
     onToggle(true);
+    await ensurePermissionAndRegister();
+  };
+
+  const handleSetTomorrowMorning = async () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    onChange(tomorrow);
+    onToggle(true);
+    await ensurePermissionAndRegister();
   };
 
   const handleClearReminder = () => {
@@ -143,7 +165,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => handleQuickSet(1)}
+              onClick={() => void handleQuickSet(1)}
               className="text-xs"
             >
               בעוד שעה
@@ -152,7 +174,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => handleQuickSet(3)}
+              onClick={() => void handleQuickSet(3)}
               className="text-xs"
             >
               בעוד 3 שעות
@@ -161,13 +183,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(9, 0, 0, 0);
-                onChange(tomorrow);
-                onToggle(true);
-              }}
+              onClick={() => void handleSetTomorrowMorning()}
               className="text-xs"
             >
               מחר ב-9:00
