@@ -4,7 +4,7 @@
  * אחראי על שלושה דברים:
  * 1. קליטת שיתופים נכנסים (Web Share Target)
  * 2. אסטרטגיות cache לנכסים סטטיים
- * 3. תזמון והצגה של התראות תזכורת
+ * 3. הצגת התראות תזכורת שמגיעות ב-push
  */
 
 /// <reference lib="webworker" />
@@ -15,7 +15,7 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
-import type { ReminderMessage, ReminderMessageResult, ScheduledReminder } from './types/reminder';
+import type { FcmPushEnvelope, ReminderPushData } from './types/reminder';
 
 // ==================== קליטת שיתוף נכנס ====================
 // חייב להירשם לפני מסלולי Workbox כדי לתפוס בקשות POST
@@ -111,19 +111,22 @@ registerRoute(
 // ממנו, כך שהתגובות דווקא כן נשמרו ב-cache.)
 
 // ==================== התראות ====================
+//
+// ה-SW לא מתזמן דבר. תזמון מקומי (setTimeout) לא עובד כאן: הדפדפן הורג
+// Service Worker לא פעיל אחרי שניות, ואיתו כל טיימר ממתין. במקום זאת
+// פונקציה מתוזמנת בענן שולחת push במועד, וכאן רק מציגים אותו.
 
-/** טיימרים פעילים, לפי מזהה פתק */
-const scheduledTimers = new Map<string, number>();
-
-const showReminderNotification = async (reminder: ScheduledReminder): Promise<void> => {
+const showReminderNotification = async (data: ReminderPushData): Promise<void> => {
   try {
-    await self.registration.showNotification(reminder.title, {
-      body: reminder.body,
+    await self.registration.showNotification(data.title || 'תזכורת', {
+      body: data.body,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      tag: `note-${reminder.noteId}`,
+      // תג לפי מזהה הפתק: אם אותה תזכורת נשלחה פעמיים, ההתראה
+      // השנייה מחליפה את הראשונה במקום להיערם לידה.
+      tag: `note-${data.noteId}`,
       requireInteraction: true,
-      data: { noteId: reminder.noteId },
+      data,
       actions: [
         { action: 'open', title: 'פתח פתק' },
         { action: 'close', title: 'סגור' },
@@ -134,55 +137,47 @@ const showReminderNotification = async (reminder: ScheduledReminder): Promise<vo
   }
 };
 
-/**
- * מחליף את כל התזכורות המתוזמנות ברשימה חדשה.
- *
- * החלפה מלאה (ולא הוספה/ביטול פרטני) מונעת מצב שבו טיימר של פתק שנמחק
- * או שהתזכורת שלו בוטלה נשאר תלוי ומצוץ בכל זאת.
- */
-const syncReminders = (reminders: ScheduledReminder[]): number => {
-  for (const timerId of scheduledTimers.values()) {
-    clearTimeout(timerId);
-  }
-  scheduledTimers.clear();
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
 
-  const now = Date.now();
-  let scheduled = 0;
+  event.waitUntil(
+    (async () => {
+      let payload: FcmPushEnvelope & Partial<ReminderPushData>;
 
-  for (const reminder of reminders) {
-    const delay = reminder.reminderTime - now;
+      try {
+        payload = event.data!.json();
+      } catch (error) {
+        console.error('SW: Push payload is not valid JSON:', error);
+        return;
+      }
 
-    if (delay <= 0) {
-      void showReminderNotification(reminder);
-      continue;
-    }
+      // FCM עוטף הודעות data-only ב-`{ data: {...} }`. הנפילה לאובייקט
+      // עצמו מכסה שליחה ידנית בבדיקות, שבה אין מעטפת.
+      const data = payload.data ?? payload;
 
-    const timerId = self.setTimeout(() => {
-      scheduledTimers.delete(reminder.noteId);
-      void showReminderNotification(reminder);
-    }, delay);
+      if (!data.noteId) {
+        console.warn('SW: Push received without noteId, ignoring');
+        return;
+      }
 
-    scheduledTimers.set(reminder.noteId, timerId);
-    scheduled += 1;
-  }
-
-  return scheduled;
-};
-
-self.addEventListener('message', (event: ExtendableMessageEvent) => {
-  const message = event.data as ReminderMessage | undefined;
-  if (message?.type !== 'SYNC_REMINDERS') return;
-
-  const scheduled = syncReminders(message.reminders ?? []);
-
-  const result: ReminderMessageResult = { success: true, scheduled };
-  event.ports[0]?.postMessage(result);
+      await showReminderNotification({
+        noteId: data.noteId,
+        title: data.title ?? 'תזכורת',
+        body: data.body ?? '',
+        categoryId: data.categoryId ?? '',
+      });
+    })()
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   if (event.action === 'close') return;
+
+  const data = event.notification.data as ReminderPushData | undefined;
+  // בלי קטגוריה אין לאן לנווט חוץ מהבית - פתק תמיד מוצג בתוך קטגוריה
+  const targetPath = data?.categoryId ? `/category/${data.categoryId}` : '/';
 
   event.waitUntil(
     (async () => {
@@ -191,14 +186,19 @@ self.addEventListener('notificationclick', (event) => {
         includeUncontrolled: true,
       });
 
-      // אם האפליקציה כבר פתוחה - מעבירים אליה פוקוס במקום לפתוח חלון נוסף
+      // אם האפליקציה כבר פתוחה - מנווטים בה ומעבירים פוקוס,
+      // במקום לפתוח חלון נוסף
       for (const client of clientList) {
-        if (client.url.startsWith(self.registration.scope)) {
-          return client.focus();
+        if (!client.url.startsWith(self.registration.scope)) continue;
+
+        await client.focus();
+        if ('navigate' in client) {
+          await client.navigate(targetPath).catch(() => undefined);
         }
+        return;
       }
 
-      await self.clients.openWindow('/');
+      await self.clients.openWindow(targetPath);
     })()
   );
 });

@@ -55,5 +55,12 @@ export default tseslint.config(
     // הלוגר עצמו הוא העטיפה סביב console
     files: ['src/utils/logger.ts'],
     rules: { 'no-console': 'off' },
+  },
+  {
+    // פונקציות הענן הן חבילת Node נפרדת: אין להן DOM, אין להן את הלוגר
+    // של האפליקציה, וסקריפטים חד-פעמיים מדפיסים ל-console בכוונה.
+    files: ['functions/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': 'off' },
   }
 );

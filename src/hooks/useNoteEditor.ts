@@ -41,6 +41,12 @@ export const useNoteEditor = (categoryId: string) => {
       if (!user) return Promise.resolve(false);
 
       const reminderTime = data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null;
+      const reminderEnabled = data.reminderEnabled ?? false;
+
+      // תזכורת "חמושה" רק אם היא פעילה ומועדה עוד לפנינו. חישוב מחדש
+      // בכל שמירה מטפל גם בהזזת מועד קדימה (חימוש מחדש) וגם בעריכת פתק
+      // שתזכורתו כבר נשלחה (נשארת כבויה).
+      const reminderPending = reminderEnabled && reminderTime !== null && reminderTime.toMillis() > Date.now();
 
       if (existingNote) {
         // רק השדות שהטופס עורך - לא אובייקט הפתק כולו
@@ -52,7 +58,10 @@ export const useNoteEditor = (categoryId: string) => {
             tags: data.tags,
             color: data.color,
             reminderTime,
-            reminderEnabled: data.reminderEnabled ?? false,
+            reminderEnabled,
+            reminderPending,
+            // מועד חדש מאפס את תיעוד השליחה הקודמת
+            ...(reminderPending ? { reminderSentAt: null } : {}),
           })
         );
       }
@@ -69,7 +78,8 @@ export const useNoteEditor = (categoryId: string) => {
         sharedWith: [],
         isPinned: false,
         reminderTime,
-        reminderEnabled: data.reminderEnabled ?? false,
+        reminderEnabled,
+        reminderPending,
       };
 
       return run(() => createNote(newNote));

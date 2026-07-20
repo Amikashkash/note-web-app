@@ -57,6 +57,16 @@ const stripImmutableFields = (updates: Partial<NoteInput>): Record<string, unkno
 export const createNote = async (noteInput: NoteInput): Promise<string> => {
   try {
     const docRef = await addDoc(notesRef(), {
+      // ברירות המחדל לפני הפיזור: קורא שמעביר ערך מפורש גובר עליהן.
+      //
+      // `reminderPending` חייב להיכתב תמיד, גם כ-false. הפונקציה המתוזמנת
+      // בענן מסננת לפיו, ושאילתת Firestore לא מחזירה מסמכים שהשדה כלל
+      // לא קיים בהם - פתק בלי השדה הוא בלתי נראה לה לצמיתות. הערך נקבע
+      // כאן ולא אצל הקוראים כי זו נקודת המעבר היחידה ליצירת פתק, ויש
+      // יותר מקורא אחד (טופס הפתק, וגם קליטת שיתוף נכנס).
+      reminderEnabled: false,
+      reminderTime: null,
+      reminderPending: false,
       ...noteInput,
       isArchived: false,
       createdAt: serverTimestamp(),

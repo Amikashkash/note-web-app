@@ -1,0 +1,24 @@
+{
+  "name": "notes-app-functions",
+  "description": "פונקציות ענן לאפליקציית הפתקים - שליחת תזכורות",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "backfill": "npm run build && node lib/scripts/backfillReminderPending.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

@@ -16,6 +16,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from './config';
+import { unregisterDeviceForPush } from '@/services/notifications/fcmService';
 import { logger } from '@/utils/logger';
 import { getFirebaseErrorCode } from '@/utils/errors';
 
@@ -108,8 +109,18 @@ export const signInWithGoogle = async (): Promise<void> => {
 
 /**
  * התנתקות
+ *
+ * רישום ההתראות של המכשיר מבוטל לפני ההתנתקות עצמה, כדי שמכשיר משותף
+ * לא ימשיך לקבל את התזכורות של המשתמש שיצא. הביטול לא חוסם התנתקות
+ * אם נכשל - עדיף להתנתק בלי לנקות מאשר לא להתנתק כלל.
  */
 export const signOut = async (): Promise<void> => {
+  const userId = auth.currentUser?.uid;
+
+  if (userId) {
+    await unregisterDeviceForPush(userId);
+  }
+
   try {
     await firebaseSignOut(auth);
   } catch (error) {

@@ -62,6 +62,8 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
     reminderTime: asOptionalTimestamp(data.reminderTime),
     reminderEnabled: asBoolean(data.reminderEnabled),
+    reminderPending: asBoolean(data.reminderPending),
+    reminderSentAt: asOptionalTimestamp(data.reminderSentAt),
   };
 };
 

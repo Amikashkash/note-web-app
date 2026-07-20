@@ -1,27 +1,29 @@
 /**
- * טיפוסים משותפים לאפליקציה ול-Service Worker
+ * חוזה ההתראות בין השרת, ה-Service Worker והאפליקציה
  *
- * שני הצדדים מייבאים מכאן, כך ששינוי בפרוטוקול ההודעות נתפס בקומפילציה
- * ולא בזמן ריצה.
+ * התזמון מתבצע בפונקציה מתוזמנת בענן (`functions/src/index.ts`), שמעירה
+ * את המכשיר ב-push. ה-Service Worker רק מקבל ומציג - הוא לא מתזמן כלום.
+ *
+ * שים לב: `functions/src/reminderPayload.ts` הוא מראה של `ReminderPushData`,
+ * כי `functions/` היא חבילה נפרדת שלא יכולה לייבא מכאן. שינוי כאן מחייב
+ * שינוי מקביל שם.
  */
 
-/** תזכורת מתוזמנת בודדת */
-export interface ScheduledReminder {
+/**
+ * גוף ההתראה כפי שהוא מגיע ב-push.
+ * כל השדות מחרוזות - FCM מעביר `data` כמפת מחרוזות בלבד.
+ */
+export interface ReminderPushData {
   noteId: string;
   title: string;
   body: string;
-  /** מועד ההתראה כ-epoch milliseconds */
-  reminderTime: number;
+  categoryId: string;
 }
 
-/** הודעות שהאפליקציה שולחת ל-Service Worker */
-export type ReminderMessage = {
-  type: 'SYNC_REMINDERS';
-  /** רשימת התזכורות הפעילות במלואה - מחליפה את מה שמתוזמן כרגע */
-  reminders: ScheduledReminder[];
-};
-
-export interface ReminderMessageResult {
-  success: boolean;
-  scheduled?: number;
+/**
+ * המעטפת ש-FCM עוטף בה הודעות data-only.
+ * ה-SW מטפל באירוע `push` הגולמי ולכן רואה את המעטפת, לא רק את התוכן.
+ */
+export interface FcmPushEnvelope {
+  data?: Partial<ReminderPushData>;
 }

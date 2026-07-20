@@ -76,6 +76,15 @@ if (isFirebaseConfigured) {
   );
 }
 
+/**
+ * מפתח VAPID לזיהוי השולח מול שירות ה-push של הדפדפן.
+ * מפתח ציבורי - נוצר ב-Firebase Console תחת Cloud Messaging.
+ * לא נכלל ב-`requiredEnvVars` כי בלעדיו האפליקציה עובדת, רק בלי התראות.
+ */
+export const vapidKey: string = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
+
+export const isPushConfigured = isFirebaseConfigured && vapidKey.length > 0;
+
 export const auth: Auth = authInstance ?? uninitialized<Auth>('Auth');
 export const db: Firestore = dbInstance ?? uninitialized<Firestore>('Firestore');
 export const storage: FirebaseStorage =

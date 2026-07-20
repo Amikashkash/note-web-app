@@ -8,6 +8,8 @@ import {
   isNotificationSupported,
   requestNotificationPermission,
 } from '@/services/notifications/notificationService';
+import { registerDeviceForPush } from '@/services/notifications/fcmService';
+import { useAuthStore } from '@/store/authStore';
 
 interface ReminderPickerProps {
   value: Date | null;
@@ -24,6 +26,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
 }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [permissionWarning, setPermissionWarning] = useState<string | null>(null);
+  const userId = useAuthStore((state) => state.user?.uid);
 
   /**
    * הפעלת תזכורת דורשת הרשאת התראות. מבקשים אותה ברגע שהמשתמש
@@ -47,11 +50,24 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
     }
 
     const permission = await requestNotificationPermission();
-    setPermissionWarning(
-      permission === 'granted'
-        ? null
-        : 'ההתראות חסומות בדפדפן. התזכורת תישמר, אך כדי לקבל התראה יש לאפשר התראות בהגדרות האתר.'
-    );
+
+    if (permission !== 'granted') {
+      setPermissionWarning(
+        'ההתראות חסומות בדפדפן. התזכורת תישמר, אך כדי לקבל התראה יש לאפשר התראות בהגדרות האתר.'
+      );
+      return;
+    }
+
+    setPermissionWarning(null);
+
+    // רישום מיידי: בלעדיו המכשיר לא מוכר לשרת עד הטעינה הבאה של
+    // האפליקציה, ותזכורת שנקבעה עכשיו לא הייתה מגיעה לשום מקום.
+    if (userId) {
+      const registered = await registerDeviceForPush(userId);
+      if (!registered) {
+        setPermissionWarning('לא הצלחנו לרשום את המכשיר להתראות. התזכורת תישמר, אך ייתכן שלא תגיע התראה.');
+      }
+    }
   };
 
   const formatDateTime = (date: Date | null): string => {

@@ -30,6 +30,15 @@ export interface Note {
   archivedAt?: Timestamp;
   reminderTime?: Timestamp | null;
   reminderEnabled?: boolean;
+  /**
+   * תזכורת חמושה שטרם נשלחה. זהו השדה שהפונקציה המתוזמנת בענן מסננת
+   * לפיו, ולכן הוא חייב להיכתב תמיד - גם כערך `false`. שאילתת Firestore
+   * לא מחזירה מסמכים שהשדה כלל לא קיים בהם, ופתק כזה יהיה בלתי נראה
+   * לפונקציה ותזכורתו לא תישלח לעולם.
+   */
+  reminderPending?: boolean;
+  /** מתי ההתראה נשלחה בפועל - לתיעוד ואבחון */
+  reminderSentAt?: Timestamp | null;
 }
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;

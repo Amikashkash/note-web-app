@@ -7,7 +7,7 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuthStore } from './store/authStore';
-import { useNoteReminders } from './hooks/useNoteReminders';
+import { usePushRegistration } from './hooks/usePushRegistration';
 import './styles/globals.css';
 
 const App: React.FC = () => {
@@ -18,8 +18,8 @@ const App: React.FC = () => {
     initialize();
   }, [initialize]);
 
-  // תזמון התראות לפתקים עם תזכורת פעילה
-  useNoteReminders();
+  // רישום המכשיר לקבלת תזכורות ב-push
+  usePushRegistration();
 
   return (
     <ThemeProvider>

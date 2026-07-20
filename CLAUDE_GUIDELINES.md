@@ -204,12 +204,21 @@ unrecognized JSON is emitted as a fenced code block rather than dropped.
 There used to be four separate copies of that map and one had already fallen
 out of sync (`aisummary` was missing).
 
+**Reminders** — scheduling happens in a scheduled Cloud Function
+(`functions/src/index.ts`), never in the browser. An earlier version armed a
+`setTimeout` inside the Service Worker; browsers evict idle workers within
+seconds and every pending timer died with them, so no reminder past the
+eviction window ever fired. Two consequences worth keeping in mind:
+
+- `reminderPending` must always be written, including as `false`. A Firestore
+  query does not return documents that lack the field entirely, so a note
+  missing it is invisible to the function and its reminder never sends.
+- The function sends **data-only** FCM messages. This app owns its Service
+  Worker (`injectManifest`) and renders notifications itself; adding a
+  `notification` block would make the browser display one too — a duplicate.
+
 ### Known Issues
 - Search requires notes to load asynchronously from Firebase
-- Service Worker reminders rely on `setTimeout`; a browser may evict an idle
-  worker and drop a pending timer. Reminders re-sync on every app load, so it
-  self-corrects, but a long-range reminder can be missed if the app is never
-  opened. A real fix needs server-side Push.
 - Any signed-in user can read the `userLookup` collection, which allows
   checking whether an email is registered. Closing that requires moving the
   email lookup into a Cloud Function.
@@ -224,7 +233,8 @@ out of sync (`aisummary` was missing).
   so linting had effectively been off
 - Firestore rules hardened: shared users can edit content but not take
   ownership; full user documents are owner-only
-- Reminders are actually wired up end to end (`useNoteReminders` → SW)
+- Reminders are delivered by server-side Push (scheduled Cloud Function →
+  FCM → SW `push` handler), not by in-worker timers
 - Working branch: `main`
 
 ### Recent Changes (v1.5.0)

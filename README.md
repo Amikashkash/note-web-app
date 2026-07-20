@@ -72,7 +72,7 @@ src/
 │   ├── note/           # NotesList, NoteCard, NoteForm, NoteView
 │   └── auth/           # Login, Register
 ├── pages/              # דפי האפליקציה (Home, Login, Category View)
-├── hooks/              # Custom React Hooks (useNotes, useReminders)
+├── hooks/              # Custom React Hooks (useNotes, usePushRegistration)
 ├── store/              # Zustand State Management
 ├── services/           # Firebase, API
 ├── utils/              # פונקציות עזר
@@ -94,7 +94,7 @@ src/
 - ✅ שיתוף קטגוריות ופתקים
 - ✅ עדכונים בזמן-אמת
 - ✅ מצב כהה
-- ✅ תזכורות
+- ✅ תזכורות עם התראות Push
 - ✅ Drag & Drop לסידור פתקים
 - ✅ תצוגת קטגוריה מלאה
 - ✅ PWA Support
@@ -103,7 +103,6 @@ src/
 ### 🚧 בפיתוח
 - 🚧 עורך טקסט עשיר (Tiptap)
 - 🚧 ייצוא/ייבוא נתונים
-- 🚧 התראות Push
 - 🚧 בינלאום (i18n) - תמיכה בשפות נוספות
 
 ### 💡 מתוכנן לעתיד

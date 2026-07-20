@@ -28,7 +28,10 @@
       "Bash(curl:*)",
       "Bash(https://api.github.com/repos/Amikashkash/note-web-app/actions/workflows/firebase-deploy.yml/dispatches )",
       "Bash(cat:*)",
-      "Bash(npx vite build)"
+      "Bash(npx vite build)",
+      "Bash(xargs wc -l)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"=== EXIT: $? ===\")"
     ],
     "deny": [],
     "ask": []
