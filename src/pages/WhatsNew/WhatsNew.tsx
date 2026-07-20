@@ -16,6 +16,25 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'גיבוי הפתקים לקובץ להורדה (תפריט הפרופיל ← גיבוי והגדרות) - קובץ Markdown קריא לעין, או קובץ JSON מלא לשחזור מדויק',
+      },
+      {
+        type: 'feature',
+        description: 'הגיבוי כולל את כל הקטגוריות והפתקים, גם אלה שבארכיון',
+      },
+      {
+        type: 'improvement',
+        description: 'מסך ההגדרות נגיש עכשיו ישירות מתפריט הפרופיל',
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     date: 'יולי 2026',
     changes: [

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
+import { BackupSection } from '@/components/settings/BackupSection';
 import { saveGeminiApiKey, getGeminiApiKey } from '@/services/api/userSettings';
 import { logger } from '@/utils/logger';
 import { getErrorMessage } from '@/utils/errors';
@@ -79,7 +80,9 @@ export const Settings: React.FC = () => {
       </header>
 
       {/* Content */}
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+        <BackupSection />
+
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors">
           <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6">הגדרות בינה מלאכותית</h2>
 

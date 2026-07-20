@@ -83,6 +83,16 @@ export const ProfileMenu: React.FC = () => {
           {/* פריטי תפריט */}
           <div className="py-2">
             <button
+              onClick={() => handleMenuClick('/settings')}
+              className="w-full text-right px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+            >
+              <span className="text-xl">💾</span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">גיבוי והגדרות</span>
+            </button>
+
+            <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
+
+            <button
               onClick={() => handleMenuClick('/about')}
               className="w-full text-right px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
             >

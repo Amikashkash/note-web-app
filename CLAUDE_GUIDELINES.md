@@ -194,6 +194,12 @@ users and writes junk fields into the document.
 **Array fields** — `sharedWith` is only ever modified with `arrayUnion` /
 `arrayRemove`. Read-modify-write loses concurrent shares.
 
+**Backup rendering** — `src/utils/backupFormat.ts` is pure (no Firebase calls,
+no React) so it can be exercised directly. Content renderers dispatch on the
+declared `templateType` but fall back to shape detection, because notes
+converted between templates hold content that doesn't match the recorded type;
+unrecognized JSON is emitted as a fenced code block rather than dropped.
+
 **Template metadata** — labels and icons live only in `src/utils/templates.ts`.
 There used to be four separate copies of that map and one had already fallen
 out of sync (`aisummary` was missing).
