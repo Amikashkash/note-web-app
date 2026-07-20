@@ -227,9 +227,6 @@ const noteToMarkdown = (note: Note): string => {
     getTemplateLabel(note.templateType),
     note.isPinned ? '📌 מוצמד' : '',
     note.tags.length > 0 ? `תגיות: ${note.tags.join(', ')}` : '',
-    note.reminderEnabled && note.reminderTime
-      ? `⏰ תזכורת: ${formatDateTime(note.reminderTime)}`
-      : '',
     `נוצר: ${formatDateTime(note.createdAt)}`,
     `עודכן: ${formatDateTime(note.updatedAt)}`,
   ].filter(Boolean);
@@ -363,7 +360,6 @@ export const buildJsonBackup = (
         createdAt: isoOrNull(note.createdAt),
         updatedAt: isoOrNull(note.updatedAt),
         archivedAt: isoOrNull(note.archivedAt),
-        reminderTime: isoOrNull(note.reminderTime),
       })),
     },
     null,

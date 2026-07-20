@@ -1,8 +1,9 @@
 /**
  * חוזה ההתראות בין השרת, ה-Service Worker והאפליקציה
  *
- * התזמון מתבצע בפונקציה מתוזמנת בענן (`functions/src/index.ts`), שמעירה
- * את המכשיר ב-push. ה-Service Worker רק מקבל ומציג - הוא לא מתזמן כלום.
+ * תזכורת שייכת למשימה בודדת ברשימת משימות, לא לפתק. טריגר בענן
+ * (`functions/src/index.ts`) מתחזק מסמך תזכורת לכל משימה שיש לה תאריך
+ * ושעה, ופונקציה מתוזמנת שולחת push במועד. ה-Service Worker רק מציג.
  *
  * שים לב: `functions/src/reminderPayload.ts` הוא מראה של `ReminderPushData`,
  * כי `functions/` היא חבילה נפרדת שלא יכולה לייבא מכאן. שינוי כאן מחייב
@@ -15,7 +16,11 @@
  */
 export interface ReminderPushData {
   noteId: string;
+  /** המשימה שהתזכורת שייכת לה */
+  itemId: string;
+  /** כותרת ההתראה - טקסט המשימה */
   title: string;
+  /** גוף ההתראה - שם הפתק, כהקשר */
   body: string;
   categoryId: string;
 }

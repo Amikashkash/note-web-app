@@ -28,18 +28,9 @@ export interface Note {
   isPinned: boolean;
   isArchived: boolean;
   archivedAt?: Timestamp;
-  reminderTime?: Timestamp | null;
-  reminderEnabled?: boolean;
-  /**
-   * תזכורת חמושה שטרם נשלחה. זהו השדה שהפונקציה המתוזמנת בענן מסננת
-   * לפיו, ולכן הוא חייב להיכתב תמיד - גם כערך `false`. שאילתת Firestore
-   * לא מחזירה מסמכים שהשדה כלל לא קיים בהם, ופתק כזה יהיה בלתי נראה
-   * לפונקציה ותזכורתו לא תישלח לעולם.
-   */
-  reminderPending?: boolean;
-  /** מתי ההתראה נשלחה בפועל - לתיעוד ואבחון */
-  reminderSentAt?: Timestamp | null;
 }
+// תזכורות אינן שדה של הפתק. הן שייכות למשימה בודדת ברשימת משימות,
+// ומתוחזקות בקולקציה נפרדת ע"י טריגר בענן - ראה `functions/src/index.ts`.
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;
 
@@ -53,6 +44,4 @@ export interface NoteFormData {
   templateType: TemplateType;
   tags: string[];
   color: string | null;
-  reminderTime?: Date | null;
-  reminderEnabled?: boolean;
 }

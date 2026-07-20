@@ -10,7 +10,11 @@
  */
 export interface ReminderPushData {
   noteId: string;
+  /** המשימה שהתזכורת שייכת לה */
+  itemId: string;
+  /** כותרת ההתראה - טקסט המשימה */
   title: string;
+  /** גוף ההתראה - שם הפתק, כהקשר */
   body: string;
   categoryId: string;
   [key: string]: string;

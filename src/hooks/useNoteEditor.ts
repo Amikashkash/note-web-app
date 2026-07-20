@@ -6,7 +6,6 @@
  */
 
 import { useCallback } from 'react';
-import { Timestamp } from 'firebase/firestore';
 import { useNotes } from './useNotes';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
@@ -40,14 +39,6 @@ export const useNoteEditor = (categoryId: string) => {
     (data: NoteFormData, existingNote?: Note | null): Promise<boolean> => {
       if (!user) return Promise.resolve(false);
 
-      const reminderTime = data.reminderTime ? Timestamp.fromDate(data.reminderTime) : null;
-      const reminderEnabled = data.reminderEnabled ?? false;
-
-      // תזכורת "חמושה" רק אם היא פעילה ומועדה עוד לפנינו. חישוב מחדש
-      // בכל שמירה מטפל גם בהזזת מועד קדימה (חימוש מחדש) וגם בעריכת פתק
-      // שתזכורתו כבר נשלחה (נשארת כבויה).
-      const reminderPending = reminderEnabled && reminderTime !== null && reminderTime.toMillis() > Date.now();
-
       if (existingNote) {
         // רק השדות שהטופס עורך - לא אובייקט הפתק כולו
         return run(() =>
@@ -57,11 +48,6 @@ export const useNoteEditor = (categoryId: string) => {
             templateType: data.templateType,
             tags: data.tags,
             color: data.color,
-            reminderTime,
-            reminderEnabled,
-            reminderPending,
-            // מועד חדש מאפס את תיעוד השליחה הקודמת
-            ...(reminderPending ? { reminderSentAt: null } : {}),
           })
         );
       }
@@ -77,9 +63,6 @@ export const useNoteEditor = (categoryId: string) => {
         order: notes.length,
         sharedWith: [],
         isPinned: false,
-        reminderTime,
-        reminderEnabled,
-        reminderPending,
       };
 
       return run(() => createNote(newNote));

@@ -61,15 +61,15 @@
       ]
     },
     {
-      "collectionGroup": "notes",
+      "collectionGroup": "reminders",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "reminderPending",
+          "fieldPath": "sent",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "reminderTime",
+          "fieldPath": "remindAt",
           "order": "ASCENDING"
         }
       ]

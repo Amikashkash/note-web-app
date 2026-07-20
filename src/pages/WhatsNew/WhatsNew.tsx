@@ -16,6 +16,26 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'תזכורות עברו לרמת המשימה. כל משימה שקבעת לה תאריך ושעה תשלח לך התראה במועד - בדיוק כמו שהיה סביר לצפות עד היום',
+      },
+      {
+        type: 'improvement',
+        description:
+          'התזכורת ברמת הפתק הוסרה. תזכורת אחת לרשימה שלמה לא אמרה כלום על מה בדיוק צריך לעשות',
+      },
+      {
+        type: 'improvement',
+        description: 'מועדי המשימות מחושבים לפי שעון ישראל, כולל מעברי שעון קיץ',
+      },
+    ],
+  },
+  {
     version: '1.8.1',
     date: 'יולי 2026',
     changes: [

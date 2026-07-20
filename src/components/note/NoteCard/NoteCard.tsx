@@ -107,11 +107,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           <h4 className="font-bold text-gray-800 dark:text-gray-100 flex-1 line-clamp-1 text-base">
             {note.title}
           </h4>
-          {note.reminderEnabled && note.reminderTime && (
-            <span className="text-base flex-shrink-0 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded-full" title={`תזכורת: ${new Date(note.reminderTime.toDate()).toLocaleString('he-IL')}`}>
-              ⏰
-            </span>
-          )}
         </div>
         {onTogglePin && (
           <button

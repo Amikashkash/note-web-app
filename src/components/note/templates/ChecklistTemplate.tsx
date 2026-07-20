@@ -4,6 +4,7 @@
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/common/Button';
+import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 
 export interface ChecklistItem {
   id: string;
@@ -29,6 +30,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   // ולכן אין סיבה לגרור בגללה רינדור נוסף.
   const pendingFocusIdRef = useRef<string | null>(null);
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const { warning: notificationWarning, ensureEnabled } = useNotificationOptIn();
 
   const items = useMemo<ChecklistItem[]>(() => {
     try {
@@ -102,6 +104,12 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       item.id === id ? { ...item, dueTime: dueTime || undefined } : item
     );
     onChange(JSON.stringify(updatedItems));
+
+    // שעה היא מה שהופך תאריך יעד לתזכורת אמיתית, ולכן זו הנקודה לבקש
+    // הרשאה. תאריך לבדו נשאר ויזואלי ולא מצדיק בקשה.
+    if (dueTime) {
+      void ensureEnabled();
+    }
   };
 
   const handleDeleteItem = (id: string) => {
@@ -333,6 +341,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
           })
         )}
       </div>
+
+      {/* משוב על הרשאת התראות - מוצג רק כשמשהו חוסם תזכורת */}
+      {!readOnly && notificationWarning && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">⚠️ {notificationWarning}</p>
+      )}
 
       {/* כפתור הוספת משימה */}
       {!readOnly && (

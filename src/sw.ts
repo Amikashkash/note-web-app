@@ -122,9 +122,9 @@ const showReminderNotification = async (data: ReminderPushData): Promise<void> =
       body: data.body,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      // תג לפי מזהה הפתק: אם אותה תזכורת נשלחה פעמיים, ההתראה
-      // השנייה מחליפה את הראשונה במקום להיערם לידה.
-      tag: `note-${data.noteId}`,
+      // תג לפי משימה ולא לפי פתק: שתי משימות באותו פתק שמועדן קרוב
+      // צריכות שתי התראות נפרדות, אחרת השנייה הייתה מחליפה את הראשונה.
+      tag: `task-${data.noteId}-${data.itemId}`,
       requireInteraction: true,
       data,
       actions: [
@@ -162,6 +162,7 @@ self.addEventListener('push', (event) => {
 
       await showReminderNotification({
         noteId: data.noteId,
+        itemId: data.itemId ?? '',
         title: data.title ?? 'תזכורת',
         body: data.body ?? '',
         categoryId: data.categoryId ?? '',
