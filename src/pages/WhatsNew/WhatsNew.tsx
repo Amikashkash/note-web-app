@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.16.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'דף הבית, תצוגת הקטגוריה, ההגדרות והארכיון עוצבו מחדש. הכותרות עברו לרקע נקי עם פס צבע דק, במקום גרדיאנט שהתחרה בתוכן',
+      },
+      {
+        type: 'design',
+        description:
+          'הגרדיאנט נשאר במסך ההתחברות בלבד, כרגע המיתוג היחיד באפליקציה',
+      },
+    ],
+  },
+  {
     version: '1.15.1',
     date: 'יולי 2026',
     changes: [

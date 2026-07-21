@@ -4,9 +4,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
-import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common';
 import { NoteCard } from '@/components/note/NoteCard';
 import { NoteForm } from '@/components/note/NoteForm';
@@ -23,7 +23,6 @@ export const CategoryView: React.FC = () => {
   // ישירה לכתובת - למשל מלחיצה על התראת תזכורת - השאירה את הרשימה
   // ריקה לנצח ואת המסך תקוע על "טוען".
   const { categories, hasLoaded: categoriesLoaded } = useCategories();
-  const { theme } = useTheme();
 
   const {
     notes,
@@ -110,38 +109,40 @@ export const CategoryView: React.FC = () => {
 
   if (!category) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-xl text-gray-600 dark:text-gray-400">טוען...</p>
+      <div className="min-h-screen bg-app-light dark:bg-app-dark flex items-center justify-center">
+        <p className="text-xl text-ink-2-light dark:text-ink-2-dark">טוען...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen bg-app-light dark:bg-app-dark transition-colors">
+      {/* כותרת על משטח נקי ולא על גרדיאנט: הגרדיאנט נשמר למסך ההתחברות
+          בלבד, כרגע המיתוג היחיד. זהות הקטגוריה מסומנת בפס צבע דק
+          בראש הכותרת במקום ברקע מלא שמתחרה בתוכן. */}
       <header
-        className={`${
-          theme === 'dark' ? 'bg-gradient-primary-dark' : 'bg-gradient-primary'
-        } shadow-card mb-5 rounded-b-2xl`}
-        style={{ borderBottom: `4px solid ${category.color}` }}
+        className="bg-surface-light dark:bg-surface-dark border-b border-hairline-light dark:border-hairline-dark mb-5"
+        style={{ borderTop: `3px solid ${category.color}` }}
       >
-        <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-5">
+        <div className="container mx-auto px-3 sm:px-6 py-4">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {/* ב-RTL "חזור" מצביע ימינה - לכיוון שממנו הגענו */}
               <button
                 onClick={() => navigate('/')}
-                className="text-white hover:bg-white/20 rounded-xl p-2 transition-colors"
+                className="h-11 w-11 grid place-items-center rounded-xl text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors flex-shrink-0"
                 title="חזור לדף הבית"
               >
-                ← חזור
+                <ChevronRight size={24} strokeWidth={1.75} />
               </button>
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {category.icon && <span className="text-3xl">{category.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-3xl font-bold text-white truncate">
-                    {category.name}
-                  </h1>
-                  <p className="text-sm text-white/70">{visibleNotes.length} פתקים</p>
-                </div>
+              {category.icon && <span className="text-2xl flex-shrink-0">{category.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-h1 text-ink-light dark:text-ink-dark truncate">
+                  {category.name}
+                </h1>
+                <p className="text-caption text-ink-3-light dark:text-ink-3-dark">
+                  {visibleNotes.length} פתקים
+                </p>
               </div>
             </div>
 
@@ -150,9 +151,10 @@ export const CategoryView: React.FC = () => {
                 setEditingNote(null);
                 setShowNoteForm(true);
               }}
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+              className="flex-shrink-0"
             >
-              + פתק חדש
+              <Plus size={18} strokeWidth={2} />
+              פתק חדש
             </Button>
           </div>
 
@@ -163,16 +165,20 @@ export const CategoryView: React.FC = () => {
                 placeholder="חפש פתקים בקטגוריה..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 pr-10 pl-10 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+                className="w-full h-11 ps-10 pe-10 rounded-lg bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark text-body text-ink-light dark:text-ink-dark focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand transition-all"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70">🔍</span>
+              <Search
+                size={18}
+                strokeWidth={1.75}
+                className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-3-light dark:text-ink-3-dark pointer-events-none"
+              />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
                   title="נקה חיפוש"
                 >
-                  ✕
+                  <X size={18} strokeWidth={2} />
                 </button>
               )}
             </div>
@@ -183,7 +189,7 @@ export const CategoryView: React.FC = () => {
       <main className="container mx-auto px-3 sm:px-6 pb-8">
         {visibleNotes.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">
+            <p className="text-ink-3-light dark:text-ink-3-dark text-lg mb-4">
               {searchQuery ? 'לא נמצאו פתקים תואמים' : 'אין פתקים בקטגוריה זו'}
             </p>
             {!searchQuery && (

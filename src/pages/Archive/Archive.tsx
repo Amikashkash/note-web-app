@@ -4,6 +4,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+// `Archive` מיובא בשם אחר: הדף עצמו נקרא `Archive`, ושם זהה היה
+// מסתיר את הרכיב המיוצא מהקובץ.
+import { Archive as ArchiveIcon, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common';
 import { subscribeToArchivedNotes, restoreNote, permanentlyDeleteNote } from '@/services/api/notes';
@@ -58,26 +61,26 @@ export const Archive: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">טוען...</p>
+      <div className="min-h-screen bg-raised-light dark:bg-raised-dark flex items-center justify-center">
+        <p className="text-ink-2-light dark:text-ink-2-dark">טוען...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-raised-light dark:bg-raised-dark">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-surface-light dark:bg-surface-dark shadow-e1">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/')}
-              className="text-gray-600 hover:text-gray-800 text-xl"
+              className="h-11 w-11 grid place-items-center rounded-xl text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
               title="חזרה לדף הבית"
             >
-              ←
+              <ChevronRight size={24} strokeWidth={1.75} />
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-800">🗄️ ארכיון פתקים</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-ink-light dark:text-ink-dark">ארכיון פתקים</h1>
           </div>
         </div>
       </header>
@@ -85,10 +88,10 @@ export const Archive: React.FC = () => {
       {/* Main Content */}
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {archivedNotes.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-6xl mb-4">🗄️</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">הארכיון ריק</h2>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-e1 p-8 text-center">
+            <ArchiveIcon size={56} strokeWidth={1.25} className="mx-auto mb-4 text-ink-3-light dark:text-ink-3-dark" />
+            <h2 className="text-xl font-bold text-ink-light dark:text-ink-dark mb-2">הארכיון ריק</h2>
+            <p className="text-ink-2-light dark:text-ink-2-dark mb-4">
               פתקים שתמחק יופיעו כאן, ותוכל לשחזר אותם או למחוק לצמיתות
             </p>
             <Button onClick={() => navigate('/')} variant="outline">
@@ -98,7 +101,7 @@ export const Archive: React.FC = () => {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-ink-2-light dark:text-ink-2-dark">
                 {archivedNotes.length} פתק{archivedNotes.length === 1 ? '' : 'ים'} בארכיון
               </p>
             </div>
@@ -106,7 +109,7 @@ export const Archive: React.FC = () => {
             {archivedNotes.map((note) => (
               <div
                 key={note.id}
-                className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 hover:shadow-md transition-shadow"
+                className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-sm p-4 border border-hairline-light dark:border-hairline-dark hover:shadow-e2 transition-shadow"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -116,10 +119,10 @@ export const Archive: React.FC = () => {
                         size={20}
                         className="flex-shrink-0 text-ink-2-light dark:text-ink-2-dark"
                       />
-                      <h3 className="text-lg font-bold text-gray-800 truncate">{note.title}</h3>
+                      <h3 className="text-lg font-bold text-ink-light dark:text-ink-dark truncate">{note.title}</h3>
                     </div>
 
-                    <div className="text-sm text-gray-500 mb-2">
+                    <div className="text-sm text-ink-3-light dark:text-ink-3-dark mb-2">
                       <span>
                         הועבר לארכיון:{' '}
                         {note.archivedAt
@@ -139,7 +142,7 @@ export const Archive: React.FC = () => {
                         {note.tags.map((tag, index) => (
                           <span
                             key={index}
-                            className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
+                            className="px-2 py-0.5 bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark text-xs rounded-full"
                           >
                             #{tag}
                           </span>
@@ -154,7 +157,8 @@ export const Archive: React.FC = () => {
                       size="sm"
                       className="whitespace-nowrap"
                     >
-                      ↺ שחזר
+                      <RotateCcw size={16} strokeWidth={1.75} />
+                      שחזר
                     </Button>
                     <Button
                       onClick={() => handlePermanentDelete(note.id, note.title)}
@@ -162,7 +166,8 @@ export const Archive: React.FC = () => {
                       size="sm"
                       className="whitespace-nowrap"
                     >
-                      🗑 מחק לצמיתות
+                      <Trash2 size={16} strokeWidth={1.75} />
+                      מחק לצמיתות
                     </Button>
                   </div>
                 </div>

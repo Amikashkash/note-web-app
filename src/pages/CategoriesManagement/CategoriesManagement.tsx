@@ -53,16 +53,16 @@ export const CategoriesManagement: React.FC = () => {
 
   if (isLoading && categories.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-raised-light dark:bg-raised-dark flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-raised-light dark:bg-raised-dark">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-surface-light dark:bg-surface-dark shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -79,9 +79,9 @@ export const CategoriesManagement: React.FC = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-e2 p-6">
           {categories.length === 0 ? (
-            <div className="text-center p-8 text-gray-500">
+            <div className="text-center p-8 text-ink-3-light dark:text-ink-3-dark">
               <p>אין קטגוריות עדיין</p>
             </div>
           ) : (
@@ -93,14 +93,14 @@ export const CategoriesManagement: React.FC = () => {
                 return (
                   <div
                     key={category.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-r-4 hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between p-4 bg-raised-light dark:bg-raised-dark rounded-lg border-r-4 hover:bg-raised-light dark:bg-raised-dark transition-colors"
                     style={{ borderRightColor: category.color }}
                   >
                     <div className="flex items-center gap-3 flex-1">
                       {category.icon && <span className="text-2xl">{category.icon}</span>}
                       <div>
-                        <h3 className="font-semibold text-gray-800">{category.name}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-semibold text-ink-light dark:text-ink-dark">{category.name}</h3>
+                        <p className="text-sm text-ink-3-light dark:text-ink-3-dark">
                           {notesCount} פתקים
                           {hasNotes && ' (יש למחוק את הפתקים לפני מחיקת הקטגוריה)'}
                         </p>
