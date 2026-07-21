@@ -80,6 +80,13 @@ service cloud.firestore {
       match /fcmTokens/{tokenId} {
         allow read, write: if isOwner(userId);
       }
+
+      // זיכרון המוצרים להשלמה אוטומטית ברשימת הקניות.
+      // נכתב מהלקוח ברגע שמוצר נוסף לרשימה, ולכן נדרשת כאן הרשאת כתיבה
+      // (בניגוד ל-`reminders`, שנכתבת רק מהשרת).
+      match /products/{productId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // אינדקס מינימלי לחיפוש משתמש לפי אימייל, לצורך שיתוף.

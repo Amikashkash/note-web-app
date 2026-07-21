@@ -1,16 +1,23 @@
 /**
  * תבנית רשימת קניות - Shopping List
+ *
+ * ההוספה נעשית משדה אחד בראש הרשימה: מקלידים, לוחצים Enter, והשדה
+ * מתנקה ומוכן לבא. הזרימה הקודמת - ללחוץ "הוסף פריט", לקבל שורה ריקה
+ * ואז להקליד - עלתה פעולה מיותרת לכל מוצר.
+ *
+ * המוצרים נזכרים בין רשימות (`useProductSuggestions`) ומוצעים תוך כדי
+ * הקלדה. הקטגוריה שהייתה כאן הוסרה: היא דרשה בחירה ידנית בתפריט לכל
+ * מוצר ושורה שלמה נוספת, בתמורה לקיבוץ שהופיע רק בתצוגת קריאה.
  */
 
-import React, { useMemo } from 'react';
-import { Button } from '@/components/common/Button';
+import React, { useMemo, useRef, useState } from 'react';
+import { useProductSuggestions } from '@/hooks/useProductSuggestions';
 
 export interface ShoppingItem {
   id: string;
   name: string;
   quantity: string;
   checked: boolean;
-  category: string;
 }
 
 interface ShoppingTemplateProps {
@@ -19,197 +26,197 @@ interface ShoppingTemplateProps {
   readOnly?: boolean;
 }
 
-const CATEGORIES = ['פירות וירקות', 'מוצרי חלב', 'בשר ודגים', 'לחם ומאפים', 'שימורים', 'משקאות', 'אחר'];
-
 export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
 }) => {
+  const [draft, setDraft] = useState('');
+  const quickAddRef = useRef<HTMLInputElement | null>(null);
+
   const items = useMemo<ShoppingItem[]>(() => {
     try {
       const parsed = value ? JSON.parse(value) : [];
-      // Ensure it's an array
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-      // Validate each item has required properties
+      if (!Array.isArray(parsed)) return [];
+
       // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
-      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי
+      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי.
+      // שדה `category` של רשימות ישנות פשוט לא נקרא.
       return parsed.map((item, index) => ({
         id: item.id || `item-${index}`,
         name: item.name || '',
         quantity: item.quantity || '',
         checked: item.checked || false,
-        category: item.category || 'אחר',
       }));
     } catch {
       return [];
     }
   }, [value]);
 
-  const handleAddItem = () => {
-    const newItem: ShoppingItem = {
-      id: Date.now().toString(),
-      name: '',
-      quantity: '',
-      checked: false,
-      category: 'אחר',
-    };
-    const updatedItems = [...items, newItem];
-    onChange(JSON.stringify(updatedItems));
+  const existingNames = useMemo(() => items.map((item) => item.name), [items]);
+  const { suggestions, remember } = useProductSuggestions(draft, existingNames);
+
+  const commit = (updated: ShoppingItem[]) => onChange(JSON.stringify(updated));
+
+  /** קריאה אחת לאירוע, כדי ששני עדכונים לא יתבססו על מצב שהתיישן */
+  const updateItem = (id: string, patch: Partial<ShoppingItem>) => {
+    commit(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
-  const handleToggleItem = (id: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, checked: !item.checked } : item
-    );
-    onChange(JSON.stringify(updatedItems));
-  };
+  const addItem = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
 
-  const handleUpdateItem = (id: string, field: keyof ShoppingItem, newValue: string | boolean) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, [field]: newValue } : item
-    );
-    onChange(JSON.stringify(updatedItems));
+    commit([
+      ...items,
+      { id: Date.now().toString(), name: trimmed, quantity: '', checked: false },
+    ]);
+
+    remember(trimmed);
+    setDraft('');
+    quickAddRef.current?.focus();
   };
 
   const handleDeleteItem = (id: string) => {
-    const updatedItems = items.filter((item) => item.id !== id);
-    onChange(JSON.stringify(updatedItems));
+    commit(items.filter((item) => item.id !== id));
   };
 
   const checkedCount = items.filter((item) => item.checked).length;
   const totalCount = items.length;
-
-  // קיבוץ לפי קטגוריות
-  const itemsByCategory = useMemo(() => {
-    const grouped: Record<string, ShoppingItem[]> = {};
-    items.forEach((item) => {
-      if (!grouped[item.category]) {
-        grouped[item.category] = [];
-      }
-      grouped[item.category].push(item);
-    });
-    return grouped;
-  }, [items]);
+  const checkedPercent = totalCount > 0 ? (checkedCount / totalCount) * 100 : 0;
 
   return (
     <div className="space-y-3">
       {/* התקדמות */}
       {totalCount > 0 && (
-        <div className="bg-green-50 p-3 rounded-lg">
+        <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">התקדמות בקניות:</span>
-            <span className="text-sm font-bold text-green-600">
-              {checkedCount} / {totalCount} ({Math.round((checkedCount / totalCount) * 100)}%)
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              התקדמות בקניות:
+            </span>
+            <span className="text-sm font-bold text-green-600 dark:text-green-300">
+              {checkedCount} / {totalCount} ({Math.round(checkedPercent)}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <div
               className="bg-green-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(checkedCount / totalCount) * 100}%` }}
+              style={{ width: `${checkedPercent}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* רשימת קניות */}
+      {/* הוספה מהירה */}
+      {!readOnly && (
+        <div className="relative">
+          <input
+            ref={quickAddRef}
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                // מוסיף בדיוק את מה שהוקלד ולא את ההצעה הראשונה: בחירת
+                // הצעה היא הקשה מפורשת עליה, אחרת Enter היה מוסיף
+                // לפעמים מוצר שלא התכוונת אליו.
+                addItem(draft);
+              } else if (e.key === 'Escape') {
+                setDraft('');
+              }
+            }}
+            placeholder="🛒 הוסף מוצר ולחץ Enter..."
+            className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+
+          {suggestions.length > 0 && (
+            <ul className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg overflow-hidden">
+              {suggestions.map((product) => (
+                <li key={product.name}>
+                  <button
+                    type="button"
+                    onClick={() => addItem(product.name)}
+                    className="w-full text-right px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-gray-600"
+                  >
+                    {product.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* הרשימה */}
       {items.length === 0 ? (
-        <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">
+        <div className="text-center p-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
           אין פריטים ברשימה
         </div>
-      ) : readOnly ? (
-        /* תצוגת קריאה - מקובץ לפי קטגוריות */
-        <div className="space-y-4">
-          {Object.entries(itemsByCategory).map(([category, categoryItems]) => (
-            <div key={category}>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2 border-b pb-1">
-                {category}
-              </h4>
-              <div className="space-y-2">
-                {categoryItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 px-3 py-2 rounded border-2 transition-all ${
-                      item.checked
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-white border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {/* Checkbox */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleItem(item.id)}
-                      className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                        item.checked
-                          ? 'bg-green-500 border-green-500'
-                          : 'bg-white border-gray-300 hover:border-green-400'
-                      }`}
-                    >
-                      {item.checked && <span className="text-white text-sm">✓</span>}
-                    </button>
-
-                    <span className={`flex-1 ${item.checked ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                      {item.name}
-                    </span>
-                    {item.quantity && (
-                      <span className="text-sm text-gray-600">({item.quantity})</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
-        /* תצוגת עריכה */
         <div className="space-y-2">
           {items.map((item) => (
             <div
               key={item.id}
-              className={`flex flex-col gap-2 p-2 rounded-lg border-2 transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
                 item.checked
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-white border-gray-200 hover:border-gray-300'
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
               }`}
             >
-              {/* שורה ראשונה: Checkbox, שם, כמות, מחיקה */}
-              <div className="flex items-center gap-2">
-                {/* Checkbox */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleItem(item.id)}
-                  className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+              <button
+                type="button"
+                onClick={() => updateItem(item.id, { checked: !item.checked })}
+                className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                  item.checked
+                    ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600'
+                    : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 hover:border-green-400'
+                }`}
+              >
+                {item.checked && <span className="text-white text-sm">✓</span>}
+              </button>
+
+              {readOnly ? (
+                <span
+                  className={`flex-1 text-sm ${
                     item.checked
-                      ? 'bg-green-500 border-green-500'
-                      : 'bg-white border-gray-300 hover:border-green-400'
+                      ? 'line-through text-gray-500 dark:text-gray-400'
+                      : 'text-gray-700 dark:text-gray-200'
                   }`}
                 >
-                  {item.checked && <span className="text-white text-sm">✓</span>}
-                </button>
-
-                {/* שם הפריט */}
+                  {item.name}
+                </span>
+              ) : (
                 <input
                   type="text"
                   value={item.name}
-                  onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
+                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
                   placeholder="פריט..."
-                  className={`flex-1 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
-                    item.checked ? 'line-through text-gray-500' : 'text-gray-700'
+                  className={`flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-green-300 rounded ${
+                    item.checked
+                      ? 'line-through text-gray-500 dark:text-gray-400'
+                      : 'text-gray-700 dark:text-gray-200'
                   }`}
                 />
+              )}
 
-                {/* כמות */}
+              {readOnly ? (
+                item.quantity && (
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    ({item.quantity})
+                  </span>
+                )
+              ) : (
                 <input
                   type="text"
                   value={item.quantity}
-                  onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
+                  onChange={(e) => updateItem(item.id, { quantity: e.target.value })}
                   placeholder="כמות"
-                  className="w-16 sm:w-20 px-2 py-1 text-xs sm:text-sm bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  className="w-16 sm:w-20 flex-shrink-0 px-2 py-1 text-xs sm:text-sm bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-green-300"
                 />
+              )}
 
-                {/* מחיקה */}
+              {!readOnly && (
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
@@ -218,33 +225,10 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 >
                   🗑
                 </button>
-              </div>
-
-              {/* שורה שנייה: קטגוריה */}
-              <div className="flex items-center gap-2 mr-8">
-                <label className="text-xs text-gray-600 flex-shrink-0">קטגוריה:</label>
-                <select
-                  value={item.category}
-                  onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)}
-                  className="flex-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              )}
             </div>
           ))}
         </div>
-      )}
-
-      {/* כפתור הוספת פריט */}
-      {!readOnly && (
-        <Button type="button" onClick={handleAddItem} size="sm" variant="outline" className="w-full">
-          🛒 הוסף פריט
-        </Button>
       )}
     </div>
   );

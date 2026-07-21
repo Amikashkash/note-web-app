@@ -73,25 +73,17 @@ const renderChecklist: Renderer = (parsed) => {
 const renderShopping: Renderer = (parsed) => {
   if (!isRowsWith(parsed, 'name')) return null;
 
-  // הפריטים נשמרים כרשימה שטוחה עם שדה קטגוריה; בגיבוי נוח יותר
-  // לראות אותם מקובצים, כפי שהם מוצגים באפליקציה.
-  const groups = new Map<string, string[]>();
-
-  for (const item of parsed) {
-    const group = asText(item.category) || 'אחר';
-    const quantity = asText(item.quantity);
-    const line = `- [${item.checked ? 'x' : ' '}] ${singleLine(asText(item.name))}${
-      quantity ? ` — ${singleLine(quantity)}` : ''
-    }`;
-
-    const existing = groups.get(group);
-    if (existing) existing.push(line);
-    else groups.set(group, [line]);
-  }
-
-  return Array.from(groups.entries())
-    .map(([group, lines]) => `**${group}**\n${lines.join('\n')}`)
-    .join('\n\n');
+  // רשימה שטוחה, כפי שהיא מוצגת באפליקציה. בעבר הפריטים קובצו כאן לפי
+  // שדה `category`, אבל הסיווג הידני הוסר מהתבנית - רשימות ישנות עדיין
+  // מכילות את השדה, והוא פשוט לא נקרא.
+  return parsed
+    .map((item) => {
+      const quantity = asText(item.quantity);
+      return `- [${item.checked ? 'x' : ' '}] ${singleLine(asText(item.name))}${
+        quantity ? ` — ${singleLine(quantity)}` : ''
+      }`;
+    })
+    .join('\n');
 };
 
 const renderWorkPlan: Renderer = (parsed) => {
