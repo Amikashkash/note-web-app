@@ -12,6 +12,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import { useProductSuggestions } from '@/hooks/useProductSuggestions';
+import { normalizeProductName } from '@/services/api/productMatching';
 
 export interface ShoppingItem {
   id: string;
@@ -32,6 +33,9 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   readOnly = false,
 }) => {
   const [draft, setDraft] = useState('');
+  const [quantityDraft, setQuantityDraft] = useState('');
+  /** משוב קצר על הוספה שלא יצרה שורה חדשה */
+  const [notice, setNotice] = useState<string | null>(null);
   const quickAddRef = useRef<HTMLInputElement | null>(null);
 
   const items = useMemo<ShoppingItem[]>(() => {
@@ -63,17 +67,48 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
     commit(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
-  const addItem = (name: string) => {
+  /**
+   * הוספת מוצר, או עדכון כמות אם הוא כבר ברשימה.
+   *
+   * הוספה כפולה של אותו מוצר כמעט תמיד טעות - בסופר רוצים שורה אחת עם
+   * כמות, לא שתי שורות זהות. לכן מוצר קיים לא משוכפל: אם צוינה כמות היא
+   * מעדכנת את השורה הקיימת, ובכל מקרה מוצגת הודעה קצרה כדי שההוספה
+   * שלא קרתה לא תיראה כמו תקלה.
+   */
+  const addItem = (name: string, itemQuantity: string = quantityDraft) => {
     const trimmed = name.trim();
     if (!trimmed) return;
 
-    commit([
-      ...items,
-      { id: Date.now().toString(), name: trimmed, quantity: '', checked: false },
-    ]);
+    const normalized = normalizeProductName(trimmed);
+    const existing = items.find((item) => normalizeProductName(item.name) === normalized);
+    const trimmedQuantity = itemQuantity.trim();
 
-    remember(trimmed);
+    if (existing) {
+      if (trimmedQuantity) {
+        updateItem(existing.id, { quantity: trimmedQuantity });
+        setNotice(`${existing.name} — הכמות עודכנה`);
+      } else {
+        setNotice(`${existing.name} כבר ברשימה`);
+      }
+    } else {
+      commit([
+        ...items,
+        {
+          id: Date.now().toString(),
+          name: trimmed,
+          quantity: trimmedQuantity,
+          checked: false,
+        },
+      ]);
+      remember(trimmed);
+      setNotice(null);
+    }
+
     setDraft('');
+    setQuantityDraft('');
+
+    // החזרת הפוקוס לשדה המוצר משאירה את המקלדת פתוחה ומאפשרת להמשיך
+    // ישר למוצר הבא, בלי לסגור אותה ובלי לגלול לרשימה.
     quickAddRef.current?.focus();
   };
 
@@ -109,60 +144,81 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
 
       {/* הוספה מהירה */}
       {!readOnly && (
-        <div className="relative">
+        <div className="space-y-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg">
+          {/* מוצר וכמות באותה שורה: הכמות הייתה מחייבת לסגור את המקלדת,
+              לגלול לשורה שנוספה, למלא אותה, ולחזור למעלה. */}
           <div className="flex items-center gap-2">
             <input
               ref={quickAddRef}
               type="text"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              // מבקש מקלדת עם מקש "סיום" במקום "הבא". בלי זה, מקלדות
-              // אנדרואיד מציגות חץ מעבר-לשדה-הבא ומזיזות את הפוקוס
-              // במקום להוסיף מוצר.
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setNotice(null);
+              }}
+              // מבקש מקלדת עם מקש "סיום" במקום חץ מעבר-לשדה-הבא
               enterKeyHint="done"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  // מוסיף בדיוק את מה שהוקלד ולא את ההצעה הראשונה: בחירת
-                  // הצעה היא הקשה מפורשת עליה, אחרת Enter היה מוסיף
-                  // לפעמים מוצר שלא התכוונת אליו.
+                  // מוסיף את מה שהוקלד ולא את ההצעה הראשונה: בחירת הצעה
+                  // היא הקשה מפורשת עליה, אחרת Enter היה מוסיף לפעמים
+                  // מוצר שלא התכוונת אליו.
                   addItem(draft);
                 } else if (e.key === 'Escape') {
                   setDraft('');
                 }
               }}
-              placeholder="🛒 הוסף מוצר..."
+              placeholder="🛒 מוצר..."
               className="flex-1 min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
             />
 
-            {/* הכפתור הוא דרך ההוספה האמינה. אי אפשר להסתמך על Enter
-                בנייד: חלק ממקלדות אנדרואיד לא משדרות אותו כאירוע מקש
-                אלא מזיזות פוקוס לשדה הבא, והמוצר לא נוסף. */}
+            <input
+              type="text"
+              value={quantityDraft}
+              onChange={(e) => setQuantityDraft(e.target.value)}
+              enterKeyHint="done"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addItem(draft);
+                }
+              }}
+              placeholder="כמות"
+              className="w-16 flex-shrink-0 px-2 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+            />
+
+            {/* גיבוי ל-Enter, שלא כל מקלדת בנייד משדרת כאירוע מקש */}
             <button
               type="button"
               onClick={() => addItem(draft)}
               disabled={draft.trim().length === 0}
-              className="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
+              className="flex-shrink-0 px-3 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
               title="הוסף מוצר"
             >
               הוסף
             </button>
           </div>
 
+          {/* ההצעות בזרימה רגילה ולא כשכבה צפה: שכבה מוחלטת נחתכה בתוך
+              חלון הפתק הגלילי, ובנייד לא הייתה נגישה כלל. */}
           {suggestions.length > 0 && (
-            <ul className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg overflow-hidden">
+            <div className="flex flex-wrap gap-1.5">
               {suggestions.map((product) => (
-                <li key={product.name}>
-                  <button
-                    type="button"
-                    onClick={() => addItem(product.name)}
-                    className="w-full text-right px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-gray-600"
-                  >
-                    {product.name}
-                  </button>
-                </li>
+                <button
+                  key={product.name}
+                  type="button"
+                  onClick={() => addItem(product.name)}
+                  className="px-3 py-1.5 text-sm rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-gray-600"
+                >
+                  {product.name}
+                </button>
               ))}
-            </ul>
+            </div>
+          )}
+
+          {notice && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">{notice}</p>
           )}
         </div>
       )}
