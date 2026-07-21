@@ -192,19 +192,31 @@ self.addEventListener('notificationclick', (event) => {
         includeUncontrolled: true,
       });
 
-      // אם האפליקציה כבר פתוחה - מנווטים בה ומעבירים פוקוס,
-      // במקום לפתוח חלון נוסף
+      // אם האפליקציה כבר פתוחה - מנווטים בה ומעבירים פוקוס, במקום
+      // לפתוח חלון נוסף.
+      //
+      // כל השימוש בחלון קיים עטוף: `focus()` נכשל באנדרואיד כשה-client
+      // רשום אך לא באמת גלוי - מצב נפוץ ב-PWA מותקנת שנסגרה. קודם רק
+      // `navigate()` היה עטוף, ודחייה של `focus()` הפילה את כל המטפל
+      // אחרי שכבר יצאנו מהלולאה. התוצאה: לחיצה על ההתראה לא פתחה כלום.
       for (const client of clientList) {
         if (!client.url.startsWith(self.registration.scope)) continue;
 
-        await client.focus();
-        if ('navigate' in client) {
-          await client.navigate(targetPath).catch(() => undefined);
+        try {
+          const navigated = 'navigate' in client ? await client.navigate(targetPath) : null;
+          await (navigated ?? client).focus();
+          return;
+        } catch (error) {
+          console.warn('SW: could not reuse the open window, opening a new one:', error);
+          break;
         }
-        return;
       }
 
-      await self.clients.openWindow(targetPath);
+      try {
+        await self.clients.openWindow(targetPath);
+      } catch (error) {
+        console.error('SW: openWindow failed:', error);
+      }
     })()
   );
 });

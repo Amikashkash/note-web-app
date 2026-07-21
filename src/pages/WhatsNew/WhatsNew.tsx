@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.4',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'לחיצה על התראת תזכורת לא פתחה את האפליקציה כשהיא הייתה סגורה. ניסיון להשתמש בחלון קיים נכשל בשקט ולא היה גיבוי שפותח חלון חדש',
+      },
+    ],
+  },
+  {
     version: '1.9.3',
     date: 'יולי 2026',
     changes: [

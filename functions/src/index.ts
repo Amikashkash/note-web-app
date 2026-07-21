@@ -278,13 +278,25 @@ export const sendDueReminders = onSchedule(
         continue;
       }
 
-      const dead = await sendToUser(tokens, {
+      const payload = {
         noteId: (doc.get('noteId') as string) || '',
         itemId: (doc.get('itemId') as string) || '',
         title: (doc.get('itemText') as string) || 'תזכורת',
         body: (doc.get('noteTitle') as string) || '',
         categoryId: (doc.get('categoryId') as string) || '',
+      };
+
+      // מזהי היעד נרשמים כדי שאפשר יהיה לאמת לאן ההתראה אמורה לנווט.
+      // בלי זה, "ההתראה לא פותחת את הפתק" הוא דיווח שאי אפשר לאבחן
+      // בלי ניפוי מרחוק על המכשיר עצמו.
+      logger.info('Sending reminder', {
+        reminderId: doc.id,
+        noteId: payload.noteId,
+        categoryId: payload.categoryId,
+        deviceCount: tokens.length,
       });
+
+      const dead = await sendToUser(tokens, payload);
 
       for (const entry of dead) {
         deadTokens.add(entry.path);
