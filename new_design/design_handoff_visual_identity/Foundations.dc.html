@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #FAFAF9; }
+  .tnum { font-feature-settings: "tnum" 1, "lnum" 1; }
+  pre, code, .ltr { direction: ltr; text-align: left; unicode-bidi: isolate; }
+</style>
+</helmet>
+<div dir="rtl" style="font-family: Assistant, system-ui, sans-serif; background: #FAFAF9; color: #1C1917; min-height: 100vh; padding: 40px 20px 96px;">
+  <div style="max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px;">
+
+    <!-- Masthead -->
+    <header style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 28px; border-bottom: 1px solid #E7E5E4;">
+      <div style="display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; background: #4F46E5; color: #fff; height: 36px; padding: 0 14px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+        <i data-lucide="notebook-pen" style="width:18px;height:18px;"></i>
+        פתקים · Foundations
+      </div>
+      <h1 style="font-size: 28px; line-height: 34px; font-weight: 800;">מערכת עיצוב — יסודות</h1>
+      <p style="font-size: 16px; line-height: 24px; color: #57534E; max-width: 60ch; text-wrap: pretty;">טיפוגרפיה, צבע, הרמות (elevation) ואייקונים. הכול RTL-first, עם ערך בהיר וכהה לכל צבע. בתחתית הדף — קונפיג מוכן להעתקה ל‑<span class="ltr">tailwind.config.js</span> וטבלת מיפוי מחלקות.</p>
+    </header>
+
+    <!-- 1. TYPOGRAPHY -->
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-size:13px; font-weight:700; color:#4F46E5;">01</span>
+        <h2 style="font-size: 22px; line-height: 28px; font-weight: 700;">טיפוגרפיה — Assistant</h2>
+      </div>
+      <p style="font-size:15px; line-height:23px; color:#57534E; max-width:64ch;">משפחה אחת, 400–800. נבחרה כי היא <b>שורטטה לעברית על מסך</b> (לא הותאמה מלטינית), עם טווח משקלים שבונה היררכיה שלמה בלי גופן שני — מה ששומר על RTL פשוט. לטבלת החשבונאות בלבד: ספרות טבלאיות דרך <code class="ltr">tnum</code>.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 2px; background: #fff; border: 1px solid #E7E5E4; border-radius: 12px; box-shadow: 0 1px 2px rgb(0 0 0/.04), 0 1px 3px rgb(0 0 0/.08); overflow: hidden;">
+        <div class="row" style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:28px; line-height:34px; font-weight:700;">כותרת ראשית · Display</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">28/34 · 700 · text-display</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:22px; line-height:28px; font-weight:700;">כותרת מסך · H1</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">22/28 · 700 · text-h1</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:18px; line-height:24px; font-weight:600;">כותרת פתק / קטע · H2</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">18/24 · 600 · text-h2</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:16px; line-height:24px; font-weight:400;">גוף הפתק והטפסים — 16px מונע זום ב‑iOS · Body</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">16/24 · 400 · text-body</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:14px; line-height:20px; font-weight:400; color:#57534E;">תצוגה מקדימה בכרטיס, טקסט משני · Body-sm</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">14/20 · 400 · text-body-sm</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid #F5F5F4;">
+          <span style="font-size:13px; line-height:18px; font-weight:500; color:#78716C;">תגיות · חותמות זמן · תוויות טבלה · Caption</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">13/18 · 500 · text-caption</span>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px;">
+          <span class="tnum" style="font-size:16px; line-height:24px; font-weight:500;">‏1,240.50 ₪ · 12 · 03/07 — ספרות טבלאיות</span>
+          <span class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#78716C; white-space:nowrap;">16/24 · 500 · tnum</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. COLOR -->
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-size:13px; font-weight:700; color:#4F46E5;">02</span>
+        <h2 style="font-size: 22px; line-height: 28px; font-weight: 700;">צבע — נייטרל חמים + מותג אינדיגו</h2>
+      </div>
+      <p style="font-size:15px; line-height:23px; color:#57534E; max-width:64ch;">הגרדיאנט הסגול‑כחול פורש מהצ'רום ונשאר רק כרגע מיתוג במסך ההתחברות. המותג הוא <b>אינדיגו</b> (נבדל מכחול‑הקטגוריה), ופעולה חיובית/משנית היא <b>טורקיז</b>. כל יחס ניגודיות נמדד מול המשטח שעליו הצבע יושב — <span class="ltr">AA</span> דורש 4.5:1 לטקסט.</p>
+
+      <!-- brand + status -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:12px;">
+        <div style="border:1px solid #E7E5E4; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="height:64px; background:#4F46E5; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:14px;">Aa · 5.1:1</div>
+          <div style="padding:8px 10px;"><div style="font-size:13px; font-weight:600;">Brand</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">#4F46E5 / #6366F1</div></div>
+        </div>
+        <div style="border:1px solid #E7E5E4; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="height:64px; background:#0F766E; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:14px;">Aa · 5.3:1</div>
+          <div style="padding:8px 10px;"><div style="font-size:13px; font-weight:600;">Teal</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">#0F766E / #2DD4BF</div></div>
+        </div>
+        <div style="border:1px solid #E7E5E4; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="height:64px; background:#059669; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:14px;">Aa · 4.5:1</div>
+          <div style="padding:8px 10px;"><div style="font-size:13px; font-weight:600;">Success</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">#059669 / #34D399</div></div>
+        </div>
+        <div style="border:1px solid #E7E5E4; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="height:64px; background:#DC2626; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:14px;">Aa · 5.9:1</div>
+          <div style="padding:8px 10px;"><div style="font-size:13px; font-weight:600;">Danger</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">#DC2626 / #F87171</div></div>
+        </div>
+      </div>
+
+      <!-- light neutrals -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:13px; font-weight:600; color:#78716C;">נייטרל — בהיר</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px;">
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#FAFAF9;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">app</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#FAFAF9</div></div></div>
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#FFFFFF;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">surface</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#FFFFFF</div></div></div>
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#F5F5F4;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">raised</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#F5F5F4</div></div></div>
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#1C1917;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">ink · 16:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#1C1917</div></div></div>
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#57534E;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">ink-2 · 7:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#57534E</div></div></div>
+          <div style="border:1px solid #E7E5E4; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#78716C;"></div><div style="padding:6px 8px; background:#fff;"><div style="font-size:12px; font-weight:600;">ink-3 · 4.9:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">#78716C</div></div></div>
+        </div>
+      </div>
+
+      <!-- dark neutrals -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:13px; font-weight:600; color:#78716C;">נייטרל — כהה</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; background:#0C0A09; padding:10px; border-radius:12px;">
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#0C0A09;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">app</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#0C0A09</div></div></div>
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#1C1917;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">surface</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#1C1917</div></div></div>
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#292524;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">raised</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#292524</div></div></div>
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#F5F5F4;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">ink · 15:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#F5F5F4</div></div></div>
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#A8A29E;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">ink-2 · 6:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#A8A29E</div></div></div>
+          <div style="border:1px solid #33302D; border-radius:10px; overflow:hidden;"><div style="height:44px; background:#8A827C;"></div><div style="padding:6px 8px; background:#1C1917;"><div style="font-size:12px; font-weight:600; color:#F5F5F4;">ink-3 · 4.6:1</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A827C;">#8A827C</div></div></div>
+        </div>
+      </div>
+
+      <!-- category -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:13px; font-weight:600; color:#78716C;">קטגוריות — כוילו לאותה בהירות/רוויה (בהיר · כהה)</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:8px;">
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#3B82F6;"></div><div style="flex:1; background:#60A5FA;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">כחול</div></div>
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#8B5CF6;"></div><div style="flex:1; background:#A78BFA;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">סגול</div></div>
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#10B981;"></div><div style="flex:1; background:#34D399;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">ירוק</div></div>
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#F59E0B;"></div><div style="flex:1; background:#FBBF24;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">כתום</div></div>
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#EF4444;"></div><div style="flex:1; background:#F87171;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">אדום</div></div>
+          <div style="border-radius:10px; overflow:hidden; border:1px solid #E7E5E4;"><div style="display:flex; height:40px;"><div style="flex:1; background:#EC4899;"></div><div style="flex:1; background:#F472B6;"></div></div><div style="padding:5px 8px; background:#fff; font-size:12px; font-weight:600;">ורוד</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ELEVATION -->
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-size:13px; font-weight:700; color:#4F46E5;">03</span>
+        <h2 style="font-size: 22px; line-height: 28px; font-weight: 700;">הרמה וגבולות — סוף ל‑border-2</h2>
+      </div>
+      <p style="font-size:15px; line-height:23px; color:#57534E; max-width:64ch;">קו שיער 1px במקום מסגרת כבדה, וסולם הרמה בן 4 שלבים. במצב כהה מרימים ב<b>בהירות משטח</b> ולא בצל — צל לא נקרא על שחור‑כמעט.</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:16px; align-items:end;">
+        <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+          <div style="width:100%; height:80px; background:#fff; border:1px solid #E7E5E4; border-radius:12px;"></div>
+          <div style="text-align:center;"><div style="font-size:13px; font-weight:600;">e0 · שטוח</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">שדות · תאי טבלה</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+          <div style="width:100%; height:80px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; box-shadow:0 1px 2px rgb(0 0 0/.04),0 1px 3px rgb(0 0 0/.08);"></div>
+          <div style="text-align:center;"><div style="font-size:13px; font-weight:600;">e1 · כרטיס במנוחה</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">shadow-e1</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+          <div style="width:100%; height:80px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; box-shadow:0 4px 12px rgb(0 0 0/.10);"></div>
+          <div style="text-align:center;"><div style="font-size:13px; font-weight:600;">e2 · hover / תפריט</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">shadow-e2</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+          <div style="width:100%; height:80px; background:#fff; border:1px solid #E7E5E4; border-radius:16px; box-shadow:0 12px 32px rgb(0 0 0/.18);"></div>
+          <div style="text-align:center;"><div style="font-size:13px; font-weight:600;">e3 · מודל / sheet</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#78716C;">shadow-e3 · rounded-xl</div></div>
+        </div>
+      </div>
+      <div style="font-size:14px; line-height:22px; color:#57534E; background:#F5F5F4; border:1px solid #E7E5E4; border-radius:12px; padding:14px 16px;">
+        <b>רדיוסים:</b> <code class="ltr">rounded-lg = 12px</code> (כרטיסים, כפתורים, שדות) · <code class="ltr">rounded-xl = 16px</code> (מודלים, sheets) · <code class="ltr">rounded-full</code> (צ'יפים, מתגים).<br>
+        <b>⇄ כיוון:</b> פס הקטגוריה בכרטיס יושב על <code class="ltr">border-s-4</code> (התחלה = ימין ב‑RTL) — לוגי, לא <code class="ltr">border-right</code>.
+      </div>
+    </section>
+
+    <!-- 4. ICONS -->
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-size:13px; font-weight:700; color:#4F46E5;">04</span>
+        <h2 style="font-size: 22px; line-height: 28px; font-weight: 700;">אייקונים — lucide-react</h2>
+      </div>
+      <p style="font-size:15px; line-height:23px; color:#57534E; max-width:64ch;">קו 1.75px, <code class="ltr">currentColor</code>, 24px למגע/ניווט ו‑20px inline. מחליף כל אימוג'י. הרשת למטה מרונדרת ב‑lucide עצמו.</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="notebook-pen" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">📝 פתקים</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">NotebookPen</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="search" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">🔍 חיפוש</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Search</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="shopping-cart" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">🛒 קניות</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">ShoppingCart</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="list-checks" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">משימות</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">ListChecks</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="chef-hat" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">מתכון</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">ChefHat</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="clipboard-list" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">תוכנית עבודה</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">ClipboardList</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="wallet" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">חשבונאות</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Wallet</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="calendar-days" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">📅 תאריך</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">CalendarDays</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="alarm-clock" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">⏰ תזכורת</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">AlarmClock</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="pin" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">📌 הצמדה</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Pin</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="trash-2" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">🗑 מחיקה</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Trash2</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="archive" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">🗄️ ארכיון</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Archive</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="settings" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">⚙ הגדרות</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">Settings</div></div></div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #E7E5E4; border-radius:12px; padding:12px 14px;"><i data-lucide="grip-vertical" style="width:24px;height:24px;color:#1C1917;"></i><div><div style="font-size:14px;">⋮⋮ גרירה</div><div class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#78716C;">GripVertical</div></div></div>
+      </div>
+      <div style="font-size:14px; line-height:22px; color:#57534E; background:#EEF2FF; border:1px solid #C7D2FE; border-radius:12px; padding:14px 16px;">
+        <b>⇄ חובה לשקף ב‑RTL</b> (<code class="ltr">scale-x-[-1]</code> או אייקון מראה): צ'evron/חצי חזרה‑קדימה, <code class="ltr">Undo/Redo</code>, <code class="ltr">Send</code>, חיצי «הבא».<br>
+        <b>לא לשקף:</b> <code class="ltr">Search · Trash · Pin · Clock · Settings · Check</code> — ניטרליים לכיוון.
+      </div>
+    </section>
+
+    <!-- 5. CONFIG -->
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-size:13px; font-weight:700; color:#4F46E5;">05</span>
+        <h2 style="font-size: 22px; line-height: 28px; font-weight: 700;">קונפיג להעתקה + מיפוי מחלקות</h2>
+      </div>
+      <p style="font-size:15px; line-height:23px; color:#57534E; max-width:64ch;">הדבק את <code class="ltr">theme.extend</code> ל‑<code class="ltr">tailwind.config.js</code>, ואת ה‑<code class="ltr">&lt;link&gt;</code> של הגופן ל‑<code class="ltr">index.html</code>. שים לב: מוגדר מחדש <code class="ltr">rounded-lg→12px</code> ו‑<code class="ltr">rounded-xl→16px</code>.</p>
+
+      <pre class="ltr" style="background:#1C1917; color:#E7E5E4; border-radius:12px; padding:20px; overflow-x:auto; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.7;">// index.html &lt;head&gt;
+&lt;link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"&gt;
+
+// tailwind.config.js
+export default {
+  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Assistant', 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        caption:   ['0.8125rem', { lineHeight: '1.125rem', fontWeight: '500' }],
+        'body-sm': ['0.875rem',  { lineHeight: '1.25rem' }],
+        body:      ['1rem',      { lineHeight: '1.5rem' }],
+        h2:        ['1.125rem',  { lineHeight: '1.5rem',   fontWeight: '600' }],
+        h1:        ['1.375rem',  { lineHeight: '1.75rem',  fontWeight: '700' }],
+        display:   ['1.75rem',   { lineHeight: '2.125rem', fontWeight: '700' }],
+      },
+      colors: {
+        brand:   { DEFAULT: '#4F46E5', dark: '#6366F1', text: '#4F46E5', 'text-dark': '#A5B4FC' },
+        teal:    { DEFAULT: '#0F766E', fill: '#0D9488', dark: '#2DD4BF' },
+        success: { DEFAULT: '#059669', dark: '#34D399' },
+        danger:  { DEFAULT: '#DC2626', dark: '#F87171' },
+        app:      { light: '#FAFAF9', dark: '#0C0A09' },
+        surface:  { light: '#FFFFFF', dark: '#1C1917' },
+        raised:   { light: '#F5F5F4', dark: '#292524' },
+        ink:      { light: '#1C1917', dark: '#F5F5F4' },
+        'ink-2':  { light: '#57534E', dark: '#A8A29E' },
+        'ink-3':  { light: '#78716C', dark: '#8A827C' },
+        hairline: { light: '#E7E5E4', dark: '#33302D' },
+        cat: {
+          blue:   '#3B82F6', 'blue-dark':   '#60A5FA',
+          purple: '#8B5CF6', 'purple-dark': '#A78BFA',
+          green:  '#10B981', 'green-dark':  '#34D399',
+          orange: '#F59E0B', 'orange-dark': '#FBBF24',
+          red:    '#EF4444', 'red-dark':    '#F87171',
+          pink:   '#EC4899', 'pink-dark':   '#F472B6',
+        },
+      },
+      boxShadow: {
+        e1: '0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.08)',
+        e2: '0 4px 12px rgb(0 0 0 / 0.10)',
+        e3: '0 12px 32px rgb(0 0 0 / 0.18)',
+      },
+      borderRadius: { lg: '12px', xl: '16px' },
+    },
+  },
+  plugins: [],
+}</pre>
+
+      <div style="font-size:13px; font-weight:600; color:#78716C;">מיפוי — לכל אלמנט, המחלקות שלו</div>
+      <div style="display:flex; flex-direction:column; border:1px solid #E7E5E4; border-radius:12px; overflow:hidden; background:#fff;">
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; background:#F5F5F4; font-size:12px; font-weight:700; color:#57534E;"><div>אלמנט</div><div class="ltr">מחלקות</div></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">רקע מסך</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-app-light dark:bg-app-dark text-ink-light dark:text-ink-dark</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">כרטיס פתק/קטגוריה</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-surface-light dark:bg-surface-dark rounded-lg shadow-e1 border border-hairline-light dark:border-hairline-dark hover:shadow-e2</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">פס קטגוריה</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">border-s-4 border-cat-blue dark:border-cat-blue-dark</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">כפתור ראשי</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-brand dark:bg-brand-dark text-white rounded-lg h-11 px-5 shadow-e1 hover:bg-brand/90</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">כפתור חיובי</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-teal-fill dark:bg-teal-dark dark:text-ink-dark text-white rounded-lg h-11 px-5</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">כפתור ghost (במקום outline border-2)</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">text-brand dark:text-brand-text-dark h-11 px-4 rounded-lg hover:bg-raised-light dark:hover:bg-raised-dark</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">כפתור מסוכן</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-danger dark:bg-danger-dark text-white rounded-lg h-11 px-5</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">שדה קלט</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-lg h-11 px-3 text-body focus:ring-2 focus:ring-brand/40 focus:border-brand</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">צ'יפ / תגית</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark rounded-full px-2.5 py-1 text-caption</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">מודל</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">bg-surface-light dark:bg-surface-dark rounded-xl shadow-e3</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">תא טבלה (חשבונאות)</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">border border-hairline-light dark:border-hairline-dark px-2 h-11 text-body-sm</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">מספר בטבלה</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">tabular-nums font-medium text-success / text-danger</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">מטרת מגע מינ'</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">h-11 min-w-11  (44px)</code></div>
+        <div style="display:grid; grid-template-columns: 170px 1fr; gap:12px; padding:12px 16px; border-top:1px solid #F5F5F4; font-size:13px;"><div style="font-weight:600;">אייקון</div><code class="ltr" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4F46E5;">&lt;Icon size={20} strokeWidth={1.75} /&gt;  · 24 לניווט</code></div>
+      </div>
+    </section>
+
+    <footer style="border-top:1px solid #E7E5E4; padding-top:24px; font-size:14px; color:#78716C; line-height:22px;">
+      השלב הבא, כשתאשר את המערכת: להרכיב מחדש את המסכים הקיימים בדיוק פיקסלי ואז להלביש עליהם את המערכת — <b>Home</b>, תצוגת קטגוריה, מודלי פתק, שש התבניות, הגדרות, ארכיון והתחברות.
+    </footer>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() { this.drawIcons(); }
+  componentDidUpdate() { this.drawIcons(); }
+  drawIcons() {
+    let tries = 0;
+    const run = () => {
+      if (window.lucide && window.lucide.createIcons) {
+        window.lucide.createIcons();
+      } else if (tries++ < 50) {
+        setTimeout(run, 100);
+      }
+    };
+    run();
+  }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

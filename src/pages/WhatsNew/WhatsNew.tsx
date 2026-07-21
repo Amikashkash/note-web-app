@@ -16,6 +16,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.11.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'האפליקציה עוברת לגופן Assistant, גופן מסך שתוכנן לעברית. זה השלב הראשון בעיצוב מחודש שיימשך בהדרגה',
+      },
+      {
+        type: 'improvement',
+        description: 'הגופן נשמר במטמון, כך שהוא נטען גם ללא חיבור לאינטרנט',
+      },
+    ],
+  },
+  {
     version: '1.10.4',
     date: 'יולי 2026',
     changes: [

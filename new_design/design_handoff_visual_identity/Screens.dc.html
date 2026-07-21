@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  a { color: #4F46E5; } a:hover { color: #4338CA; }
+  #board {
+    --app:#FAFAF9; --surface:#FFFFFF; --raised:#F5F5F4;
+    --ink:#1C1917; --ink2:#57534E; --ink3:#78716C; --hairline:#E7E5E4;
+    --brand:#4F46E5; --brand-2:#4338CA; --brand-text:#4F46E5; --brand-soft:#EEF2FF; --brand-soft-bd:#C7D2FE;
+    --teal:#0F766E; --teal-fill:#0D9488; --success:#059669; --danger:#DC2626; --danger-soft:#FEF2F2;
+    --cat-blue:#3B82F6; --cat-purple:#8B5CF6; --cat-green:#10B981; --cat-orange:#F59E0B; --cat-red:#EF4444; --cat-pink:#EC4899;
+    --e1:0 1px 2px rgb(0 0 0/.04),0 1px 3px rgb(0 0 0/.08);
+    --e2:0 4px 12px rgb(0 0 0/.10);
+    --e3:0 12px 32px rgb(0 0 0/.18);
+    --tint:#EEF2FF;
+  }
+  #board[data-theme="dark"] {
+    --app:#0C0A09; --surface:#1C1917; --raised:#292524;
+    --ink:#F5F5F4; --ink2:#A8A29E; --ink3:#8A827C; --hairline:#33302D;
+    --brand:#6366F1; --brand-2:#818CF8; --brand-text:#A5B4FC; --brand-soft:#1E1B4B; --brand-soft-bd:#3730A3;
+    --teal:#2DD4BF; --teal-fill:#0D9488; --success:#34D399; --danger:#F87171; --danger-soft:#450A0A;
+    --cat-blue:#60A5FA; --cat-purple:#A78BFA; --cat-green:#34D399; --cat-orange:#FBBF24; --cat-red:#F87171; --cat-pink:#F472B6;
+    --e1:0 1px 2px rgb(0 0 0/.4); --e2:0 4px 14px rgb(0 0 0/.5); --e3:0 16px 40px rgb(0 0 0/.6);
+    --tint:#292524;
+  }
+</style>
+</helmet>
+<div id="board" data-theme="{{ theme }}" dir="rtl" style="font-family: Assistant, system-ui, sans-serif; background: {{ boardBg }}; min-height: 100vh; padding: 32px; transition: background .2s;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
+    <div>
+      <h1 style="font-size:26px; font-weight:800; color: {{ boardInk }};">פתקים — מסכים</h1>
+      <p style="font-size:14px; color: {{ boardInk2 }};">זהות חזותית מיושמת · Assistant · אינדיגו + טורקיז · נייטרל חמים · RTL</p>
+    </div>
+    <button onClick="{{ toggle }}" style="display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 18px; border-radius:12px; border:1px solid {{ boardHairline }}; background: {{ boardSurface }}; color: {{ boardInk }}; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">
+      <i data-lucide="{{ toggleIcon }}" style="width:18px;height:18px;"></i>
+      {{ toggleLabel }}
+    </button>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start;">
+
+    <!-- ============ LOGIN ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">01 · התחברות <span style="color:var(--ink3); font-weight:500;">(רגע המיתוג היחיד עם גרדיאנט)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:linear-gradient(150deg,#4F46E5 0%,#4338CA 45%,#0F766E 130%);">
+        <div style="display:flex; justify-content:space-between; padding:14px 24px 0; font-size:12px; color:rgba(255,255,255,.85); font-weight:600;"><span style="font-family:'JetBrains Mono',monospace;">9:41</span><span style="display:flex; gap:6px;"><i data-lucide="signal" style="width:14px;height:14px;"></i><i data-lucide="wifi" style="width:14px;height:14px;"></i><i data-lucide="battery-full" style="width:16px;height:16px;"></i></span></div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; padding:28px;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:28px;">
+            <div style="width:72px; height:72px; border-radius:22px; background:rgba(255,255,255,.15); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.25);"><i data-lucide="notebook-pen" style="width:36px;height:36px;color:#fff;"></i></div>
+            <div style="text-align:center;"><div style="font-size:26px; font-weight:800; color:#fff;">פתקים</div><div style="font-size:14px; color:rgba(255,255,255,.75);">התחבר לחשבון שלך</div></div>
+          </div>
+          <div style="background:var(--surface); border-radius:20px; box-shadow:var(--e3); padding:22px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:13px; font-weight:500; color:var(--ink2);">אימייל</label>
+              <div style="height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 12px; gap:8px; color:var(--ink3);"><i data-lucide="mail" style="width:18px;height:18px;"></i><span style="font-size:15px;">example@gmail.com</span></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:13px; font-weight:500; color:var(--ink2);">סיסמה</label>
+              <div style="height:44px; border:2px solid var(--brand); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 12px; gap:8px; color:var(--ink);"><i data-lucide="lock" style="width:18px;height:18px;color:var(--ink3);"></i><span style="flex:1; font-size:15px; letter-spacing:3px;">••••••••</span><i data-lucide="eye" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+            </div>
+            <button style="height:48px; border:none; border-radius:12px; background:var(--brand); color:#fff; font-family:inherit; font-size:16px; font-weight:600; box-shadow:var(--e1); cursor:pointer; margin-top:4px;">התחבר</button>
+            <div style="display:flex; align-items:center; gap:10px; color:var(--ink3); font-size:13px;"><span style="flex:1; height:1px; background:var(--hairline);"></span>או<span style="flex:1; height:1px; background:var(--hairline);"></span></div>
+            <button style="height:48px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--ink); font-family:inherit; font-size:15px; font-weight:500; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;"><span style="font-size:16px;">G</span> המשך עם Google</button>
+            <div style="text-align:center; font-size:13px; color:var(--ink2);">עדיין אין לך חשבון? <span style="color:var(--brand-text); font-weight:600;">הירשם כעת</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ HOME ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">02 · דף הבית <span style="color:var(--ink3); font-weight:500;">(רשת קטגוריות)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--app);">
+        <div style="display:flex; justify-content:space-between; padding:14px 24px 6px; font-size:12px; color:var(--ink2); font-weight:600;"><span style="font-family:'JetBrains Mono',monospace;">9:41</span><span style="display:flex; gap:6px;"><i data-lucide="signal" style="width:14px;height:14px;"></i><i data-lucide="wifi" style="width:14px;height:14px;"></i><i data-lucide="battery-full" style="width:16px;height:16px;"></i></span></div>
+        <!-- header -->
+        <div style="padding:8px 18px 16px; display:flex; flex-direction:column; gap:14px; border-bottom:1px solid var(--hairline);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;"><div style="width:38px;height:38px;border-radius:11px;background:var(--brand);display:flex;align-items:center;justify-content:center;"><i data-lucide="notebook-pen" style="width:22px;height:22px;color:#fff;"></i></div><span style="font-size:22px;font-weight:800;color:var(--ink);">פתקים</span></div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);"><i data-lucide="moon" style="width:22px;height:22px;"></i></div>
+              <div style="width:38px;height:38px;border-radius:50%;background:var(--raised);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;color:var(--ink2);font-weight:700;font-size:15px;">א</div>
+            </div>
+          </div>
+          <div style="height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 12px; gap:8px; color:var(--ink3);"><i data-lucide="search" style="width:18px;height:18px;"></i><span style="font-size:15px;">חפש פתקים…</span></div>
+        </div>
+        <!-- content -->
+        <div style="flex:1; overflow:hidden; padding:16px 18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+            <span style="font-size:18px; font-weight:700; color:var(--ink);">הקטגוריות שלי</span>
+            <button style="height:40px; padding:0 14px; border:none; border-radius:12px; background:var(--brand); color:#fff; font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; box-shadow:var(--e1); cursor:pointer;"><i data-lucide="plus" style="width:18px;height:18px;"></i>חדש</button>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-green);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-green) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="shopping-cart" style="width:24px;height:24px;color:var(--cat-green);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">קניות</div><div style="font-size:13px;color:var(--ink3);">8 פתקים</div></div></div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-blue);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-blue) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="list-checks" style="width:24px;height:24px;color:var(--cat-blue);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">משימות</div><div style="font-size:13px;color:var(--ink3);">12 פתקים</div></div></div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-purple);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-purple) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="clipboard-list" style="width:24px;height:24px;color:var(--cat-purple);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">עבודה</div><div style="font-size:13px;color:var(--ink3);">5 פתקים</div></div></div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-orange);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-orange) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="chef-hat" style="width:24px;height:24px;color:var(--cat-orange);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">מתכונים</div><div style="font-size:13px;color:var(--ink3);">3 פתקים</div></div></div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-red);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-red) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="wallet" style="width:24px;height:24px;color:var(--cat-red);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">כספים</div><div style="font-size:13px;color:var(--ink3);">6 פתקים</div></div></div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:16px; display:flex; flex-direction:column; gap:12px; border-inline-start:4px solid var(--cat-pink);"><div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--cat-pink) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="notebook-pen" style="width:24px;height:24px;color:var(--cat-pink);"></i></div><div><div style="font-size:16px;font-weight:700;color:var(--ink);">אישי</div><div style="font-size:13px;color:var(--ink3);">4 פתקים</div></div></div>
+          </div>
+        </div>
+        <!-- bottom bar -->
+        <div style="display:flex; border-top:1px solid var(--hairline); background:var(--surface); padding:8px 0 20px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--brand-text);"><i data-lucide="house" style="width:24px;height:24px;"></i><span style="font-size:11px;font-weight:600;">בית</span></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--ink3);"><i data-lucide="archive" style="width:24px;height:24px;"></i><span style="font-size:11px;">ארכיון</span></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--ink3);"><i data-lucide="settings" style="width:24px;height:24px;"></i><span style="font-size:11px;">הגדרות</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CATEGORY VIEW ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">03 · תצוגת קטגוריה <span style="color:var(--ink3); font-weight:500;">(רשת פתקים + חיפוש)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--app);">
+        <div style="display:flex; justify-content:space-between; padding:14px 24px 6px; font-size:12px; color:var(--ink2); font-weight:600;"><span style="font-family:'JetBrains Mono',monospace;">9:41</span><span style="display:flex; gap:6px;"><i data-lucide="signal" style="width:14px;height:14px;"></i><i data-lucide="wifi" style="width:14px;height:14px;"></i><i data-lucide="battery-full" style="width:16px;height:16px;"></i></span></div>
+        <div style="padding:8px 18px 16px; display:flex; flex-direction:column; gap:14px; border-bottom:1px solid var(--hairline); border-top:3px solid var(--cat-green);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+              <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);flex-shrink:0;"><i data-lucide="chevron-right" style="width:26px;height:26px;"></i></div>
+              <div style="width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--cat-green) 15%,transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="shopping-cart" style="width:22px;height:22px;color:var(--cat-green);"></i></div>
+              <div style="min-width:0;"><div style="font-size:20px;font-weight:800;color:var(--ink);">קניות</div><div style="font-size:13px;color:var(--ink3);">8 פתקים</div></div>
+            </div>
+            <button style="width:44px;height:44px;border:none;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--e1);cursor:pointer;flex-shrink:0;"><i data-lucide="plus" style="width:22px;height:22px;"></i></button>
+          </div>
+          <div style="height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 12px; gap:8px; color:var(--ink3);"><i data-lucide="search" style="width:18px;height:18px;"></i><span style="font-size:15px;">חפש בקטגוריה…</span></div>
+        </div>
+        <div style="flex:1; overflow:hidden; padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+          <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:14px; border-inline-start:4px solid var(--cat-green);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;"><div style="font-size:16px;font-weight:700;color:var(--ink);">סופר שבועי</div><i data-lucide="pin" style="width:18px;height:18px;color:var(--cat-orange);fill:var(--cat-orange);"></i></div>
+            <div style="font-size:14px;line-height:20px;color:var(--ink2);margin-bottom:12px;">חלב, ביצים, לחם מלא, עגבניות, מלפפונים, גבינה צהובה, יוגורט…</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;"><span style="font-size:12px;font-weight:500;background:var(--raised);color:var(--ink2);padding:3px 10px;border-radius:9999px;">#שבועי</span><span style="font-size:12px;font-weight:500;background:var(--raised);color:var(--ink2);padding:3px 10px;border-radius:9999px;">#דחוף</span></div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:14px; border-inline-start:4px solid var(--cat-blue);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;"><div style="font-size:16px;font-weight:700;color:var(--ink);">בית מרקחת</div><i data-lucide="pin" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+            <div style="font-size:14px;line-height:20px;color:var(--ink2);margin-bottom:12px;">אקמול, ויטמין D, מדבקות פלסטר, משחת שיניים</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;"><span style="font-size:12px;font-weight:500;background:var(--raised);color:var(--ink2);padding:3px 10px;border-radius:9999px;">#בריאות</span></div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:14px; border-inline-start:4px solid var(--cat-orange);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;"><div style="font-size:16px;font-weight:700;color:var(--ink);">ארוחת שבת</div><i data-lucide="pin" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+            <div style="font-size:14px;line-height:20px;color:var(--ink2);">עוף, תפוחי אדמה, יין, חלה, סלט ירקות טרי</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NOTE VIEW MODAL (checklist) ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">04 · תצוגת פתק <span style="color:var(--ink3); font-weight:500;">(מודל · תבנית משימות)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:rgba(0,0,0,.5);">
+        <div style="position:absolute; inset:0; background:var(--app); opacity:.35;"></div>
+        <div style="position:relative; margin-top:auto; background:var(--surface); border-radius:24px 24px 0 0; box-shadow:var(--e3); max-height:92%; display:flex; flex-direction:column; overflow:hidden;">
+          <div style="padding:16px 18px 12px; border-bottom:1px solid var(--hairline);">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+              <div style="min-width:0;">
+                <div style="font-size:22px; font-weight:800; color:var(--ink); margin-bottom:4px;">קניות סוף שבוע</div>
+                <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--ink3);"><i data-lucide="list-checks" style="width:15px;height:15px;"></i>רשימת משימות · 12 ביולי, 14:30</div>
+              </div>
+              <div style="display:flex; gap:4px; flex-shrink:0;">
+                <div style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--cat-orange);"><i data-lucide="pin" style="width:20px;height:20px;fill:var(--cat-orange);"></i></div>
+                <div style="width:40px;height:40px;border-radius:11px;background:var(--raised);display:flex;align-items:center;justify-content:center;color:var(--ink2);"><i data-lucide="x" style="width:22px;height:22px;"></i></div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1; overflow:hidden; padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+            <div style="background:var(--brand-soft); border:1px solid var(--brand-soft-bd); border-radius:12px; padding:12px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;"><span style="color:var(--ink2);font-weight:500;">התקדמות</span><span style="color:var(--brand-text);font-weight:700;">2 / 4 (50%)</span></div>
+              <div style="height:8px; background:var(--raised); border-radius:9999px; overflow:hidden;"><div style="width:50%; height:100%; background:var(--brand); border-radius:9999px;"></div></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid color-mix(in srgb,var(--success) 30%,transparent); background:color-mix(in srgb,var(--success) 8%,transparent); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;background:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="check" style="width:16px;height:16px;color:#fff;"></i></div><span style="flex:1; font-size:15px; color:var(--ink3); text-decoration:line-through;">להזמין תור למספרה</span></div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid color-mix(in srgb,var(--success) 30%,transparent); background:color-mix(in srgb,var(--success) 8%,transparent); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;background:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="check" style="width:16px;height:16px;color:#fff;"></i></div><span style="flex:1; font-size:15px; color:var(--ink3); text-decoration:line-through;">לשלם חשבון חשמל</span></div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--danger); background:var(--surface); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;border:2px solid var(--hairline);flex-shrink:0;"></div><span style="flex:1; font-size:15px; color:var(--ink);">להתקשר לרופא שיניים</span><span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--danger);"><i data-lucide="alarm-clock" style="width:15px;height:15px;"></i>מחר 09:00</span></div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--hairline); background:var(--surface); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;border:2px solid var(--hairline);flex-shrink:0;"></div><span style="flex:1; font-size:15px; color:var(--ink);">לקנות מתנה ליום הולדת</span><i data-lucide="calendar-days" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+          </div>
+          <div style="padding:12px 18px 22px; border-top:1px solid var(--hairline); display:flex; gap:8px;">
+            <button style="flex:1; height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--ink); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="share-2" style="width:18px;height:18px;"></i>שתף</button>
+            <button style="flex:1; height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--ink); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="folder-input" style="width:18px;height:18px;"></i>העבר</button>
+            <button style="width:52px; height:44px; border:1px solid color-mix(in srgb,var(--danger) 40%,transparent); border-radius:12px; background:var(--danger-soft); color:var(--danger); display:flex; align-items:center; justify-content:center; cursor:pointer;"><i data-lucide="trash-2" style="width:19px;height:19px;"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NOTE FORM MODAL ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">05 · טופס פתק חדש <span style="color:var(--ink3); font-weight:500;">(בורר תבניות)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--surface);">
+        <div style="padding:18px 18px 12px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; justify-content:space-between;"><span style="font-size:22px; font-weight:800; color:var(--ink);">פתק חדש</span><div style="width:40px;height:40px;border-radius:11px;background:var(--raised);display:flex;align-items:center;justify-content:center;color:var(--ink2);"><i data-lucide="x" style="width:22px;height:22px;"></i></div></div>
+        <div style="flex:1; overflow:hidden; padding:16px 18px; display:flex; flex-direction:column; gap:18px;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:13px; font-weight:500; color:var(--ink2);">כותרת *</label>
+            <div style="height:44px; border:2px solid var(--brand); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 12px; font-size:15px; color:var(--ink);">רשימת קניות לשבת</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="font-size:13px; font-weight:500; color:var(--ink2);">סוג פתק</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+              <div style="border:1px solid var(--hairline); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--ink2);"><i data-lucide="file-text" style="width:24px;height:24px;"></i><span style="font-size:12px;">טקסט</span></div>
+              <div style="border:2px solid var(--brand); background:var(--brand-soft); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--brand-text);"><i data-lucide="list-checks" style="width:24px;height:24px;"></i><span style="font-size:12px;font-weight:600;">משימות</span></div>
+              <div style="border:1px solid var(--hairline); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--ink2);"><i data-lucide="shopping-cart" style="width:24px;height:24px;"></i><span style="font-size:12px;">קניות</span></div>
+              <div style="border:1px solid var(--hairline); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--ink2);"><i data-lucide="clipboard-list" style="width:24px;height:24px;"></i><span style="font-size:12px;">תוכנית</span></div>
+              <div style="border:1px solid var(--hairline); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--ink2);"><i data-lucide="wallet" style="width:24px;height:24px;"></i><span style="font-size:12px;">חשבונאות</span></div>
+              <div style="border:1px solid var(--hairline); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--ink2);"><i data-lucide="chef-hat" style="width:24px;height:24px;"></i><span style="font-size:12px;">מתכון</span></div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="font-size:13px; font-weight:500; color:var(--ink2);">צבע פתק</label>
+            <div style="display:flex; gap:10px;">
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-blue);"></div>
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-green);outline:2px solid var(--ink);outline-offset:2px;"></div>
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-purple);"></div>
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-orange);"></div>
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-red);"></div>
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--cat-pink);"></div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:12px 18px 22px; border-top:1px solid var(--hairline); display:flex; gap:10px;">
+          <button style="flex:1; height:48px; border:none; border-radius:12px; background:var(--brand); color:#fff; font-family:inherit; font-size:16px; font-weight:600; box-shadow:var(--e1); cursor:pointer;">שמור פתק</button>
+          <button style="flex:1; height:48px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--ink); font-family:inherit; font-size:16px; font-weight:500; cursor:pointer;">ביטול</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ACCOUNTING TEMPLATE ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">06 · תבנית חשבונאות <span style="color:var(--ink3); font-weight:500;">(ספרות טבלאיות · עברית+לטינית+₪)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--surface);">
+        <div style="padding:18px 18px 12px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:10px;"><div style="width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--cat-red) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="wallet" style="width:22px;height:22px;color:var(--cat-red);"></i></div><div><div style="font-size:18px;font-weight:800;color:var(--ink);">חשבון משותף — דירה</div><div style="font-size:13px;color:var(--ink3);">חשבונאות</div></div></div>
+        <div style="flex:1; overflow:hidden; padding:16px;">
+          <div style="border:1px solid var(--hairline); border-radius:12px; overflow:hidden;">
+            <div style="display:grid; grid-template-columns:76px 1fr 92px; background:var(--raised); font-size:13px; font-weight:700; color:var(--ink2);">
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); display:flex; align-items:center; gap:4px;"><i data-lucide="calendar-days" style="width:15px;height:15px;"></i>תאריך</div>
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline);">תיאור</div>
+              <div style="padding:10px 8px; text-align:center;">סכום</div>
+            </div>
+            <div style="display:grid; grid-template-columns:76px 1fr 92px; font-size:14px; border-top:1px solid var(--hairline);">
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink2); font-family:'JetBrains Mono',monospace; font-size:12px;">03/07</div>
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink);">שכר דירה</div>
+              <div style="padding:10px 8px; text-align:center; color:var(--danger); font-weight:600; font-feature-settings:'tnum' 1,'lnum' 1;">−3,200.00</div>
+            </div>
+            <div style="display:grid; grid-template-columns:76px 1fr 92px; font-size:14px; border-top:1px solid var(--hairline);">
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink2); font-family:'JetBrains Mono',monospace; font-size:12px;">05/07</div>
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink);">החזר מיוסי</div>
+              <div style="padding:10px 8px; text-align:center; color:var(--success); font-weight:600; font-feature-settings:'tnum' 1,'lnum' 1;">+1,600.00</div>
+            </div>
+            <div style="display:grid; grid-template-columns:76px 1fr 92px; font-size:14px; border-top:1px solid var(--hairline); background:color-mix(in srgb,var(--cat-orange) 8%,transparent);">
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink2); font-family:'JetBrains Mono',monospace; font-size:12px;">09/07</div>
+              <div style="padding:10px 8px; border-inline-end:1px solid var(--hairline); color:var(--ink);">חשמל + מים</div>
+              <div style="padding:10px 8px; text-align:center; color:var(--danger); font-weight:600; font-feature-settings:'tnum' 1,'lnum' 1;">−420.50</div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 92px; font-size:15px; border-top:1px solid var(--hairline); background:var(--brand-soft); font-weight:700;">
+              <div style="padding:12px 8px; color:var(--ink);">יתרה סופית</div>
+              <div style="padding:12px 8px; text-align:center; color:var(--danger); white-space:nowrap; font-feature-settings:'tnum' 1,'lnum' 1;">−2,020.50 ₪</div>
+            </div>
+          </div>
+          <button style="width:100%; margin-top:14px; height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--brand-text); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="plus" style="width:18px;height:18px;"></i>הוסף תנועה חדשה</button>
+          <div style="margin-top:14px; padding:14px; background:var(--raised); border-radius:12px; font-size:13px; color:var(--ink2); line-height:22px;"><div style="font-weight:600;color:var(--ink);margin-bottom:4px;display:flex;align-items:center;gap:6px;"><i data-lucide="lightbulb" style="width:16px;height:16px;color:var(--cat-orange);"></i>איך משתמשים</div>סכום חיובי = קיבלת · סכום שלילי = שילמת · היתרה מחושבת אוטומטית</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SHOPPING TEMPLATE ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">07 · תבנית קניות <span style="color:var(--ink3); font-weight:500;">(הוספה מהירה + הצעות)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--surface);">
+        <div style="padding:18px 18px 12px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:10px;"><div style="width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--cat-green) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="shopping-cart" style="width:22px;height:22px;color:var(--cat-green);"></i></div><div><div style="font-size:18px;font-weight:800;color:var(--ink);">סופר שבועי</div><div style="font-size:13px;color:var(--ink3);">רשימת קניות</div></div></div>
+        <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:12px;">
+          <div style="background:color-mix(in srgb,var(--success) 8%,transparent); border:1px solid color-mix(in srgb,var(--success) 25%,transparent); border-radius:12px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;"><span style="color:var(--ink2);font-weight:500;">התקדמות בקניות</span><span style="color:var(--success);font-weight:700;">2 / 5 (40%)</span></div>
+            <div style="height:8px; background:var(--raised); border-radius:9999px; overflow:hidden;"><div style="width:40%; height:100%; background:var(--teal-fill); border-radius:9999px;"></div></div>
+          </div>
+          <div style="background:var(--raised); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; height:42px; background:var(--surface); border:1px solid var(--hairline); border-radius:10px; display:flex; align-items:center; padding:0 10px; gap:6px; color:var(--ink3); font-size:14px;"><i data-lucide="shopping-cart" style="width:16px;height:16px;"></i>מוצר…</div>
+              <div style="width:64px; height:42px; background:var(--surface); border:1px solid var(--hairline); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--ink3); font-size:13px;">כמות</div>
+              <button style="width:60px; height:42px; border:none; border-radius:10px; background:var(--teal-fill); color:#fff; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">הוסף</button>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <span style="font-size:13px; background:var(--surface); border:1px solid var(--hairline); color:var(--ink2); padding:5px 12px; border-radius:9999px;">חלב</span>
+              <span style="font-size:13px; background:var(--surface); border:1px solid var(--hairline); color:var(--ink2); padding:5px 12px; border-radius:9999px;">לחם</span>
+              <span style="font-size:13px; background:var(--surface); border:1px solid var(--hairline); color:var(--ink2); padding:5px 12px; border-radius:9999px;">ביצים</span>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid color-mix(in srgb,var(--success) 30%,transparent); background:color-mix(in srgb,var(--success) 8%,transparent); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;background:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="check" style="width:16px;height:16px;color:#fff;"></i></div><span style="flex:1; font-size:15px; color:var(--ink3); text-decoration:line-through;">עגבניות</span><span style="font-size:13px; color:var(--ink3);">1 ק״ג</span></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--hairline); background:var(--surface); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;border:2px solid var(--hairline);flex-shrink:0;"></div><span style="flex:1; font-size:15px; color:var(--ink);">גבינה צהובה</span><span style="font-size:13px; color:var(--ink2);">2</span><i data-lucide="trash-2" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--hairline); background:var(--surface); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;border:2px solid var(--hairline);flex-shrink:0;"></div><span style="flex:1; font-size:15px; color:var(--ink);">יוגורט טבעי</span><span style="font-size:13px; color:var(--ink2);">6</span><i data-lucide="trash-2" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--hairline); background:var(--surface); border-radius:12px;"><div style="width:24px;height:24px;border-radius:7px;border:2px solid var(--hairline);flex-shrink:0;"></div><span style="flex:1; font-size:15px; color:var(--ink);">קפה טחון</span><span style="font-size:13px; color:var(--ink2);">1</span><i data-lucide="trash-2" style="width:18px;height:18px;color:var(--ink3);"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RECIPE TEMPLATE ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">08 · תבנית מתכון <span style="color:var(--ink3); font-weight:500;">(מנות · מרכיבים · הוראות)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--surface);">
+        <div style="padding:18px 18px 12px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:10px;"><div style="width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--cat-orange) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="chef-hat" style="width:22px;height:22px;color:var(--cat-orange);"></i></div><div><div style="font-size:18px;font-weight:800;color:var(--ink);">שקשוקה ביתית</div><div style="font-size:13px;color:var(--ink3);">מתכון</div></div></div>
+        <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+            <div style="background:var(--raised); border-radius:12px; padding:10px; text-align:center;"><div style="font-size:12px; color:var(--ink3); margin-bottom:2px;">מנות</div><div style="font-size:16px; font-weight:700; color:var(--ink);">4</div></div>
+            <div style="background:var(--raised); border-radius:12px; padding:10px; text-align:center;"><div style="font-size:12px; color:var(--ink3); margin-bottom:2px;">הכנה</div><div style="font-size:16px; font-weight:700; color:var(--ink);">10 דק׳</div></div>
+            <div style="background:var(--raised); border-radius:12px; padding:10px; text-align:center;"><div style="font-size:12px; color:var(--ink3); margin-bottom:2px;">בישול</div><div style="font-size:16px; font-weight:700; color:var(--ink);">25 דק׳</div></div>
+          </div>
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:15px; font-weight:700; color:var(--ink); margin-bottom:10px;"><i data-lucide="carrot" style="width:18px;height:18px;color:var(--cat-orange);"></i>מרכיבים</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink);"><span style="width:6px;height:6px;border-radius:50%;background:var(--cat-orange);flex-shrink:0;"></span>6 ביצים טריות</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink);"><span style="width:6px;height:6px;border-radius:50%;background:var(--cat-orange);flex-shrink:0;"></span>5 עגבניות בשלות</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink);"><span style="width:6px;height:6px;border-radius:50%;background:var(--cat-orange);flex-shrink:0;"></span>1 בצל, 3 שיני שום</div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink);"><span style="width:6px;height:6px;border-radius:50%;background:var(--cat-orange);flex-shrink:0;"></span>פפריקה, כמון, מלח ופלפל</div>
+            </div>
+            <button style="margin-top:10px; background:none; border:none; color:var(--brand-text); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; padding:0;"><i data-lucide="plus" style="width:16px;height:16px;"></i>הוסף מרכיב</button>
+          </div>
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:15px; font-weight:700; color:var(--ink); margin-bottom:10px;"><i data-lucide="utensils" style="width:18px;height:18px;color:var(--cat-orange);"></i>הוראות הכנה</div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; gap:10px;"><span style="width:24px;height:24px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span><span style="font-size:15px; line-height:22px; color:var(--ink);">מטגנים בצל ושום עד הזהבה, מוסיפים תבלינים.</span></div>
+              <div style="display:flex; gap:10px;"><span style="width:24px;height:24px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span><span style="font-size:15px; line-height:22px; color:var(--ink);">מוסיפים עגבניות מרוסקות ומבשלים 15 דקות.</span></div>
+              <div style="display:flex; gap:10px;"><span style="width:24px;height:24px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span><span style="font-size:15px; line-height:22px; color:var(--ink);">שוברים ביצים לתוך הרוטב ומכסים עד שהחלבון מתקשה.</span></div>
+            </div>
+            <button style="margin-top:10px; background:none; border:none; color:var(--brand-text); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; padding:0;"><i data-lucide="plus" style="width:16px;height:16px;"></i>הוסף שלב</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ WORK PLAN TEMPLATE ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">09 · תבנית תוכנית עבודה <span style="color:var(--ink3); font-weight:500;">(סעיפים · סידור)</span></div>
+      <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--surface);">
+        <div style="padding:18px 18px 12px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:10px;"><div style="width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--cat-purple) 15%,transparent);display:flex;align-items:center;justify-content:center;"><i data-lucide="clipboard-list" style="width:22px;height:22px;color:var(--cat-purple);"></i></div><div><div style="font-size:18px;font-weight:800;color:var(--ink);">השקת המוצר — רבעון 3</div><div style="font-size:13px;color:var(--ink3);">תוכנית עבודה</div></div></div>
+        <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:12px;">
+          <div style="background:var(--raised); border:1px solid var(--hairline); border-radius:14px; padding:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+              <div style="display:flex; gap:6px;"><div style="width:32px;height:32px;border-radius:9px;background:var(--surface);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;color:var(--ink3);"><i data-lucide="chevron-up" style="width:18px;height:18px;"></i></div><div style="width:32px;height:32px;border-radius:9px;background:var(--surface);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;color:var(--ink);"><i data-lucide="chevron-down" style="width:18px;height:18px;"></i></div></div>
+              <div style="width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--danger);"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></div>
+            </div>
+            <div style="font-size:17px; font-weight:700; color:var(--ink); margin-bottom:8px;">מחקר שוק</div>
+            <div style="font-size:14px; line-height:22px; color:var(--ink2);">1. סקר מתחרים ומיפוי מחירים<br>2. ראיונות עם 10 לקוחות פוטנציאליים<br>3. ניתוח פערים בשוק</div>
+          </div>
+          <div style="background:var(--raised); border:1px solid var(--hairline); border-radius:14px; padding:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+              <div style="display:flex; gap:6px;"><div style="width:32px;height:32px;border-radius:9px;background:var(--surface);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;color:var(--ink);"><i data-lucide="chevron-up" style="width:18px;height:18px;"></i></div><div style="width:32px;height:32px;border-radius:9px;background:var(--surface);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;color:var(--ink);"><i data-lucide="chevron-down" style="width:18px;height:18px;"></i></div></div>
+              <div style="width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--danger);"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></div>
+            </div>
+            <div style="font-size:17px; font-weight:700; color:var(--ink); margin-bottom:8px;">אסטרטגיית שיווק</div>
+            <div style="font-size:14px; line-height:22px; color:var(--ink2);">• קמפיין רשתות חברתיות<br>• שיתופי פעולה עם משפיענים<br>• תוכן בלוג ו‑SEO</div>
+          </div>
+          <button style="width:100%; height:44px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); color:var(--brand-text); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="plus" style="width:18px;height:18px;"></i>הוסף סעיף</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS + ARCHIVE ============ -->
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:700; color: {{ boardInk2 }};">10 · הגדרות · ארכיון</div>
+      <div style="display:flex; gap:20px;">
+        <!-- settings -->
+        <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--app);">
+          <div style="display:flex; justify-content:space-between; padding:14px 24px 6px; font-size:12px; color:var(--ink2); font-weight:600;"><span style="font-family:'JetBrains Mono',monospace;">9:41</span><span style="display:flex; gap:6px;"><i data-lucide="signal" style="width:14px;height:14px;"></i><i data-lucide="wifi" style="width:14px;height:14px;"></i><i data-lucide="battery-full" style="width:16px;height:16px;"></i></span></div>
+          <div style="padding:8px 18px 14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--hairline); background:var(--surface);"><div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);"><i data-lucide="chevron-right" style="width:26px;height:26px;"></i></div><span style="font-size:20px;font-weight:800;color:var(--ink);">הגדרות</span></div>
+          <div style="flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:16px;">
+            <div style="font-size:13px; font-weight:700; color:var(--ink3);">תצוגה</div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:14px 16px;"><i data-lucide="moon" style="width:22px;height:22px;color:var(--ink2);"></i><span style="flex:1; font-size:15px; color:var(--ink);">מצב כהה</span><div style="width:48px;height:28px;border-radius:9999px;background:var(--brand);position:relative;"><div style="position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:var(--e1);"></div></div></div>
+            </div>
+            <div style="font-size:13px; font-weight:700; color:var(--ink3);">נתונים</div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--hairline);"><i data-lucide="download" style="width:22px;height:22px;color:var(--ink2);"></i><span style="flex:1; font-size:15px; color:var(--ink);">גיבוי וייצוא</span><i data-lucide="chevron-left" style="width:20px;height:20px;color:var(--ink3);"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--hairline);"><i data-lucide="bell" style="width:22px;height:22px;color:var(--ink2);"></i><span style="flex:1; font-size:15px; color:var(--ink);">התראות ותזכורות</span><i data-lucide="chevron-left" style="width:20px;height:20px;color:var(--ink3);"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:14px 16px;"><i data-lucide="log-out" style="width:22px;height:22px;color:var(--danger);"></i><span style="flex:1; font-size:15px; color:var(--danger);">התנתקות</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- archive -->
+        <div style="width:390px; height:800px; border-radius:38px; border:1px solid var(--hairline); box-shadow:var(--e3); overflow:hidden; position:relative; display:flex; flex-direction:column; background:var(--app);">
+          <div style="display:flex; justify-content:space-between; padding:14px 24px 6px; font-size:12px; color:var(--ink2); font-weight:600;"><span style="font-family:'JetBrains Mono',monospace;">9:41</span><span style="display:flex; gap:6px;"><i data-lucide="signal" style="width:14px;height:14px;"></i><i data-lucide="wifi" style="width:14px;height:14px;"></i><i data-lucide="battery-full" style="width:16px;height:16px;"></i></span></div>
+          <div style="padding:8px 18px 14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--hairline); background:var(--surface);"><div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);"><i data-lucide="chevron-right" style="width:26px;height:26px;"></i></div><i data-lucide="archive" style="width:22px;height:22px;color:var(--ink2);"></i><span style="font-size:20px;font-weight:800;color:var(--ink);">ארכיון פתקים</span></div>
+          <div style="flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+            <div style="font-size:13px; color:var(--ink3);">2 פתקים בארכיון</div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:14px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><i data-lucide="file-text" style="width:20px;height:20px;color:var(--ink2);"></i><span style="font-size:16px;font-weight:700;color:var(--ink);">רעיונות לחופשה</span></div>
+              <div style="font-size:13px; color:var(--ink3); margin-bottom:12px;">הועבר לארכיון: 2 ביולי, 18:20</div>
+              <div style="display:flex; gap:8px;"><button style="flex:1; height:40px; border:none; border-radius:10px; background:var(--brand); color:#fff; font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i>שחזר</button><button style="flex:1; height:40px; border:1px solid color-mix(in srgb,var(--danger) 40%,transparent); border-radius:10px; background:var(--danger-soft); color:var(--danger); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i>מחק</button></div>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--e1); padding:14px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><i data-lucide="wallet" style="width:20px;height:20px;color:var(--ink2);"></i><span style="font-size:16px;font-weight:700;color:var(--ink);">חשבון ישן</span></div>
+              <div style="font-size:13px; color:var(--ink3); margin-bottom:12px;">הועבר לארכיון: 28 ביוני, 09:05</div>
+              <div style="display:flex; gap:8px;"><button style="flex:1; height:40px; border:none; border-radius:10px; background:var(--brand); color:#fff; font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i>שחזר</button><button style="flex:1; height:40px; border:1px solid color-mix(in srgb,var(--danger) 40%,transparent); border-radius:10px; background:var(--danger-soft); color:var(--danger); font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i>מחק</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'light' };
+  componentDidMount() { this.drawIcons(); }
+  componentDidUpdate() { this.drawIcons(); }
+  drawIcons() {
+    let tries = 0;
+    const run = () => {
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+      else if (tries++ < 50) setTimeout(run, 100);
+    };
+    run();
+  }
+  renderVals() {
+    const dark = this.state.theme === 'dark';
+    return {
+      theme: this.state.theme,
+      toggle: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      toggleIcon: dark ? 'sun' : 'moon',
+      toggleLabel: dark ? 'מצב יום' : 'מצב לילה',
+      boardBg: dark ? '#0C0A09' : '#FAFAF9',
+      boardSurface: dark ? '#1C1917' : '#FFFFFF',
+      boardInk: dark ? '#F5F5F4' : '#1C1917',
+      boardInk2: dark ? '#A8A29E' : '#57534E',
+      boardHairline: dark ? '#33302D' : '#E7E5E4',
+    };
+  }
+}
+</script>
+</body>
+</html>

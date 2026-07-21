@@ -12,21 +12,37 @@
   direction: rtl;
 }
 
-/* צבעי ברירת מחדל */
+/**
+ * הגבהה (elevation)
+ *
+ * כמשתני CSS ולא כערכים ב-Tailwind, כי מצב כהה דורש צללים אחרים
+ * לגמרי - אטימות 0.4 מול 0.04. צל כמעט שקוף על רקע כמעט שחור נעלם,
+ * והממשק הכהה היה יוצא שטוח בלי היררכיית עומק. כך `shadow-e1` נכון
+ * בשני המצבים בלי להכפיל מחלקות בכל כרטיס.
+ */
 :root {
-  --color-primary: #3B82F6;
-  --color-secondary: #10B981;
-  --color-accent: #F59E0B;
-  --color-danger: #EF4444;
-  --color-bg: #F9FAFB;
-  --color-text: #1F2937;
+  --e1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.08);
+  --e2: 0 4px 12px rgb(0 0 0 / 0.10);
+  --e3: 0 12px 32px rgb(0 0 0 / 0.18);
 }
 
-/* גופן ברירת מחדל */
+.dark {
+  --e1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --e2: 0 4px 14px rgb(0 0 0 / 0.5);
+  --e3: 0 16px 40px rgb(0 0 0 / 0.6);
+}
+
+/* גופן: Assistant הוא גופן מסך עברי, ראה index.html לטעינה */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Assistant', system-ui, -apple-system, 'Segoe UI', 'Roboto', sans-serif;
   direction: rtl;
   text-align: right;
+}
+
+/* ספרות טבלאיות ליישור עמודות בטבלת החשבונאות */
+.tabular-nums {
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* Reset לתיבות */
@@ -53,6 +69,19 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* פס גלילה בהיר על רקע כהה בלט בצורה צורמת */
+.dark ::-webkit-scrollbar-track {
+  background: #292524;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #57534E;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #78716C;
 }
 
 /* הסתרת scrollbar במובייל אבל שומרת על יכולת הגלילה */

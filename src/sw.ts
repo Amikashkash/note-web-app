@@ -77,13 +77,31 @@ registerRoute(
   )
 );
 
-// גופנים של Google - כמעט ולא משתנים
+// גיליון הסגנונות של Google Fonts - כמעט ולא משתנה
 registerRoute(
   /^https:\/\/fonts\.googleapis\.com\/.*/i,
   new CacheFirst({
     cacheName: 'google-fonts-cache',
     plugins: [
       new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+    ],
+  }),
+  'GET'
+);
+
+// קובצי הגופן עצמם, שמוגשים מדומיין אחר.
+//
+// בלי המסלול הזה נשמר רק גיליון הסגנונות: הוא מפנה לקבצי woff2
+// ב-gstatic, ואלה היו נטענים מהרשת בכל פעם. במצב לא מקוון הגופן היה
+// נכשל והממשק היה נופל לגופן המערכת - בדיוק כשהאפליקציה אמורה להיראות
+// זהה. סטטוס 0 בכוונה: אלה תגובות opaque של cross-origin.
+registerRoute(
+  /^https:\/\/fonts\.gstatic\.com\/.*/i,
+  new CacheFirst({
+    cacheName: 'google-fonts-files-cache',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   }),
