@@ -107,8 +107,11 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* הכרטיס הוא `surface` והפקדים שעליו `raised`, ולא להפך.
+          בפלטה הכהה `surface` כהה מ-`raised`, כלומר פקד `surface` על
+          כרטיס `raised` נקרא כשקע ולא כהגבהה - והחיצים כמעט נעלמו. */}
       {sections.map((section, index) => (
-        <div key={section.id} className="bg-raised-light dark:bg-raised-dark rounded-lg border border-hairline-light dark:border-hairline-dark p-3">
+        <div key={section.id} className="bg-surface-light dark:bg-surface-dark rounded-lg border border-hairline-light dark:border-hairline-dark p-3">
           {/* כפתורי סידור */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex gap-1">
@@ -116,19 +119,19 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
                 type="button"
                 onClick={() => handleMoveSection(section.id, 'up')}
                 disabled={index === 0}
-                className="h-9 w-9 grid place-items-center bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-10 w-10 grid place-items-center bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark disabled:opacity-30 disabled:cursor-not-allowed"
                 title="הזז למעלה"
               >
-                <ChevronUp size={16} strokeWidth={2} />
+                <ChevronUp size={20} strokeWidth={2} />
               </button>
               <button
                 type="button"
                 onClick={() => handleMoveSection(section.id, 'down')}
                 disabled={index === sections.length - 1}
-                className="h-9 w-9 grid place-items-center bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-10 w-10 grid place-items-center bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark disabled:opacity-30 disabled:cursor-not-allowed"
                 title="הזז למטה"
               >
-                <ChevronDown size={16} strokeWidth={2} />
+                <ChevronDown size={20} strokeWidth={2} />
               </button>
             </div>
             <button

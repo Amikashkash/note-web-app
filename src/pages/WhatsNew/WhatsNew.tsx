@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.15.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'חצי סידור הסעיפים בתכנית עבודה היו קטנים מדי ובמצב כהה כמעט לא נראו. הם גדלו, וקיבלו רקע שבולט מעל הכרטיס בשני המצבים',
+      },
+    ],
+  },
+  {
     version: '1.15.0',
     date: 'יולי 2026',
     changes: [
