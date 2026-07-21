@@ -5,6 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { Portal } from '../Portal/Portal';
+import { useModalHistory } from '@/hooks/useModalHistory';
 
 interface ModalProps {
   onClose: () => void;
@@ -13,6 +14,12 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
+  // כאן ולא בכל חלונית בנפרד: כל החלוניות באפליקציה עוברות דרך הרכיב
+  // הזה, ואף אחת לא עוקפת אותו. חיבור במקום אחד מבטיח שגם חלונית
+  // שתיווצר בעתיד תתנהג נכון מול כפתור "חזור" בלי לזכור לחבר אותה.
+  // הרכיב מרונדר רק כשהחלונית פתוחה, ולכן `isOpen` תמיד אמת.
+  useModalHistory(true, onClose);
+
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

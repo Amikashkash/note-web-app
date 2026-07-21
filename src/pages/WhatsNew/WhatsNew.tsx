@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.16.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'לחיצה על "חזור" בזמן צפייה או עריכה של פתק סגרה את האפליקציה כולה. עכשיו היא סוגרת את הפתק וחוזרת לרשימה, כמצופה',
+      },
+    ],
+  },
+  {
     version: '1.16.0',
     date: 'יולי 2026',
     changes: [
