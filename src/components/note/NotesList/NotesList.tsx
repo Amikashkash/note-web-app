@@ -49,7 +49,7 @@ export const NotesList: React.FC<NotesListProps> = ({
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
-          <p className="text-gray-500 mb-4">אין פתקים בקטגוריה זו</p>
+          <p className="text-ink-3-light dark:text-ink-3-dark mb-4">אין פתקים בקטגוריה זו</p>
           <Button onClick={onAddNote} size="sm">
             + פתק ראשון
           </Button>

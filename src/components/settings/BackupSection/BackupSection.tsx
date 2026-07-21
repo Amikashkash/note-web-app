@@ -71,20 +71,20 @@ export const BackupSection: React.FC = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">💾 גיבוי הפתקים</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-md p-6 transition-colors">
+      <h2 className="text-xl font-bold text-ink-light dark:text-ink-dark mb-2">💾 גיבוי הפתקים</h2>
+      <p className="text-sm text-ink-2-light dark:text-ink-2-dark mb-6">
         הורדה של כל הפתקים והקטגוריות שלך לקובץ במחשב, כולל פתקים בארכיון. שמור את הקובץ במקום
         בטוח — כך תוכל לשחזר את התוכן גם אם תהיה תקלה באפליקציה.
       </p>
 
       <div className="space-y-4">
         {/* Markdown - קריא */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="border border-hairline-light dark:border-hairline-dark rounded-lg p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-200">📄 קובץ קריא (Markdown)</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <h3 className="font-medium text-ink-light dark:text-ink-dark">📄 קובץ קריא (Markdown)</h3>
+              <p className="text-sm text-ink-3-light dark:text-ink-3-dark mt-1">
                 כל הפתקים מסודרים לפי קטגוריה, בטקסט שאפשר לקרוא בכל עורך טקסט.
               </p>
             </div>
@@ -99,11 +99,11 @@ export const BackupSection: React.FC = () => {
         </div>
 
         {/* JSON - לשחזור */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="border border-hairline-light dark:border-hairline-dark rounded-lg p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-200">🗄️ גיבוי מלא (JSON)</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <h3 className="font-medium text-ink-light dark:text-ink-dark">🗄️ גיבוי מלא (JSON)</h3>
+              <p className="text-sm text-ink-3-light dark:text-ink-3-dark mt-1">
                 כל הנתונים במדויק — צבעים, תגיות, תזכורות וסדר. פחות נוח לקריאה, אבל זה הקובץ
                 שממנו אפשר לשחזר הכול.
               </p>
@@ -120,13 +120,13 @@ export const BackupSection: React.FC = () => {
         </div>
 
         {status && (
-          <p className="text-sm text-green-600 dark:text-green-400">✓ {status}</p>
+          <p className="text-sm text-success dark:text-success-dark">✓ {status}</p>
         )}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">✗ {error}</p>}
+        {error && <p className="text-sm text-danger dark:text-danger-dark">✗ {error}</p>}
       </div>
 
-      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="mt-6 pt-6 border-t border-hairline-light dark:border-hairline-dark">
+        <p className="text-sm text-ink-2-light dark:text-ink-2-dark">
           💡 מומלץ להוריד גיבוי מדי פעם. הקובץ נוצר במכשיר שלך ואינו נשלח לשום מקום.
         </p>
       </div>

@@ -244,7 +244,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded border border-gray-300 dark:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
+      className="px-3 py-1 text-sm bg-raised-light dark:bg-raised-dark hover:bg-hairline-light dark:hover:bg-hairline-dark rounded border border-hairline-light dark:border-hairline-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ink-light dark:text-ink-dark"
     >
       {label}
     </button>
@@ -253,7 +253,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   return (
     <div className="w-full">
       {/* סרגל כלים */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-hairline-light dark:border-hairline-dark">
         <div className="flex gap-2 flex-wrap">
           <FormatButton
             label="📋 הדבק"
@@ -271,8 +271,8 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
             title="טקסט נטוי"
           />
         </div>
-        <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="hidden sm:block h-6 w-px bg-hairline-light dark:bg-hairline-dark"></div>
+        <span className="text-xs text-ink-3-light dark:text-ink-3-dark">
           טיפים: 1. למספור | * לנקודות
         </span>
       </div>
@@ -288,10 +288,10 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         rows={rows}
         className={`
           w-full px-4 py-3
-          border border-gray-300 dark:border-gray-600 rounded-lg
-          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+          border border-hairline-light dark:border-hairline-dark rounded-lg
+          bg-surface-light dark:bg-surface-dark text-ink-light dark:text-ink-dark
           focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
-          disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed
+          disabled:bg-raised-light dark:bg-raised-dark dark:disabled:bg-raised-dark disabled:cursor-not-allowed
           resize-y
           font-sans
           ${className}
@@ -300,7 +300,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       />
 
       {/* הסבר קצר */}
-      <div className="mt-2 text-xs text-gray-500 space-y-1">
+      <div className="mt-2 text-xs text-ink-3-light dark:text-ink-3-dark space-y-1">
         <p>💡 מספור אוטומטי: התחל שורה עם "1. " ולחץ Enter</p>
         <p>💡 נקודות: התחל שורה עם "* " ולחץ Enter</p>
         <p>💡 הדגשה: סמן טקסט ולחץ על כפתור "מודגש"</p>

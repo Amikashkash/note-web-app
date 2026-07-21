@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.17.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'תצוגת הפתק וטופס העריכה עוצבו מחדש, יחד עם תפריט הפרופיל, ניהול השיתוף וחלונית הקטגוריה',
+      },
+      {
+        type: 'design',
+        description:
+          'כפתור הסגירה של הפתק עבר לצד שבו השורה נגמרת, כמתאים לעברית, והפך לכפתור עדין במקום כפתור צבעוני בולט',
+      },
+    ],
+  },
+  {
     version: '1.16.1',
     date: 'יולי 2026',
     changes: [

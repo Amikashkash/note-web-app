@@ -72,14 +72,14 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   return (
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[85vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">
+        <h2 className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-4">
           {isEditMode ? 'עריכת פתק' : 'פתק חדש'}
         </h2>
 
         {/* כותרת */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            כותרת * <span className="text-xs text-gray-500">({title.length}/{LENGTH_LIMITS.NOTE_TITLE})</span>
+          <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-1">
+            כותרת * <span className="text-xs text-ink-3-light dark:text-ink-3-dark">({title.length}/{LENGTH_LIMITS.NOTE_TITLE})</span>
           </label>
           <Input
             type="text"
@@ -97,7 +97,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
         {/* בחירת תבנית */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-2">
             סוג פתק
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -127,7 +127,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
         {/* תוכן */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-1">
             תוכן
           </label>
           {templateType === 'accounting' ? (
@@ -155,7 +155,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center gap-2 text-sm text-ink-2-light dark:text-ink-2-dark hover:text-ink-light dark:text-ink-dark dark:hover:text-ink-dark transition-colors"
           >
             <span>{showAdvanced ? '▼' : '◀'}</span>
             <span>אפשרויות נוספות (תגיות וצבע)</span>
@@ -165,7 +165,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             <div className="mt-4 space-y-4">
               {/* תגיות */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-1">
                   תגיות (מופרדות בפסיקים)
                 </label>
                 <Input
@@ -178,7 +178,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
               {/* בחירת צבע */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-2">
                   צבע פתק (אופציונלי)
                 </label>
                 <div className="flex gap-2 flex-wrap">
@@ -188,8 +188,8 @@ export const NoteForm: React.FC<NoteFormProps> = ({
                     onClick={() => setSelectedColor(null)}
                     className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center ${
                       selectedColor === null
-                        ? 'border-gray-800'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-ink-light dark:border-ink-dark'
+                        : 'border-hairline-light dark:border-hairline-dark hover:border-ink-3-light dark:hover:border-ink-3-dark'
                     }`}
                     title="ללא צבע"
                   >
@@ -204,7 +204,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
                       onClick={() => setSelectedColor(color)}
                       className={`w-10 h-10 rounded-lg border-2 ${
                         selectedColor === color
-                          ? 'border-gray-800 scale-110'
+                          ? 'border-ink-light dark:border-ink-dark scale-110'
                           : 'border-transparent hover:scale-105'
                       } transition-transform`}
                       style={{ backgroundColor: color }}
@@ -219,8 +219,8 @@ export const NoteForm: React.FC<NoteFormProps> = ({
 
         {/* שגיאת ולידציה */}
         {validationError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-            <p className="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
+          <div className="bg-danger/10 border border-danger/30 rounded-lg p-3">
+            <p className="text-sm font-medium text-danger dark:text-danger-dark flex items-center gap-2">
               <span>⚠️</span>
               <span>{validationError}</span>
             </p>

@@ -79,7 +79,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
 
         {/* Color Picker */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-ink-light dark:text-ink-dark mb-2">
             בחר צבע
           </label>
           <div className="flex flex-wrap gap-2">
@@ -90,8 +90,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
                 onClick={() => setColor(colorOption)}
                 className={`w-10 h-10 rounded-full border-2 transition-all ${
                   color === colorOption
-                    ? 'border-gray-800 scale-110'
-                    : 'border-gray-300 hover:scale-105'
+                    ? 'border-ink-light dark:border-ink-dark scale-110'
+                    : 'border-hairline-light dark:border-hairline-dark hover:scale-105'
                 }`}
                 style={{ backgroundColor: colorOption }}
                 title={colorOption}

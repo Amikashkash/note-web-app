@@ -118,13 +118,13 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
   return (
     <Modal onClose={onClose}>
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+        <h2 className="text-2xl font-bold text-ink-light dark:text-ink-dark">
           שיתוף {itemTypeLabel}: {itemName}
         </h2>
 
         {/* Add new user */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
+        <div className="bg-brand-soft dark:bg-brand-soft-dark border border-brand/30 rounded-lg p-4">
+          <h3 className="font-semibold text-ink-light dark:text-ink-dark mb-3">
             הוסף משתמש חדש
           </h3>
           <form onSubmit={handleShare} className="space-y-3">
@@ -144,8 +144,8 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
 
         {/* Success message */}
         {success && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-            <p className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+          <div className="bg-success/10 border border-success/30 rounded-lg p-4">
+            <p className="text-sm font-medium text-success dark:text-success-dark flex items-center gap-2">
               <span>✓</span>
               <span>{success}</span>
             </p>
@@ -154,8 +154,8 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
+          <div className="bg-danger/10 border border-danger/30 rounded-lg p-4">
+            <p className="text-sm font-medium text-danger dark:text-danger-dark flex items-center gap-2">
               <span>⚠️</span>
               <span>{error}</span>
             </p>
@@ -164,12 +164,12 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
 
         {/* Currently shared with */}
         <div>
-          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
+          <h3 className="font-semibold text-ink-light dark:text-ink-dark mb-3">
             משותף עם ({currentSharedWith.length})
           </h3>
           {currentSharedWith.length === 0 ? (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <div className="bg-raised-light dark:bg-raised-dark rounded-lg p-4 text-center">
+              <p className="text-ink-3-light dark:text-ink-3-dark text-sm">
                 ה{itemTypeLabel} עדיין לא משותף עם אף אחד
               </p>
             </div>
@@ -178,11 +178,11 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
               {currentSharedWith.map((userId) => (
                 <div
                   key={userId}
-                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-3"
+                  className="flex items-center justify-between bg-raised-light dark:bg-raised-dark rounded-lg p-3"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-2xl">👤</span>
-                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate" dir="ltr">
+                    <span className="text-sm text-ink-light dark:text-ink-dark truncate" dir="ltr">
                       {displayNames[userId] ?? userId}
                     </span>
                   </div>
@@ -202,14 +202,14 @@ export const ShareManagement: React.FC<ShareManagementProps> = ({
 
         {/* Info */}
         <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-ink-light dark:text-ink-dark">
             <strong>💡 טיפ:</strong> משתמשים משותפים יכולים לראות ולערוך את ה{itemTypeLabel}.
             {itemType === 'category' && ' כל הפתקים בקטגוריה יהיו נגישים גם להם.'}
           </p>
         </div>
 
         {/* Close button */}
-        <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
+        <div className="flex gap-3 pt-4 border-t dark:border-hairline-dark">
           <Button onClick={onClose} variant="secondary" className="flex-1">
             סגור
           </Button>

@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { Eye, Pencil, X } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -161,7 +162,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         ) : (
           <FormattedText
             content={content}
-            className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[200px]"
+            className="p-4 bg-raised-light dark:bg-raised-dark rounded-lg min-h-[200px]"
           />
         );
     }
@@ -170,32 +171,25 @@ export const NoteView: React.FC<NoteViewProps> = ({
   return (
     <Modal onClose={handleClose}>
       <div className="max-h-[80vh] overflow-y-auto">
+        {/* `end-4` ולא `right-4`: בעברית הסגירה שייכת לקצה שבו השורה
+            נגמרת. כפתור סגירה עדין ולא צבעוני - הוא כרום, לא פעולה. */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 z-10 bg-gradient-primary dark:bg-gradient-primary-dark text-white p-2.5 rounded-full shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 hover:scale-110"
+          className="absolute top-4 end-4 z-10 h-11 w-11 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
           title="סגור"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X size={24} strokeWidth={2} />
         </button>
 
         {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200 dark:border-gray-700 pt-12">
+        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-12">
           <div className="flex-1">
             <Input
               type="text"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               maxLength={LENGTH_LIMITS.NOTE_TITLE}
-              className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 border-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 rounded px-2 dark:bg-gray-800"
+              className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-2 border-none focus:ring-2 focus:ring-brand/40 dark:focus:ring-brand-dark/40 rounded px-2 dark:bg-surface-dark"
               placeholder="כותרת הפתק..."
             />
             <div className="flex items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
@@ -229,13 +223,23 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* תוכן */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">תוכן:</h3>
+            <h3 className="text-lg font-semibold text-ink-light dark:text-ink-dark">תוכן:</h3>
             {TOGGLEABLE_TEMPLATES.has(note.templateType) && (
               <button
                 onClick={() => setIsEditMode((previous) => !previous)}
-                className="text-sm px-4 py-2 rounded-xl bg-gradient-primary dark:bg-gradient-primary-dark text-white shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5 font-semibold"
+                className="inline-flex items-center gap-1.5 text-body-sm h-9 px-4 rounded-lg bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark transition-colors font-medium"
               >
-                {isEditMode ? '👁️ צפייה' : '✏️ עריכה'}
+                {isEditMode ? (
+                  <>
+                    <Eye size={16} strokeWidth={1.75} />
+                    צפייה
+                  </>
+                ) : (
+                  <>
+                    <Pencil size={16} strokeWidth={1.75} />
+                    עריכה
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -245,12 +249,12 @@ export const NoteView: React.FC<NoteViewProps> = ({
         {/* תגיות */}
         {note.tags.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">תגיות:</h3>
+            <h3 className="text-lg font-semibold text-ink-light dark:text-ink-dark mb-3">תגיות:</h3>
             <div className="flex flex-wrap gap-2">
               {note.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-full"
+                  className="px-3 py-1.5 bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark text-sm rounded-full"
                 >
                   #{tag}
                 </span>
@@ -261,8 +265,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
         {/* תפריט שיתוף חיצוני */}
         {showShareMenu && (
-          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">שתף פתק:</h3>
+          <div className="mb-4 p-4 bg-raised-light dark:bg-raised-dark rounded-lg border border-hairline-light dark:border-hairline-dark">
+            <h3 className="text-sm font-semibold text-ink-light dark:text-ink-dark mb-3">שתף פתק:</h3>
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => {
@@ -273,7 +277,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                <span className="text-green-600">📱</span>
+                <span className="text-success dark:text-success-dark">📱</span>
                 WhatsApp
               </Button>
               <Button
@@ -298,8 +302,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
         {/* העברה לקטגוריה */}
         {showMoveMenu && categories.length > 0 && (
-          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+          <div className="mb-4 p-4 bg-raised-light dark:bg-raised-dark rounded-lg border border-hairline-light dark:border-hairline-dark">
+            <h3 className="text-sm font-semibold text-ink-light dark:text-ink-dark mb-3">
               העבר לקטגוריה:
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -322,7 +326,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         )}
 
         {/* פעולות */}
-        <div className="flex flex-col gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col gap-2 pt-4 border-t border-hairline-light dark:border-hairline-dark">
           <div className="flex gap-2">
             <Button onClick={handleShare} variant="outline" className="flex-1">
               🔗 שתף
@@ -332,14 +336,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 onClick={() => setShowShareManagement(true)}
                 variant="outline"
                 className={`flex-1 ${
-                  isShared ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : ''
+                  isShared ? 'bg-success/10 text-success dark:text-success-dark' : ''
                 }`}
               >
                 {isShared ? `👥 ${note.sharedWith.length}` : '👥 שיתוף'}
               </Button>
             )}
             {!isOwner && isShared && (
-              <span className="flex-1 px-3 py-2 text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium flex items-center justify-center">
+              <span className="flex-1 px-3 py-2 text-xs sm:text-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded font-medium flex items-center justify-center">
                 👥 משותף
               </span>
             )}
