@@ -11,6 +11,7 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useProductSuggestions } from '@/hooks/useProductSuggestions';
 import { normalizeProductName } from '@/services/api/productMatching';
 
@@ -312,7 +313,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                   className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
                   title="מחק פריט"
                 >
-                  🗑
+                  <Trash2 size={18} strokeWidth={1.75} />
                 </button>
               )}
             </div>

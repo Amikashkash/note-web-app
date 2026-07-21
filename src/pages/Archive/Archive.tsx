@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common';
 import { subscribeToArchivedNotes, restoreNote, permanentlyDeleteNote } from '@/services/api/notes';
-import { getTemplateIcon } from '@/utils/templates';
+import { TemplateIcon } from '@/components/common/TemplateIcon/TemplateIcon';
 import { getErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { Note } from '@/types/note';
@@ -111,7 +111,11 @@ export const Archive: React.FC = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xl">{getTemplateIcon(note.templateType)}</span>
+                      <TemplateIcon
+                        type={note.templateType}
+                        size={20}
+                        className="flex-shrink-0 text-ink-2-light dark:text-ink-2-dark"
+                      />
                       <h3 className="text-lg font-bold text-gray-800 truncate">{note.title}</h3>
                     </div>
 

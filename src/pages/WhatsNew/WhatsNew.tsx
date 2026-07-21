@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.13.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'אייקוני התבניות והפעולות הוחלפו באייקונים מעוצבים במקום אמוג\'י. אמוג\'י נראה שונה בכל מכשיר ולא מקבל את צבע הטקסט סביבו',
+      },
+    ],
+  },
+  {
     version: '1.12.0',
     date: 'יולי 2026',
     changes: [

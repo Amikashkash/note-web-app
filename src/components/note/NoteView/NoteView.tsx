@@ -24,7 +24,7 @@ import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from
 import { useAuthStore } from '@/store/authStore';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
-import { getTemplateIcon, getTemplateLabel } from '@/utils/templates';
+import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
 
 export interface NoteUpdates {
@@ -55,6 +55,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   categories = [],
 }) => {
   const user = useAuthStore((state) => state.user);
+  const TemplateIcon = getTemplateMeta(note.templateType).Icon;
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showShareManagement, setShowShareManagement] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
@@ -197,9 +198,10 @@ export const NoteView: React.FC<NoteViewProps> = ({
               className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 border-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 rounded px-2 dark:bg-gray-800"
               placeholder="כותרת הפתק..."
             />
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 px-2">
-              <span>
-                {getTemplateIcon(note.templateType)} {getTemplateLabel(note.templateType)}
+            <div className="flex items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
+              <span className="inline-flex items-center gap-1.5">
+                <TemplateIcon size={16} strokeWidth={1.75} />
+                {getTemplateLabel(note.templateType)}
               </span>
               <span>•</span>
               <span>

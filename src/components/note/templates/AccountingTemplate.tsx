@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import type { AccountingRow } from '@/types/template';
 
@@ -228,10 +229,10 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                       <button
                         type="button"
                         onClick={() => handleDeleteRow(row.id)}
-                        className="text-red-600 hover:text-red-800 text-sm sm:text-base leading-none"
+                        className="text-danger dark:text-danger-dark hover:opacity-80 leading-none"
                         title="מחק שורה"
                       >
-                        🗑
+                        <Trash2 size={16} strokeWidth={1.75} />
                       </button>
                     </td>
                   )}

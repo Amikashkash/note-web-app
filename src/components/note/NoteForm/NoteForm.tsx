@@ -108,12 +108,18 @@ export const NoteForm: React.FC<NoteFormProps> = ({
                 onClick={() => setTemplateType(template.value)}
                 className={`p-3 rounded-lg border-2 text-center transition-all ${
                   templateType === template.value
-                    ? 'border-primary bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 dark:bg-gray-800'
+                    ? 'border-brand bg-brand-soft dark:bg-brand-soft-dark dark:border-brand-dark'
+                    : 'border-hairline-light dark:border-hairline-dark hover:border-ink-3-light dark:hover:border-ink-3-dark'
                 }`}
               >
-                <div className="text-2xl mb-1">{template.icon}</div>
-                <div className="text-xs text-gray-700 dark:text-gray-300">{template.label}</div>
+                <template.Icon
+                  size={24}
+                  strokeWidth={1.75}
+                  className="mx-auto mb-1 text-ink-2-light dark:text-ink-2-dark"
+                />
+                <div className="text-caption text-ink-2-light dark:text-ink-2-dark">
+                  {template.label}
+                </div>
               </button>
             ))}
           </div>

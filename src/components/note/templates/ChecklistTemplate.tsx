@@ -9,6 +9,7 @@
  */
 
 import React, { useMemo, useEffect, useRef } from 'react';
+import { CalendarDays, Clock, Trash2, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 import {
@@ -36,7 +37,7 @@ interface DuePickerProps {
   inputId: string;
   type: 'date' | 'time';
   value: string;
-  icon: string;
+  Icon: LucideIcon;
   colorClass: string;
   title: string;
   onChange: (value: string) => void;
@@ -51,7 +52,7 @@ const DuePicker: React.FC<DuePickerProps> = ({
   inputId,
   type,
   value,
-  icon,
+  Icon,
   colorClass,
   title,
   onChange,
@@ -68,10 +69,10 @@ const DuePicker: React.FC<DuePickerProps> = ({
     />
     <label
       htmlFor={inputId}
-      className={`cursor-pointer text-lg pointer-events-none ${colorClass}`}
+      className={`cursor-pointer pointer-events-none ${colorClass}`}
       title={title}
     >
-      {icon}
+      <Icon size={20} strokeWidth={1.75} />
     </label>
     {value && (
       <button
@@ -80,10 +81,10 @@ const DuePicker: React.FC<DuePickerProps> = ({
           e.stopPropagation();
           onClear();
         }}
-        className="text-xs text-gray-400 hover:text-red-600 relative z-20"
+        className="text-ink-3-light dark:text-ink-3-dark hover:text-danger relative z-20"
         title={type === 'date' ? 'הסר תאריך' : 'הסר שעה'}
       >
-        ✕
+        <X size={14} strokeWidth={2} />
       </button>
     )}
   </div>
@@ -312,7 +313,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                         inputId={`date-${item.id}`}
                         type="date"
                         value={item.dueDate || ''}
-                        icon="📅"
+                        Icon={CalendarDays}
                         colorClass={dateColor}
                         title={dueLabel}
                         onChange={(next) => handleUpdateDueDate(item.id, next)}
@@ -326,7 +327,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       inputId={`time-${item.id}`}
                       type="time"
                       value={item.dueTime || ''}
-                      icon="🕐"
+                      Icon={Clock}
                       colorClass={item.dueTime ? 'text-blue-600' : 'text-gray-400'}
                       title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
                       onChange={(next) => handleUpdateDueTime(item.id, next)}
@@ -342,7 +343,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
                       title="מחק משימה"
                     >
-                      🗑
+                      <Trash2 size={18} strokeWidth={1.75} />
                     </button>
                   )}
                 </div>

@@ -5,13 +5,28 @@
  * הוספת תבנית חדשה = הוספת רשומה אחת כאן בלבד.
  */
 
+import {
+  ChefHat,
+  ClipboardList,
+  FileText,
+  ListChecks,
+  ShoppingCart,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import type { TemplateType } from '@/types/note';
 
 export interface TemplateMeta {
   /** שם התבנית לתצוגה */
   label: string;
-  /** אייקון קצר (אמוג'י) */
+  /**
+   * אמוג'י לשימוש בטקסט בלבד - ייצוא Markdown ושיתוף.
+   * קובץ טקסט לא יכול לרנדר רכיב, ושם אמוג'י הוא הייצוג הנכון.
+   * בממשק משתמשים ב-`Icon`.
+   */
   icon: string;
+  /** אייקון לממשק */
+  Icon: LucideIcon;
   /** האם התבנית מוצגת בבורר התבניות של טופס פתק חדש */
   selectable: boolean;
   /** האם התוכן נערך כטקסט חופשי (ולא ע"י קומפוננטת תבנית ייעודית) */
@@ -19,14 +34,14 @@ export interface TemplateMeta {
 }
 
 export const TEMPLATES: Record<TemplateType, TemplateMeta> = {
-  plain: { label: 'טקסט חופשי', icon: '📝', selectable: true, freeText: true },
-  checklist: { label: 'רשימת משימות', icon: '✅', selectable: true, freeText: false },
-  shopping: { label: 'רשימת קניות', icon: '🛒', selectable: true, freeText: false },
-  workplan: { label: 'תכנית עבודה', icon: '📋', selectable: true, freeText: false },
-  accounting: { label: 'חשבונאות', icon: '💰', selectable: true, freeText: false },
+  plain: { label: 'טקסט חופשי', icon: '📝', Icon: FileText, selectable: true, freeText: true },
+  checklist: { label: 'רשימת משימות', icon: '✅', Icon: ListChecks, selectable: true, freeText: false },
+  shopping: { label: 'רשימת קניות', icon: '🛒', Icon: ShoppingCart, selectable: true, freeText: false },
+  workplan: { label: 'תכנית עבודה', icon: '📋', Icon: ClipboardList, selectable: true, freeText: false },
+  accounting: { label: 'חשבונאות', icon: '💰', Icon: Wallet, selectable: true, freeText: false },
   // מתכון הוסר מהבורר - ה-AI מסדר מתכונים היטב כטקסט חופשי.
   // הערך נשמר כדי שפתקים ישנים מסוג זה ימשיכו להיפתח כרגיל.
-  recipe: { label: 'מתכון', icon: '🍳', selectable: false, freeText: false },
+  recipe: { label: 'מתכון', icon: '🍳', Icon: ChefHat, selectable: false, freeText: false },
 };
 
 /**
@@ -38,6 +53,7 @@ export const TEMPLATES: Record<TemplateType, TemplateMeta> = {
 const FALLBACK: TemplateMeta = {
   label: 'פתק',
   icon: '📝',
+  Icon: FileText,
   selectable: false,
   freeText: true,
 };
@@ -48,6 +64,7 @@ export const getTemplateMeta = (type: TemplateType | string): TemplateMeta =>
 export const getTemplateLabel = (type: TemplateType | string): string =>
   getTemplateMeta(type).label;
 
+/** אמוג'י לטקסט - ייצוא ושיתוף. בממשק יש להשתמש ב-`getTemplateMeta(...).Icon`. */
 export const getTemplateIcon = (type: TemplateType | string): string =>
   getTemplateMeta(type).icon;
 
