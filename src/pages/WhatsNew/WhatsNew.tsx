@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.13.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'בפתק חשבונאות במצב כהה הטקסט היה כהה על רקע כהה ולא ניתן לקריאה. התבנית לא תמכה במצב כהה כלל',
+      },
+      {
+        type: 'fix',
+        description:
+          'בוררי התאריך והשעה נפתחים עכשיו כהים במצב כהה, במקום לבן בוהק',
+      },
+    ],
+  },
+  {
     version: '1.13.0',
     date: 'יולי 2026',
     changes: [
