@@ -110,25 +110,44 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
       {/* הוספה מהירה */}
       {!readOnly && (
         <div className="relative">
-          <input
-            ref={quickAddRef}
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                // מוסיף בדיוק את מה שהוקלד ולא את ההצעה הראשונה: בחירת
-                // הצעה היא הקשה מפורשת עליה, אחרת Enter היה מוסיף
-                // לפעמים מוצר שלא התכוונת אליו.
-                addItem(draft);
-              } else if (e.key === 'Escape') {
-                setDraft('');
-              }
-            }}
-            placeholder="🛒 הוסף מוצר ולחץ Enter..."
-            className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              ref={quickAddRef}
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              // מבקש מקלדת עם מקש "סיום" במקום "הבא". בלי זה, מקלדות
+              // אנדרואיד מציגות חץ מעבר-לשדה-הבא ומזיזות את הפוקוס
+              // במקום להוסיף מוצר.
+              enterKeyHint="done"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  // מוסיף בדיוק את מה שהוקלד ולא את ההצעה הראשונה: בחירת
+                  // הצעה היא הקשה מפורשת עליה, אחרת Enter היה מוסיף
+                  // לפעמים מוצר שלא התכוונת אליו.
+                  addItem(draft);
+                } else if (e.key === 'Escape') {
+                  setDraft('');
+                }
+              }}
+              placeholder="🛒 הוסף מוצר..."
+              className="flex-1 min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+            />
+
+            {/* הכפתור הוא דרך ההוספה האמינה. אי אפשר להסתמך על Enter
+                בנייד: חלק ממקלדות אנדרואיד לא משדרות אותו כאירוע מקש
+                אלא מזיזות פוקוס לשדה הבא, והמוצר לא נוסף. */}
+            <button
+              type="button"
+              onClick={() => addItem(draft)}
+              disabled={draft.trim().length === 0}
+              className="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
+              title="הוסף מוצר"
+            >
+              הוסף
+            </button>
+          </div>
 
           {suggestions.length > 0 && (
             <ul className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg overflow-hidden">

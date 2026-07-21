@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.10.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'בנייד, הוספת מוצר לרשימת הקניות לא עבדה: מקש האנטר במקלדת אנדרואיד מקפיץ את הסמן לשדה הבא במקום להוסיף. נוסף כפתור "הוסף" ליד השדה',
+      },
+    ],
+  },
+  {
     version: '1.10.0',
     date: 'יולי 2026',
     changes: [
