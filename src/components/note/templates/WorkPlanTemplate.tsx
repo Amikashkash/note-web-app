@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
+import { ChevronDown, ChevronLeft, ChevronUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
@@ -86,15 +87,15 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
     return (
       <div className="space-y-4">
         {sections.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 text-center py-8">אין סעיפים בתכנית</p>
+          <p className="text-ink-3-light dark:text-ink-3-dark text-center py-8">אין סעיפים בתכנית</p>
         ) : (
           sections.map((section) => (
-            <div key={section.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
-                <span className="text-blue-600 dark:text-blue-400">▸</span>
+            <div key={section.id} className="bg-surface-light dark:bg-surface-dark rounded-lg border border-hairline-light dark:border-hairline-dark p-4">
+              <h4 className="text-lg font-bold text-ink-light dark:text-ink-dark mb-2 flex items-center gap-2">
+                <ChevronLeft size={16} strokeWidth={2} className="text-brand-text dark:text-brand-text-dark flex-shrink-0" />
                 {section.header || 'כותרת ריקה'}
               </h4>
-              <div className="text-gray-700 dark:text-gray-300 pr-6">
+              <div className="text-ink-light dark:text-ink-dark pr-6">
                 <FormattedText content={section.content || 'אין תוכן'} />
               </div>
             </div>
@@ -107,7 +108,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
   return (
     <div className="space-y-3">
       {sections.map((section, index) => (
-        <div key={section.id} className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+        <div key={section.id} className="bg-raised-light dark:bg-raised-dark rounded-lg border border-hairline-light dark:border-hairline-dark p-3">
           {/* כפתורי סידור */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex gap-1">
@@ -115,28 +116,29 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
                 type="button"
                 onClick={() => handleMoveSection(section.id, 'up')}
                 disabled={index === 0}
-                className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 w-9 grid place-items-center bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark disabled:opacity-30 disabled:cursor-not-allowed"
                 title="הזז למעלה"
               >
-                ↑
+                <ChevronUp size={16} strokeWidth={2} />
               </button>
               <button
                 type="button"
                 onClick={() => handleMoveSection(section.id, 'down')}
                 disabled={index === sections.length - 1}
-                className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 w-9 grid place-items-center bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-lg text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark disabled:opacity-30 disabled:cursor-not-allowed"
                 title="הזז למטה"
               >
-                ↓
+                <ChevronDown size={16} strokeWidth={2} />
               </button>
             </div>
             <button
               type="button"
               onClick={() => handleDeleteSection(section.id)}
-              className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
+              className="inline-flex items-center gap-1 px-2 py-1 text-caption text-danger dark:text-danger-dark hover:bg-danger/10 rounded"
               title="מחק סעיף"
             >
-              🗑 מחק
+              <Trash2 size={14} strokeWidth={1.75} />
+              מחק
             </button>
           </div>
 
@@ -152,7 +154,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
               }
             }}
             placeholder="הזן כותרת סעיף..."
-            className="w-full px-3 py-2 mb-2 text-lg font-bold border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 mb-2 text-lg font-bold border border-hairline-light dark:border-hairline-dark dark:bg-surface-dark dark:text-ink-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
             style={{ direction: 'rtl', textAlign: 'right' }}
           />
 
@@ -179,7 +181,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
       </Button>
 
       {sections.length === 0 && (
-        <p className="text-gray-500 text-center text-sm py-4">
+        <p className="text-ink-3-light dark:text-ink-3-dark text-center text-sm py-4">
           לחץ על "הוסף סעיף" כדי להתחיל לבנות את תכנית העבודה
         </p>
       )}

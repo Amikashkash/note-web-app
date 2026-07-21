@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.15.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'כל שש התבניות עוצבו מחדש. סרגל ההתקדמות ברשימת המשימות בצבע המותג וברשימת הקניות בטורקיז, וכל האייקונים הוחלפו',
+      },
+      {
+        type: 'fix',
+        description:
+          'מצב כהה עובד עכשיו בכל התבניות. תוכנית עבודה ומתכון היו מכוסות חלקית בלבד, ופתק חשבונאות לא נתמך כלל',
+      },
+    ],
+  },
+  {
     version: '1.14.0',
     date: 'יולי 2026',
     changes: [

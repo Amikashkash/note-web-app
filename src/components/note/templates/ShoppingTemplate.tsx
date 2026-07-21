@@ -126,18 +126,18 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
     <div className="space-y-3">
       {/* התקדמות */}
       {totalCount > 0 && (
-        <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+        <div className="bg-teal/10 p-3 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <span className="text-sm font-medium text-ink-light dark:text-ink-dark">
               התקדמות בקניות:
             </span>
-            <span className="text-sm font-bold text-green-600 dark:text-green-300">
+            <span className="text-sm font-bold text-teal dark:text-teal-dark">
               {checkedCount} / {totalCount} ({Math.round(checkedPercent)}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-hairline-light dark:bg-hairline-dark rounded-full h-2">
             <div
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+              className="bg-teal-fill h-2 rounded-full transition-all duration-300"
               style={{ width: `${checkedPercent}%` }}
             />
           </div>
@@ -146,7 +146,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
 
       {/* הוספה מהירה */}
       {!readOnly && (
-        <div className="space-y-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg">
+        <div className="space-y-2 bg-raised-light dark:bg-raised-dark p-2 rounded-lg">
           {/* מוצר וכמות באותה שורה: הכמות הייתה מחייבת לסגור את המקלדת,
               לגלול לשורה שנוספה, למלא אותה, ולחזור למעלה. */}
           <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 }
               }}
               placeholder="🛒 מוצר..."
-              className="flex-1 min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="flex-1 min-w-0 px-3 py-2 text-sm bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-md text-ink-light dark:text-ink-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
 
             <input
@@ -192,7 +192,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 }
               }}
               placeholder="כמות"
-              className="w-16 flex-shrink-0 px-2 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="w-16 flex-shrink-0 px-2 py-2 text-sm bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark rounded-md text-ink-light dark:text-ink-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
 
             {/* גיבוי ל-Enter, שלא כל מקלדת בנייד משדרת כאירוע מקש */}
@@ -200,7 +200,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
               type="button"
               onClick={() => addItem(draft)}
               disabled={draft.trim().length === 0}
-              className="flex-shrink-0 px-3 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400"
+              className="flex-shrink-0 px-3 py-2 text-sm font-medium rounded-md bg-teal-fill text-white hover:opacity-90 disabled:bg-hairline-light dark:disabled:bg-hairline-dark disabled:text-ink-3-light dark:disabled:text-ink-3-dark"
               title="הוסף מוצר"
             >
               הוסף
@@ -224,7 +224,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                     setNotice(null);
                     quantityRef.current?.focus();
                   }}
-                  className="px-3 py-1.5 text-sm rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-gray-600"
+                  className="px-3 py-1.5 text-sm rounded-full bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark text-ink-light dark:text-ink-dark hover:bg-teal/10 dark:hover:bg-raised-dark"
                 >
                   {product.name}
                 </button>
@@ -240,7 +240,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
 
       {/* הרשימה */}
       {items.length === 0 ? (
-        <div className="text-center p-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="text-center p-8 text-ink-3-light dark:text-ink-3-dark bg-raised-light dark:bg-raised-dark rounded-lg">
           אין פריטים ברשימה
         </div>
       ) : (
@@ -250,8 +250,8 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
               key={item.id}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
                 item.checked
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  ? 'bg-success/10 border-success/30'
+                  : 'bg-surface-light dark:bg-surface-dark border-hairline-light dark:border-hairline-dark hover:border-ink-3-light dark:hover:border-ink-3-dark'
               }`}
             >
               <button
@@ -259,8 +259,8 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 onClick={() => updateItem(item.id, { checked: !item.checked })}
                 className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                   item.checked
-                    ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600'
-                    : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 hover:border-green-400'
+                    ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'
+                    : 'bg-surface-light dark:bg-raised-dark border-hairline-light dark:border-hairline-dark hover:border-success'
                 }`}
               >
                 {item.checked && <span className="text-white text-sm">✓</span>}
@@ -270,8 +270,8 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 <span
                   className={`flex-1 text-sm ${
                     item.checked
-                      ? 'line-through text-gray-500 dark:text-gray-400'
-                      : 'text-gray-700 dark:text-gray-200'
+                      ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                      : 'text-ink-light dark:text-ink-dark'
                   }`}
                 >
                   {item.name}
@@ -282,17 +282,17 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                   value={item.name}
                   onChange={(e) => updateItem(item.id, { name: e.target.value })}
                   placeholder="פריט..."
-                  className={`flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-green-300 rounded ${
+                  className={`flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
                     item.checked
-                      ? 'line-through text-gray-500 dark:text-gray-400'
-                      : 'text-gray-700 dark:text-gray-200'
+                      ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                      : 'text-ink-light dark:text-ink-dark'
                   }`}
                 />
               )}
 
               {readOnly ? (
                 item.quantity && (
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-sm text-ink-2-light dark:text-ink-2-dark">
                     ({item.quantity})
                   </span>
                 )
@@ -302,7 +302,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                   value={item.quantity}
                   onChange={(e) => updateItem(item.id, { quantity: e.target.value })}
                   placeholder="כמות"
-                  className="w-16 sm:w-20 flex-shrink-0 px-2 py-1 text-xs sm:text-sm bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-green-300"
+                  className="w-16 sm:w-20 flex-shrink-0 px-2 py-1 text-xs sm:text-sm bg-surface-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark rounded text-ink-light dark:text-ink-dark focus:outline-none focus:ring-1 focus:ring-brand/40"
                 />
               )}
 
@@ -310,7 +310,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
-                  className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
+                  className="flex-shrink-0 text-danger dark:text-danger-dark hover:opacity-80 text-lg"
                   title="מחק פריט"
                 >
                   <Trash2 size={18} strokeWidth={1.75} />

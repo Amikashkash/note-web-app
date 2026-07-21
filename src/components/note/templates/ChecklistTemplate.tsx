@@ -203,16 +203,16 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     <div className="space-y-3">
       {/* התקדמות */}
       {totalCount > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+        <div className="bg-brand-soft dark:bg-brand-soft-dark p-3 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">התקדמות:</span>
-            <span className="text-sm font-bold text-blue-600 dark:text-blue-300">
+            <span className="text-sm font-medium text-ink-light dark:text-ink-dark">התקדמות:</span>
+            <span className="text-sm font-bold text-brand-text dark:text-brand-text-dark">
               {completedCount} / {totalCount} ({Math.round(completedPercent)}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-hairline-light dark:bg-hairline-dark rounded-full h-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-brand h-2 rounded-full transition-all duration-300"
               style={{ width: `${completedPercent}%` }}
             />
           </div>
@@ -222,7 +222,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       {/* רשימת משימות */}
       <div className="space-y-2">
         {items.length === 0 ? (
-          <div className="text-center p-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="text-center p-8 text-ink-3-light dark:text-ink-3-dark bg-raised-light dark:bg-raised-dark rounded-lg">
             אין משימות עדיין
           </div>
         ) : (
@@ -231,24 +231,24 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             const dueLabel = formatDueLabel(item.dueDate, item.dueTime);
 
             const borderColor = item.completed
-              ? 'border-green-200 dark:border-green-800'
+              ? 'border-success/30'
               : dateStatus
               ? DATE_STATUS_BORDER_CLASS[dateStatus]
-              : 'border-gray-200 dark:border-gray-600';
+              : 'border-hairline-light dark:border-hairline-dark';
 
             const dateColor = item.dueDate && dateStatus
               ? DATE_STATUS_TEXT_CLASS[dateStatus]
-              : 'text-gray-400';
+              : 'text-ink-3-light dark:text-ink-3-dark';
 
             return (
               <div
                 key={item.id}
                 className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-all ${
                   item.completed
-                    ? 'bg-green-50 dark:bg-green-900/20 ' + borderColor
-                    : 'bg-white dark:bg-gray-700 ' +
+                    ? 'bg-success/10 ' + borderColor
+                    : 'bg-surface-light dark:bg-surface-dark ' +
                       borderColor +
-                      ' hover:border-gray-300 dark:hover:border-gray-500'
+                      ' hover:border-ink-3-light dark:hover:border-ink-3-dark'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -258,8 +258,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     onClick={() => handleToggleItem(item.id, item.completed)}
                     className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                       item.completed
-                        ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600'
-                        : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 hover:border-green-400 dark:hover:border-green-500'
+                        ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'
+                        : 'bg-surface-light dark:bg-raised-dark border-hairline-light dark:border-hairline-dark hover:border-success dark:hover:border-success-dark'
                     }`}
                   >
                     {item.completed && <span className="text-white text-sm">✓</span>}
@@ -271,8 +271,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       <span
                         className={
                           item.completed
-                            ? 'line-through text-gray-500 dark:text-gray-400'
-                            : 'text-gray-700 dark:text-gray-200'
+                            ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                            : 'text-ink-light dark:text-ink-dark'
                         }
                       >
                         {item.text}
@@ -292,10 +292,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                           }
                         }}
                         placeholder="הזן משימה..."
-                        className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded ${
+                        className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
                           item.completed
-                            ? 'line-through text-gray-500 dark:text-gray-400'
-                            : 'text-gray-700 dark:text-gray-200'
+                            ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                            : 'text-ink-light dark:text-ink-dark'
                         }`}
                       />
                     )}
@@ -328,7 +328,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       type="time"
                       value={item.dueTime || ''}
                       Icon={Clock}
-                      colorClass={item.dueTime ? 'text-blue-600' : 'text-gray-400'}
+                      colorClass={item.dueTime ? 'text-brand-text' : 'text-ink-3-light dark:text-ink-3-dark'}
                       title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
                       onChange={(next) => handleUpdateDueTime(item.id, next)}
                       onClear={() => handleUpdateDueTime(item.id, '')}
@@ -340,7 +340,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="flex-shrink-0 text-red-600 hover:text-red-800 text-lg"
+                      className="flex-shrink-0 text-danger dark:text-danger-dark hover:opacity-80 text-lg"
                       title="מחק משימה"
                     >
                       <Trash2 size={18} strokeWidth={1.75} />

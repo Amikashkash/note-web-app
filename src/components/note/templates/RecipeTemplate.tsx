@@ -3,6 +3,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { X } from 'lucide-react';
 
 export interface RecipeData {
   servings: string;
@@ -95,44 +96,44 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
       {/* פרטי מתכון */}
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">מנות</label>
+          <label className="block text-xs font-medium text-ink-2-light dark:text-ink-2-dark mb-1">מנות</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700 dark:text-gray-200">{data.servings || '-'}</div>
+            <div className="text-sm text-ink-light dark:text-ink-dark">{data.servings || '-'}</div>
           ) : (
             <input
               type="text"
               value={data.servings}
               onChange={(e) => updateData({ servings: e.target.value })}
               placeholder="4 מנות"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">זמן הכנה</label>
+          <label className="block text-xs font-medium text-ink-2-light dark:text-ink-2-dark mb-1">זמן הכנה</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700 dark:text-gray-200">{data.prepTime || '-'}</div>
+            <div className="text-sm text-ink-light dark:text-ink-dark">{data.prepTime || '-'}</div>
           ) : (
             <input
               type="text"
               value={data.prepTime}
               onChange={(e) => updateData({ prepTime: e.target.value })}
               placeholder="15 דקות"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">זמן בישול</label>
+          <label className="block text-xs font-medium text-ink-2-light dark:text-ink-2-dark mb-1">זמן בישול</label>
           {readOnly ? (
-            <div className="text-sm text-gray-700 dark:text-gray-200">{data.cookTime || '-'}</div>
+            <div className="text-sm text-ink-light dark:text-ink-dark">{data.cookTime || '-'}</div>
           ) : (
             <input
               type="text"
               value={data.cookTime}
               onChange={(e) => updateData({ cookTime: e.target.value })}
               placeholder="30 דקות"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
           )}
         </div>
@@ -140,13 +141,13 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
 
       {/* מרכיבים */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">🥕 מרכיבים:</h4>
+        <h4 className="text-sm font-semibold text-ink-light dark:text-ink-dark mb-2">🥕 מרכיבים:</h4>
         <div className="space-y-2">
           {data.ingredients.map((ingredient, index) => (
             <div key={index} className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400">•</span>
+              <span className="text-ink-3-light dark:text-ink-3-dark">•</span>
               {readOnly ? (
-                <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{ingredient || '-'}</span>
+                <span className="flex-1 text-sm text-ink-light dark:text-ink-dark">{ingredient || '-'}</span>
               ) : (
                 <>
                   <input
@@ -154,15 +155,15 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
                     value={ingredient}
                     onChange={(e) => updateIngredient(index, e.target.value)}
                     placeholder="מרכיב..."
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="flex-1 px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                   {data.ingredients.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeIngredient(index)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-danger dark:text-danger-dark hover:opacity-80"
                     >
-                      ✕
+                      <X size={16} strokeWidth={2} />
                     </button>
                   )}
                 </>
@@ -174,7 +175,7 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
           <button
             type="button"
             onClick={addIngredient}
-            className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+            className="mt-2 text-sm text-brand-text hover:text-brand-2"
           >
             + הוסף מרכיב
           </button>
@@ -183,13 +184,13 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
 
       {/* הוראות הכנה */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">👨‍🍳 הוראות הכנה:</h4>
+        <h4 className="text-sm font-semibold text-ink-light dark:text-ink-dark mb-2">👨‍🍳 הוראות הכנה:</h4>
         <div className="space-y-2">
           {data.instructions.map((instruction, index) => (
             <div key={index} className="flex items-start gap-2">
-              <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">{index + 1}.</span>
+              <span className="text-ink-3-light dark:text-ink-3-dark font-medium text-sm">{index + 1}.</span>
               {readOnly ? (
-                <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{instruction || '-'}</span>
+                <span className="flex-1 text-sm text-ink-light dark:text-ink-dark">{instruction || '-'}</span>
               ) : (
                 <>
                   <textarea
@@ -197,15 +198,15 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
                     onChange={(e) => updateInstruction(index, e.target.value)}
                     placeholder="הוראת הכנה..."
                     rows={2}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                    className="flex-1 px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40 resize-none"
                   />
                   {data.instructions.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeInstruction(index)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-danger dark:text-danger-dark hover:opacity-80"
                     >
-                      ✕
+                      <X size={16} strokeWidth={2} />
                     </button>
                   )}
                 </>
@@ -217,7 +218,7 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
           <button
             type="button"
             onClick={addInstruction}
-            className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+            className="mt-2 text-sm text-brand-text hover:text-brand-2"
           >
             + הוסף שלב
           </button>
