@@ -37,6 +37,7 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   /** משוב קצר על הוספה שלא יצרה שורה חדשה */
   const [notice, setNotice] = useState<string | null>(null);
   const quickAddRef = useRef<HTMLInputElement | null>(null);
+  const quantityRef = useRef<HTMLInputElement | null>(null);
 
   const items = useMemo<ShoppingItem[]>(() => {
     try {
@@ -156,15 +157,15 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 setDraft(e.target.value);
                 setNotice(null);
               }}
-              // מבקש מקלדת עם מקש "סיום" במקום חץ מעבר-לשדה-הבא
-              enterKeyHint="done"
+              // "הבא" ולא "סיום": כאן Enter מעביר לכמות ולא מוסיף.
+              // המקלדת מציגה חץ מעבר, וזו בדיוק הפעולה הנכונה.
+              enterKeyHint="next"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  // מוסיף את מה שהוקלד ולא את ההצעה הראשונה: בחירת הצעה
-                  // היא הקשה מפורשת עליה, אחרת Enter היה מוסיף לפעמים
-                  // מוצר שלא התכוונת אליו.
-                  addItem(draft);
+                  // מעבר לכמות, לא הוספה: המקצב הוא מוצר ← כמות ← הוספה,
+                  // ואותו Enter עושה את אותו דבר בכל שלב.
+                  if (draft.trim()) quantityRef.current?.focus();
                 } else if (e.key === 'Escape') {
                   setDraft('');
                 }
@@ -174,14 +175,19 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
             />
 
             <input
+              ref={quantityRef}
               type="text"
               value={quantityDraft}
               onChange={(e) => setQuantityDraft(e.target.value)}
+              // סוף המקצב - כאן Enter מוסיף, ו-`addItem` מחזיר את הפוקוס
+              // לשדה המוצר כך שאפשר להמשיך ישר לבא.
               enterKeyHint="done"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   addItem(draft);
+                } else if (e.key === 'Escape') {
+                  quickAddRef.current?.focus();
                 }
               }}
               placeholder="כמות"
@@ -208,7 +214,15 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                 <button
                   key={product.name}
                   type="button"
-                  onClick={() => addItem(product.name)}
+                  onClick={() => {
+                    // משלים את שם המוצר ועובר לכמות, ולא מוסיף מיד.
+                    // כך בחירה מההצעות נכנסת לאותו מקצב כמו הקלדה, ואפשר
+                    // לתת כמות למוצר מוצע - קודם זה היה מחייב להקליד את
+                    // הכמות לפני הבחירה.
+                    setDraft(product.name);
+                    setNotice(null);
+                    quantityRef.current?.focus();
+                  }}
                   className="px-3 py-1.5 text-sm rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-gray-600"
                 >
                   {product.name}

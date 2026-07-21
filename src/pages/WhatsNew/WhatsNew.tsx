@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.10.3',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'אנטר מוביל את כל הזרימה ברשימת הקניות: מוצר ← כמות ← הוספה, וחזרה למוצר הבא. אפשר להזין רשימה שלמה בלי להרים את היד מהמקלדת',
+      },
+      {
+        type: 'improvement',
+        description:
+          'בחירת מוצר מההצעות משלימה את השם ועוברת לכמות, במקום להוסיף מיד. כך אפשר לתת כמות גם למוצר שנבחר מההצעות',
+      },
+    ],
+  },
+  {
     version: '1.10.2',
     date: 'יולי 2026',
     changes: [
