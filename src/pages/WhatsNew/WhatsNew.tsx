@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.12.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'כפתורים, שדות וחלוניות בעיצוב החדש: צבע מותג אינדיגו, גבולות דקים במקום מסגרות כבדות, וגובה אחיד של 44 פיקסל לנוחות מגע',
+      },
+      {
+        type: 'design',
+        description:
+          'מסך ההתחברות עוצב מחדש, וכולל סוף סוף מצב כהה. חלוניות בנייד נפתחות עכשיו כגיליון מלמטה',
+      },
+    ],
+  },
+  {
     version: '1.11.0',
     date: 'יולי 2026',
     changes: [

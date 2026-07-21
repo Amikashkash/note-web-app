@@ -25,28 +25,32 @@ export const Input: React.FC<InputProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   const inputStyles = error
-    ? 'border-danger focus:ring-danger focus:border-danger'
-    : 'border-gray-300 focus:ring-primary focus:border-primary';
+    ? 'border-danger dark:border-danger-dark focus:ring-danger/40 focus:border-danger'
+    : 'border-hairline-light dark:border-hairline-dark focus:ring-brand/40 focus:border-brand';
 
   const inputType = showPasswordToggle && showPassword ? 'text' : type;
 
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-body-sm font-medium text-ink-2-light dark:text-ink-2-dark mb-1">
           {label}
         </label>
       )}
       <div className="relative">
+        {/* text-body הוא 16px בכוונה: גופן קטן מזה גורם ל-iOS לזום
+            אוטומטי על השדה בעת מיקוד, וזה קופץ למשתמש בפרצוף. */}
         <input
           type={inputType}
           className={`
-            w-full px-4 py-2
+            w-full h-11 px-3
+            bg-surface-light dark:bg-surface-dark
+            text-body text-ink-light dark:text-ink-dark
             border rounded-lg
             transition-colors duration-200
             focus:outline-none focus:ring-2
-            disabled:bg-gray-100 disabled:cursor-not-allowed
-            ${showPasswordToggle ? 'pr-10' : ''}
+            disabled:bg-raised-light dark:disabled:bg-raised-dark disabled:cursor-not-allowed
+            ${showPasswordToggle ? 'pe-10' : ''}
             ${inputStyles}
             ${className}
           `}
@@ -56,7 +60,7 @@ export const Input: React.FC<InputProps> = ({
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+            className="absolute end-3 top-1/2 -translate-y-1/2 text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark focus:outline-none"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -76,10 +80,10 @@ export const Input: React.FC<InputProps> = ({
         )}
       </div>
       {error && (
-        <p className="mt-1 text-sm text-danger">{error}</p>
+        <p className="mt-1 text-caption text-danger dark:text-danger-dark">{error}</p>
       )}
       {helperText && !error && (
-        <p className="mt-1 text-sm text-gray-500">{helperText}</p>
+        <p className="mt-1 text-caption text-ink-3-light dark:text-ink-3-dark">{helperText}</p>
       )}
     </div>
   );

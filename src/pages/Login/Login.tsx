@@ -120,30 +120,30 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div className="min-h-screen bg-gradient-login flex items-center justify-center p-4">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-2xl shadow-e3 p-8 w-full max-w-md">
         {/* לוגו וכותרת */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="text-display text-ink-light dark:text-ink-dark mb-2">
             📝 אפליקציית פתקים
           </h1>
-          <span className="text-[9px] text-gray-400 block -mt-2 mb-2">v{__APP_VERSION__}</span>
-          <p className="text-gray-600">
+          <span className="text-[9px] text-ink-3-light dark:text-ink-3-dark block -mt-2 mb-2">v{__APP_VERSION__}</span>
+          <p className="text-ink-2-light dark:text-ink-2-dark">
             {mode === 'signin' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש'}
           </p>
         </div>
 
         {/* הודעת הצלחה */}
         {successMessage && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-600">{successMessage}</p>
+          <div className="mb-4 p-3 bg-success/10 border border-success/30 rounded-lg">
+            <p className="text-body-sm text-success dark:text-success-dark">{successMessage}</p>
           </div>
         )}
 
         {/* שגיאת אימות */}
         {authError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{authError}</p>
+          <div className="mb-4 p-3 bg-danger-soft dark:bg-danger-soft-dark border border-danger/30 rounded-lg">
+            <p className="text-body-sm text-danger dark:text-danger-dark">{authError}</p>
           </div>
         )}
 
@@ -213,16 +213,18 @@ export const Login: React.FC = () => {
         {/* מפריד */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-hairline-light dark:border-hairline-dark"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-white text-gray-500">או</span>
+            <span className="px-4 bg-surface-light dark:bg-surface-dark text-ink-3-light dark:text-ink-3-dark">או</span>
           </div>
         </div>
 
-        {/* כפתור Google */}
+        {/* כפתור Google - `secondary` ולא `outline`: מאז ש-`outline` הפך
+            ל-ghost הוא נטול מסגרת ורקע, ופעולת התחברות מלאה נראתה כמו
+            קישור. כאן צריך משקל של כפתור. */}
         <Button
-          variant="outline"
+          variant="secondary"
           fullWidth
           onClick={handleGoogleSignIn}
           disabled={isLoading}
@@ -251,12 +253,12 @@ export const Login: React.FC = () => {
 
         {/* החלפת מצב */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-body-sm text-ink-2-light dark:text-ink-2-dark">
             {mode === 'signin' ? 'עדיין אין לך חשבון?' : 'כבר יש לך חשבון?'}
             <button
               type="button"
               onClick={toggleMode}
-              className="mr-1 text-primary font-medium hover:underline"
+              className="ms-1 text-brand-text dark:text-brand-text-dark font-medium hover:underline"
               disabled={isLoading}
             >
               {mode === 'signin' ? 'הירשם כעת' : 'התחבר'}

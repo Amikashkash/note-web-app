@@ -33,7 +33,10 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/50 dark:bg-black/70">
+      {/* בנייד החלונית עוגנת לתחתית כגיליון (bottom sheet) ולא ממלאת
+          את המסך: זו התנהגות מוכרת במגע, והפינות המעוגלות למעלה מרמזות
+          שאפשר לסגור. במסך רחב היא נשארת חלונית ממורכזת. */}
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 dark:bg-black/70">
         {/* Backdrop */}
         <div
           className="fixed inset-0 -z-10"
@@ -41,18 +44,19 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
         ></div>
 
         {/* Modal */}
-        <div className="relative bg-white dark:bg-gray-800 rounded-none sm:rounded-2xl shadow-2xl w-full sm:max-w-4xl sm:w-auto min-h-screen sm:min-h-0 sm:my-4 max-h-screen sm:max-h-[95vh] overflow-y-auto transition-colors"
+        <div className="relative bg-surface-light dark:bg-surface-dark rounded-t-2xl sm:rounded-xl shadow-e3 w-full sm:max-w-4xl sm:w-auto max-h-[92vh] sm:max-h-[95vh] overflow-y-auto transition-colors"
           style={{
             WebkitOverflowScrolling: 'touch'
           } as React.CSSProperties}
         >
           {/* Header - only show if title is provided */}
           {title && (
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{title}</h2>
+            <div className="flex items-center justify-between p-4 border-b border-hairline-light dark:border-hairline-dark sticky top-0 bg-surface-light dark:bg-surface-dark z-10">
+              <h2 className="text-h1 text-ink-light dark:text-ink-dark">{title}</h2>
               <button
                 onClick={onClose}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                className="h-11 w-11 -m-2 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+                aria-label="סגור"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
