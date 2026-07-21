@@ -3,7 +3,7 @@
  * כל סעיף מכיל כותרת משנה וטקסט חופשי עם תמיכה במספור אוטומטי ועיצוב טקסט
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Button } from '@/components/common/Button';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
@@ -22,14 +22,31 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
   onChange,
   readOnly = false,
 }) => {
-  // המרת JSON ממחרוזת למערך
+  // המרת JSON ממחרוזת למערך.
+  // בדיקת המערך אינה קוסמטית: תוכן שמתפרסר לערך שאינו מערך (מספר,
+  // אובייקט) היה מגיע הלאה עם `length` לא מוגדר, וגם `map` וגם הזריעה
+  // של הסעיף הראשון היו מתנהגים בצורה בלתי צפויה.
   const sections = useMemo<WorkPlanSection[]>(() => {
     try {
-      return value ? JSON.parse(value) : [];
+      const parsed = value ? JSON.parse(value) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
   }, [value]);
+
+  /**
+   * תכנית ריקה מקבלת סעיף ראשון אוטומטית.
+   *
+   * תכנית בלי סעיף אחד לפחות היא חסרת משמעות, ולכן הלחיצה על "הוסף
+   * סעיף" רק כדי להתחיל הייתה מיותרת. בלי פוקוס בכוונה: בפתק חדש
+   * הפוקוס שייך לשדה הכותרת, ובפתק קיים הוא היה מקפיץ מקלדת בנייד.
+   */
+  useEffect(() => {
+    if (readOnly || sections.length > 0) return;
+
+    onChange(JSON.stringify([{ id: Date.now().toString(), header: '', content: '' }]));
+  }, [readOnly, sections.length, onChange]);
 
   const handleAddSection = () => {
     const newSection: WorkPlanSection = {

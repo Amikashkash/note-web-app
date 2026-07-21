@@ -88,6 +88,10 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             placeholder="הזן כותרת..."
             maxLength={LENGTH_LIMITS.NOTE_TITLE}
             required
+            // רק בפתק חדש: הכותרת היא השדה הראשון שממלאים, ובלי פוקוס
+            // קל לדלג עליה ולגלות את זה רק כשהשמירה נחסמת. בעריכת פתק
+            // קיים כבר יש כותרת, ופוקוס אוטומטי רק היה מקפיץ מקלדת.
+            autoFocus={!isEditMode}
           />
         </div>
 

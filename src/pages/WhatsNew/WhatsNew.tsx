@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.10.4',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'פתק חדש נפתח עם הסמן בשדה הכותרת. קל היה לדלג עליה ולגלות את זה רק כשהשמירה נחסמה',
+      },
+      {
+        type: 'improvement',
+        description:
+          'פתק תכנית עבודה נפתח עם סעיף ראשון מוכן, בלי הלחיצה המיותרת על "הוסף סעיף"',
+      },
+    ],
+  },
+  {
     version: '1.10.3',
     date: 'יולי 2026',
     changes: [
