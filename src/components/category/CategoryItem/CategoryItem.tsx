@@ -4,6 +4,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronLeft, Pin, Plus, Search, Share2, Users } from 'lucide-react';
 import type { Category } from '@/types';
 import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
@@ -103,34 +104,43 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
 
   return (
     <div
-      className="mb-4 bg-white dark:bg-gray-800 rounded-card p-5 shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-hover-dark transition-smooth hover-slide overflow-visible"
-      style={{ borderRight: `6px solid ${category.color}` }}
+      className="mb-4 bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-hairline-light dark:border-hairline-dark border-s-4 shadow-e1 hover:shadow-e2 transition-smooth overflow-visible"
+      // תכונה לוגית: בעברית `borderRight` צייר את הפס בקצה שבו השורה
+      // נגמרת, במקום בקצה שבו היא מתחילה.
+      style={{ borderInlineStartColor: category.color }}
     >
       {/* כותרת הקטגוריה */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3 flex-1">
           <button
             onClick={() => setManuallyExpanded((previous) => !previous)}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-base"
+            className="text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
             title={isExpanded ? 'קפל' : 'הרחב'}
           >
-            {isExpanded ? '▼' : '◀'}
+            {/* מקופל מצביע שמאלה ולא ימינה: ב-RTL כיוון ההמשך הוא שמאלה,
+                וחץ ימינה היה קורא כ"חזור". */}
+            {isExpanded ? (
+              <ChevronDown size={18} strokeWidth={1.75} />
+            ) : (
+              <ChevronLeft size={18} strokeWidth={1.75} />
+            )}
           </button>
           {category.icon && <span className="text-2xl">{category.icon}</span>}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              <h3 className="text-h2 text-ink-light dark:text-ink-dark">
                 {category.name}
               </h3>
               <button
                 onClick={() => navigate(`/category/${category.id}`)}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="inline-flex items-center gap-1 text-caption text-ink-3-light dark:text-ink-3-dark hover:text-brand-text dark:hover:text-brand-text-dark transition-colors px-2 py-1 rounded-lg hover:bg-raised-light dark:hover:bg-raised-dark"
                 title="פתח בתצוגה מלאה"
               >
-                🔍 הצג הכל
+                <Search size={14} strokeWidth={1.75} />
+                הצג הכל
               </button>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{categoryNotes.length} פתקים</p>
+            <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">{categoryNotes.length} פתקים</p>
           </div>
         </div>
 
@@ -138,19 +148,21 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
           {isOwner && (
             <button
               onClick={() => setShowShareManagement(true)}
-              className={`px-3 py-1.5 text-sm rounded-xl transition-smooth font-medium ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm rounded-lg transition-smooth font-medium ${
                 isShared
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 hover:-translate-y-0.5'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:-translate-y-0.5'
+                  ? 'bg-success/10 text-success dark:text-success-dark hover:bg-success/20'
+                  : 'bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-hairline-light dark:hover:bg-hairline-dark'
               }`}
               title={isShared ? `משותף עם ${category.sharedWith.length} משתמשים` : 'שתף קטגוריה'}
             >
-              {isShared ? `🔗 ${category.sharedWith.length}` : '🔗'}
+              <Share2 size={16} strokeWidth={1.75} />
+              {isShared && category.sharedWith.length}
             </button>
           )}
           {!isOwner && isShared && (
-            <span className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-xl font-medium">
-              👥 משותף
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded-lg font-medium">
+              <Users size={16} strokeWidth={1.75} />
+              משותף
             </span>
           )}
           <button
@@ -158,36 +170,41 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
               setEditingNote(null);
               setShowNoteForm(true);
             }}
-            className="px-5 py-2.5 text-sm bg-gradient-primary dark:bg-gradient-primary-dark text-white rounded-xl font-medium shadow-button dark:shadow-button-dark hover:shadow-button-hover dark:hover:shadow-button-hover-dark transition-smooth hover:-translate-y-0.5"
+            className="inline-flex items-center gap-1 h-11 px-4 text-body-sm bg-brand dark:bg-brand-dark text-white rounded-lg font-medium shadow-e1 hover:bg-brand-2 dark:hover:bg-brand-2-dark transition-smooth"
           >
-            + פתק
+            <Plus size={18} strokeWidth={2} />
+            פתק
           </button>
         </div>
       </div>
 
       {/* תצוגה מקופלת - כותרות בלבד */}
       {!isExpanded && categoryNotes.length > 0 && (
-        <div className="pb-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
+        <div className="pb-2 border-t border-hairline-light dark:border-hairline-dark mt-3 pt-3">
           <div className="overflow-x-auto notes-scroll" dir="rtl">
             <div className="flex gap-3">
               {collapsedPreview.map((note) => (
                 <button
                   key={note.id}
                   onClick={() => setViewingNote(note)}
-                  className="px-4 py-2 bg-gradient-note hover:shadow-note dark:hover:shadow-note-dark rounded-note text-sm text-gray-700 dark:text-gray-200 transition-smooth hover-lift border-r-3 flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
-                  style={{
-                    borderRightColor: note.color || category.color,
-                    borderRightWidth: '3px',
-                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-raised-light dark:bg-raised-dark hover:shadow-e1 rounded-lg text-body-sm text-ink-2-light dark:text-ink-2-dark transition-smooth border-s-[3px] flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
+                  style={{ borderInlineStartColor: note.color || category.color }}
                 >
-                  {note.isPinned && '📌 '}
+                  {note.isPinned && (
+                    <Pin
+                      size={12}
+                      strokeWidth={1.75}
+                      fill="currentColor"
+                      className="flex-shrink-0 text-cat-orange dark:text-cat-orange-dark"
+                    />
+                  )}
                   {note.title}
                 </button>
               ))}
               {hiddenCount > 0 && (
                 <button
                   onClick={() => setManuallyExpanded(true)}
-                  className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
+                  className="px-4 py-2 text-body-sm text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
                 >
                   +{hiddenCount} עוד...
                 </button>

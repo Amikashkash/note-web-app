@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.14.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'design',
+        description:
+          'כרטיסי הפתקים והקטגוריות עוצבו מחדש: רקע נקי, גבול דק והגבהה עדינה במקום גרדיאנטים וצללים כבדים',
+      },
+      {
+        type: 'fix',
+        description:
+          'פס הצבע של הפתק והקטגוריה צויר בקצה שבו השורה נגמרת במקום בקצה שבו היא מתחילה. עכשיו הוא בצד ימין, כמתאים לעברית',
+      },
+    ],
+  },
+  {
     version: '1.13.1',
     date: 'יולי 2026',
     changes: [

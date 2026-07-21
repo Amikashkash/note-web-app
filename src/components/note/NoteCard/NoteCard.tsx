@@ -2,6 +2,7 @@
  * קומפוננטה המציגה כרטיס פתק בודד
  */
 
+import { Eye, GripVertical, Pin, Trash2 } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Button } from '@/components/common/Button';
 import { getNotePreview } from '@/utils/notePreview';
@@ -82,12 +83,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     <div
       onDragOver={onDragOver ? handleDragOver : undefined}
       onDrop={onDrop ? handleDrop : undefined}
-      className={`flex-shrink-0 w-52 sm:w-64 h-44 bg-gradient-note rounded-note p-4 shadow-note dark:shadow-note-dark transition-smooth flex flex-col cursor-pointer ${
+      className={`flex-shrink-0 w-52 sm:w-64 h-44 bg-surface-light dark:bg-surface-dark rounded-lg p-4 border border-hairline-light dark:border-hairline-dark border-s-4 shadow-e1 transition-smooth flex flex-col cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
-        isDragOver ? 'ring-2 ring-primary-start shadow-note-hover dark:shadow-note-hover-dark scale-105' : 'hover:shadow-note-hover dark:hover:shadow-note-hover-dark hover:-translate-y-1'
+        isDragOver ? 'ring-2 ring-brand shadow-e2 scale-105' : 'hover:shadow-e2'
       }`}
-      style={{ borderRight: `4px solid ${note.color || '#667eea'}` }}
+      // פס הצבע בתכונה לוגית: `borderRight` היה מצייר אותו בצד שמאל
+      // החזותי בעברית, כלומר בקצה שבו השורה נגמרת במקום שבו היא מתחילה.
+      style={{ borderInlineStartColor: note.color || '#4F46E5' }}
       onClick={handleView}
     >
       {/* כותרת ואייקון הצמדה */}
@@ -98,13 +101,13 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               draggable={true}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              className="text-gray-400 dark:text-gray-500 text-sm flex-shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-grab active:cursor-grabbing"
+              className="text-ink-3-light dark:text-ink-3-dark flex-shrink-0 hover:text-ink-light dark:hover:text-ink-dark transition-colors cursor-grab active:cursor-grabbing"
               title="גרור להזזה"
             >
-              ⋮⋮
+              <GripVertical size={16} strokeWidth={1.75} />
             </span>
           )}
-          <h4 className="font-bold text-gray-800 dark:text-gray-100 flex-1 line-clamp-1 text-base">
+          <h4 className="text-h2 text-ink-light dark:text-ink-dark flex-1 line-clamp-1">
             {note.title}
           </h4>
         </div>
@@ -114,17 +117,23 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               e.stopPropagation();
               handleTogglePin();
             }}
-            className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-smooth flex-shrink-0 text-lg hover:scale-110"
+            className={`transition-smooth flex-shrink-0 hover:scale-110 ${
+              note.isPinned
+                ? 'text-cat-orange dark:text-cat-orange-dark'
+                : 'text-ink-3-light dark:text-ink-3-dark hover:text-cat-orange'
+            }`}
             title={note.isPinned ? 'ביטול הצמדה' : 'הצמדה'}
           >
-            {note.isPinned ? '📌' : '📍'}
+            {/* מוצמד = אייקון מלא, לא אייקון אחר. שני אימוג'י שונים
+                (📌 מול 📍) קראו כשני דברים ולא כשני מצבים של אותו דבר. */}
+            <Pin size={18} strokeWidth={1.75} fill={note.isPinned ? 'currentColor' : 'none'} />
           </button>
         )}
       </div>
 
       {/* תוכן הפתק */}
       <div className="flex-1 overflow-hidden mb-3">
-        <p className="text-sm text-gray-700 dark:text-gray-100 whitespace-pre-wrap line-clamp-3 leading-relaxed">
+        <p className="text-body-sm text-ink-2-light dark:text-ink-2-dark whitespace-pre-wrap line-clamp-3">
           {displayContent}
         </p>
       </div>
@@ -135,7 +144,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           {note.tags.slice(0, 3).map(tag => (
             <span
               key={tag}
-              className="text-xs bg-white/70 dark:bg-gray-700/70 text-gray-700 dark:text-gray-200 px-2.5 py-1 rounded-full font-medium shadow-sm"
+              className="text-caption bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark px-2.5 py-1 rounded-full"
             >
               #{tag}
             </span>
@@ -152,9 +161,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             e.stopPropagation();
             handleView();
           }}
-          className="flex-1 text-xs py-2 font-semibold"
+          className="flex-1"
         >
-          👁 הצג
+          <Eye size={16} strokeWidth={1.75} />
+          הצג
         </Button>
         <Button
           variant="danger"
@@ -163,9 +173,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             e.stopPropagation();
             handleDelete();
           }}
-          className="flex-1 text-xs py-2 font-semibold"
+          className="flex-1"
         >
-          🗑 מחק
+          <Trash2 size={16} strokeWidth={1.75} />
+          מחק
         </Button>
       </div>
     </div>
