@@ -127,10 +127,13 @@ const showReminderNotification = async (data: ReminderPushData): Promise<void> =
       tag: `task-${data.noteId}-${data.itemId}`,
       requireInteraction: true,
       data,
-      actions: [
-        { action: 'open', title: 'פתח פתק' },
-        { action: 'close', title: 'סגור' },
-      ],
+      // בלי כפתורי פעולה בכוונה.
+      //
+      // הקשה על גוף ההודעה עובדת בכל מקום, כי מערכת ההפעלה עצמה מפעילה
+      // את האפליקציה ורק אז המטפל כאן רץ. כפתור פעולה לא מפעיל אותה
+      // באנדרואיד, וכל האחריות נופלת על `clients.openWindow()` - קריאה
+      // שלא אמינה בהפעלת PWA מותקנת שאינה רצה. כפתור "פתח פתק" לא הוסיף
+      // שום יכולת מעבר להקשה על ההודעה, אבל כן הציע מסלול שנכשל.
     } as NotificationOptions);
   } catch (error) {
     console.error('SW: Error showing notification:', error);
@@ -174,6 +177,9 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
+  // התראות חדשות כבר לא מציגות כפתורים, אבל `requireInteraction` משאיר
+  // התראות ישנות על המסך עד שנוגעים בהן - כולל כאלה שנוצרו לפני השינוי
+  // ועדיין מציגות "סגור". הבדיקה נשארת כדי שלחיצה עליהן לא תפתח את הפתק.
   if (event.action === 'close') return;
 
   const data = event.notification.data as ReminderPushData | undefined;

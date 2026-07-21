@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.9.5',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'כפתורי הפעולה בהתראת התזכורת הוסרו. הקשה על ההודעה פותחת את הפתק, בעוד שכפתור "פתח פתק" לא הצליח להפעיל את האפליקציה באנדרואיד כשהיא הייתה סגורה',
+      },
+    ],
+  },
+  {
     version: '1.9.4',
     date: 'יולי 2026',
     changes: [
