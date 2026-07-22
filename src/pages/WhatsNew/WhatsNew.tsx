@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.20.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'תזכורות חוזרות: אחרי שקבעת למשימה תאריך ושעה אפשר לבחור "כל יום", "כל שבוע", "כל חודש" או "כל שנה". התזכורת תחזור מעצמה במועד הבא',
+      },
+      {
+        type: 'improvement',
+        description:
+          'משימה שנקבעה ל-31 בחודש תזכיר ב-28 בפברואר וב-31 במרץ - היום המקורי לא הולך לאיבוד אחרי חודש קצר',
+      },
+    ],
+  },
+  {
     version: '1.19.1',
     date: 'יולי 2026',
     changes: [

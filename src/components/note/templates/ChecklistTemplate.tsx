@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useEffect, useRef } from 'react';
-import { CalendarDays, Clock, Trash2, X, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Clock, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 import {
@@ -19,12 +19,23 @@ import {
   DATE_STATUS_BORDER_CLASS,
 } from './dueDate';
 
+/** מרווחי חזרה נתמכים. חסר = תזכורת חד-פעמית. */
+export type RepeatRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const REPEAT_LABELS: Record<RepeatRule, string> = {
+  daily: 'כל יום',
+  weekly: 'כל שבוע',
+  monthly: 'כל חודש',
+  yearly: 'כל שנה',
+};
+
 export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
   dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
   dueTime?: string; // שעת יעד בפורמט HH:MM
+  repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
 }
 
 interface ChecklistTemplateProps {
@@ -115,6 +126,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
         completed: item.completed || false,
         dueDate: item.dueDate,
         dueTime: item.dueTime,
+        repeat: item.repeat,
       }));
     } catch {
       return [];
@@ -186,9 +198,16 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   };
 
-  /** ניקוי התאריך מסיר גם את השעה - שעה בלי תאריך היא חסרת משמעות */
+  /**
+   * ניקוי התאריך מסיר גם את השעה ואת החזרה - שעה בלי תאריך היא חסרת
+   * משמעות, וחזרה בלי מועד בסיס אין לה ממה להתגלגל.
+   */
   const handleClearDue = (id: string) => {
-    updateItem(id, { dueDate: undefined, dueTime: undefined });
+    updateItem(id, { dueDate: undefined, dueTime: undefined, repeat: undefined });
+  };
+
+  const handleUpdateRepeat = (id: string, repeat: string) => {
+    updateItem(id, { repeat: repeat ? (repeat as RepeatRule) : undefined });
   };
 
   const handleDeleteItem = (id: string) => {
@@ -331,7 +350,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                       colorClass={item.dueTime ? 'text-brand-text' : 'text-ink-3-light dark:text-ink-3-dark'}
                       title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
                       onChange={(next) => handleUpdateDueTime(item.id, next)}
-                      onClear={() => handleUpdateDueTime(item.id, '')}
+                      // הסרת השעה מסירה גם את החזרה: בלי שעה אין תזכורת,
+                      // וכלל חזרה שנשאר היה חוזר בשקט אם תוסיף שעה שוב
+                      onClear={() =>
+                        updateItem(item.id, { dueTime: undefined, repeat: undefined })
+                      }
                     />
                   )}
 
@@ -347,6 +370,36 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     </button>
                   )}
                 </div>
+
+                {/* חזרה תקופתית - שורה שנייה, ורק כשיש תאריך ושעה.
+                    בלי שעה אין תזכורת שתחזור, ודחיסת בורר רביעי לשורה
+                    הראשונה הייתה מוציאה אותה מהמסך בנייד. */}
+                {!readOnly && item.dueDate && item.dueTime && (
+                  <div className="flex items-center gap-2 ps-9">
+                    <Repeat
+                      size={14}
+                      strokeWidth={1.75}
+                      className={
+                        item.repeat
+                          ? 'text-brand-text dark:text-brand-text-dark flex-shrink-0'
+                          : 'text-ink-3-light dark:text-ink-3-dark flex-shrink-0'
+                      }
+                    />
+                    <select
+                      value={item.repeat || ''}
+                      onChange={(e) => handleUpdateRepeat(item.id, e.target.value)}
+                      className="text-caption bg-transparent text-ink-2-light dark:text-ink-2-dark border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded cursor-pointer"
+                      title="חזרה תקופתית"
+                    >
+                      <option value="">פעם אחת</option>
+                      {(Object.keys(REPEAT_LABELS) as RepeatRule[]).map((rule) => (
+                        <option key={rule} value={rule}>
+                          {REPEAT_LABELS[rule]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             );
           })

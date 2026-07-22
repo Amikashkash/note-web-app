@@ -26,6 +26,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { localDateTimeToDate } from './timezone';
+import { isRepeatRule, nextOccurrence, type RepeatRule } from './recurrence';
 import type { ReminderPushData } from './reminderPayload';
 
 initializeApp();
@@ -56,6 +57,8 @@ interface ChecklistItem {
   completed?: boolean;
   dueDate?: string;
   dueTime?: string;
+  /** 'daily' | 'weekly' | 'monthly' | 'yearly', או חסר לתזכורת חד-פעמית */
+  repeat?: string;
 }
 
 interface DesiredReminder {
@@ -63,6 +66,16 @@ interface DesiredReminder {
   itemId: string;
   itemText: string;
   remindAt: Timestamp;
+  repeat: RepeatRule | null;
+  /**
+   * התאריך והשעה שהמשתמש קבע, כמחרוזות מקומיות.
+   *
+   * נשמרים כי המתזמן חייב לחשב את המועד הבא מהבסיס ולא מהמועד שהרגע
+   * נורה. "כל חודש ב-31" שנורה ב-28 בפברואר וממשיך משם היה מקבל 28
+   * במרץ - הקיצוץ מצטבר. מהבסיס, מרץ מקבל את ה-31 שלו.
+   */
+  baseDate: string;
+  baseTime: string;
 }
 
 /**
@@ -99,7 +112,15 @@ const computeDesiredReminders = (noteId: string, items: ChecklistItem[]): Desire
     if (item.completed) return;
     if (!item.dueDate || !item.dueTime) return;
 
-    const remindAt = localDateTimeToDate(item.dueDate, item.dueTime);
+    const repeat = isRepeatRule(item.repeat) ? item.repeat : null;
+
+    // תזכורת חוזרת מתגלגלת קדימה למועד הבא במקום להיפסל כשעברה.
+    // המועד נגזר מהכלל, ולכן החישוב כאן זהה לזה שהמתזמן עושה אחרי
+    // שליחה - שניהם מגיעים לאותה תוצאה ואין ביניהם מרוץ.
+    const remindAt = repeat
+      ? nextOccurrence(item.dueDate, item.dueTime, repeat, new Date(now))
+      : localDateTimeToDate(item.dueDate, item.dueTime);
+
     if (!remindAt || remindAt.getTime() <= now) return;
 
     // מזהה נגזר-מיקום תואם את מה שהלקוח עושה כשפריט ישן חסר `id`
@@ -112,6 +133,9 @@ const computeDesiredReminders = (noteId: string, items: ChecklistItem[]): Desire
       itemId,
       itemText: (item.text || '').slice(0, BODY_PREVIEW_LENGTH),
       remindAt: Timestamp.fromDate(remindAt),
+      repeat,
+      baseDate: item.dueDate,
+      baseTime: item.dueTime,
     });
   });
 
@@ -142,9 +166,14 @@ export const syncNoteReminders = onDocumentWritten('notes/{noteId}', async (even
     const remindAtChanged =
       !current || !reminder.remindAt.isEqual(current.get('remindAt') as Timestamp);
 
+    // גם שינוי בכלל החזרה נחשב שינוי, גם כשהמועד הבא יצא זהה. מעבר
+    // מיומי לשבועי כשהמופע הבא הוא ממילא מחר לא מזיז את `remindAt`,
+    // ובלי הבדיקה הזו הכלל הישן היה נשאר במסמך וממשיך לגלגל לפיו.
+    const repeatChanged = !current || (current.get('repeat') ?? null) !== reminder.repeat;
+
     // מסמך שלא השתנה נשאר כפי שהוא. דריסה שלו הייתה מאפסת את `sent`
     // ומייצרת התראה חוזרת בכל שמירה של הפתק.
-    if (!remindAtChanged) continue;
+    if (!remindAtChanged && !repeatChanged) continue;
 
     batch.set(
       db.collection('reminders').doc(reminder.docId),
@@ -156,6 +185,9 @@ export const syncNoteReminders = onDocumentWritten('notes/{noteId}', async (even
         noteTitle: (note!.title as string) || 'תזכורת',
         itemText: reminder.itemText,
         remindAt: reminder.remindAt,
+        repeat: reminder.repeat,
+        baseDate: reminder.baseDate,
+        baseTime: reminder.baseTime,
         // מועד חדש מחמש מחדש, גם אם התזכורת הקודמת כבר נשלחה
         sent: false,
         sentAt: null,
@@ -260,7 +292,28 @@ export const sendDueReminders = onSchedule(
 
       // התזכורת מסומנת כמטופלת בכל מקרה, גם כשאין למי לשלוח. אחרת היא
       // הייתה נשלפת מחדש בכל הרצה, כל דקה, לנצח.
-      batch.update(doc.ref, { sent: true, sentAt: FieldValue.serverTimestamp() });
+      //
+      // בתזכורת חוזרת "מטופלת" פירושה מתגלגלת למועד הבא ולא נסגרת.
+      // החישוב מתאריך הבסיס ולא מהמועד שנורה - אחרת קיצוץ לסוף חודש
+      // מצטבר ו"כל 31 בחודש" מתדרדר ל-28.
+      const repeat = doc.get('repeat') as string | null;
+      const baseDate = doc.get('baseDate') as string | undefined;
+      const baseTime = doc.get('baseTime') as string | undefined;
+
+      const rollForward =
+        isRepeatRule(repeat) && baseDate && baseTime
+          ? nextOccurrence(baseDate, baseTime, repeat, now.toDate())
+          : null;
+
+      if (rollForward) {
+        batch.update(doc.ref, {
+          remindAt: Timestamp.fromDate(rollForward),
+          sent: false,
+          sentAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        batch.update(doc.ref, { sent: true, sentAt: FieldValue.serverTimestamp() });
+      }
 
       if (!userId) {
         logger.warn('Reminder has no userId', { reminderId: doc.id });
