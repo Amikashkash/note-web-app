@@ -70,8 +70,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       }
 
       logger.debug('Subscribing to categories for user:', userId);
+      // `hasLoaded` מתאפס יחד עם הרשימה. בלי זה הוא נשאר `true` ממנוי
+      // קודם בזמן שהרשימה כבר רוקנה, וצרכן שמחכה לטעינה מקבל תשובה
+      // שקרית: "נטען, ואין קטגוריות".
       set({
         isLoading: true,
+        hasLoaded: false,
         categories: [],
         _subscribedUserId: userId,
         _subscriberCount: 1,
@@ -101,6 +105,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       set({
         categories: [],
         isLoading: false,
+        hasLoaded: false,
         _unsubscribe: null,
         _subscribedUserId: null,
         _subscriberCount: 0,

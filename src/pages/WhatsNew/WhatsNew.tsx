@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.19.1',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'לחיצה על קטגוריה הבהבה וחזרה לדף הבית במקום לפתוח את הקטגוריה',
+      },
+    ],
+  },
+  {
     version: '1.19.0',
     date: 'יולי 2026',
     changes: [
