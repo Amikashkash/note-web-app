@@ -4,7 +4,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Pin, Plus, Search, Share2, Users } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Pin, Plus, Share2, Users } from 'lucide-react';
 import type { Category } from '@/types';
 import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
@@ -126,22 +126,23 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
             )}
           </button>
           {category.icon && <span className="text-2xl">{category.icon}</span>}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-h2 text-ink-light dark:text-ink-dark">
-                {category.name}
-              </h3>
-              <button
-                onClick={() => navigate(`/category/${category.id}`)}
-                className="inline-flex items-center gap-1 text-caption text-ink-3-light dark:text-ink-3-dark hover:text-brand-text dark:hover:text-brand-text-dark transition-colors px-2 py-1 rounded-lg hover:bg-raised-light dark:hover:bg-raised-dark"
-                title="פתח בתצוגה מלאה"
-              >
-                <Search size={14} strokeWidth={1.75} />
-                הצג הכל
-              </button>
-            </div>
-            <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">{categoryNotes.length} פתקים</p>
-          </div>
+          {/* הקטגוריה עצמה נפתחת בתצוגה מלאה - זו פעולת המגע המצופה,
+              והרשת שם מציגה שתי עמודות עם חיפוש. קודם היה כאן קישור
+              "הצג הכל" בגודל caption עם אייקון זכוכית מגדלת: הוא נקרא
+              כחיפוש ולא כפתיחה, ובפועל אף אחד לא מצא את המסך המלא.
+              ה-chevron ליד ממשיך להרחיב בתוך הדף. */}
+          <button
+            onClick={() => navigate(`/category/${category.id}`)}
+            className="flex-1 min-w-0 min-h-11 text-start rounded-lg px-2 -mx-2 hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+            title="פתח בתצוגה מלאה"
+          >
+            <h3 className="text-h2 text-ink-light dark:text-ink-dark truncate">
+              {category.name}
+            </h3>
+            <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">
+              {categoryNotes.length} פתקים
+            </p>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">

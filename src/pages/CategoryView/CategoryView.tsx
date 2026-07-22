@@ -140,8 +140,12 @@ export const CategoryView: React.FC = () => {
                 <h1 className="text-h1 text-ink-light dark:text-ink-dark truncate">
                   {category.name}
                 </h1>
+                {/* בזמן חיפוש מציגים גם את הסך הכל, אחרת נראה כאילו
+                    פתקים נעלמו מהקטגוריה */}
                 <p className="text-caption text-ink-3-light dark:text-ink-3-dark">
-                  {visibleNotes.length} פתקים
+                  {searchQuery
+                    ? `${visibleNotes.length} מתוך ${notes.length} פתקים`
+                    : `${visibleNotes.length} פתקים`}
                 </p>
               </div>
             </div>
@@ -204,7 +208,9 @@ export const CategoryView: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          // שתי עמודות כבר בנייד. קודם היה כאן `grid-cols-1 sm:grid-cols-2`,
+          // ו-`sm:` מתחיל ב-640px - כלומר בטלפון התקבלה עמודה אחת.
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {visibleNotes.map((note) => (
               <NoteCard
                 key={note.id}
@@ -212,6 +218,7 @@ export const CategoryView: React.FC = () => {
                 onView={setViewingNote}
                 onDelete={deleteNote}
                 onTogglePin={pinNote}
+                fluid
               />
             ))}
           </div>

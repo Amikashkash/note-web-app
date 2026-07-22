@@ -18,6 +18,14 @@ interface NoteCardProps {
   onDrop?: (targetNote: Note) => void;
   isDragging?: boolean;
   isDragOver?: boolean;
+  /**
+   * ממלא את רוחב המיכל במקום רוחב קבוע - לשימוש ברשת.
+   *
+   * ברירת המחדל היא רוחב קבוע כי שלושה מתוך ארבעת המשטחים שמציגים
+   * כרטיסים הם רצועות גלילה אופקית, ושם רוחב קבוע הוא מה שנדרש. ברשת
+   * הוא דווקא מזיק: הכרטיס נעצר ב-208px ומשאיר את שאר תא הרשת ריק.
+   */
+  fluid?: boolean;
 }
 
 export const NoteCard: React.FC<NoteCardProps> = ({
@@ -31,6 +39,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onDrop,
   isDragging = false,
   isDragOver = false,
+  fluid = false,
 }) => {
   const handleView = () => {
     onView(note);
@@ -83,7 +92,9 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     <div
       onDragOver={onDragOver ? handleDragOver : undefined}
       onDrop={onDrop ? handleDrop : undefined}
-      className={`flex-shrink-0 w-52 sm:w-64 h-44 bg-surface-light dark:bg-surface-dark rounded-lg p-4 border border-hairline-light dark:border-hairline-dark border-s-4 shadow-e1 transition-smooth flex flex-col cursor-pointer ${
+      className={`${
+        fluid ? 'w-full min-h-44' : 'flex-shrink-0 w-52 sm:w-64 h-44'
+      } bg-surface-light dark:bg-surface-dark rounded-lg p-4 border border-hairline-light dark:border-hairline-dark border-s-4 shadow-e1 transition-smooth flex flex-col cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isDragOver ? 'ring-2 ring-brand shadow-e2 scale-105' : 'hover:shadow-e2'
@@ -161,7 +172,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             e.stopPropagation();
             handleView();
           }}
-          className="flex-1"
+          // `min-w-0` מאפשר לכפתור להתכווץ מתחת לרוחב תוכנו. ברשת של שתי
+          // עמודות בטלפון העמודה היא כ-167px, ושני כפתורים ברוחבם הטבעי
+          // היו גולשים מחוץ לכרטיס.
+          className="flex-1 min-w-0 px-2 sm:px-4"
         >
           <Eye size={16} strokeWidth={1.75} />
           הצג
@@ -173,7 +187,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             e.stopPropagation();
             handleDelete();
           }}
-          className="flex-1"
+          // `min-w-0` מאפשר לכפתור להתכווץ מתחת לרוחב תוכנו. ברשת של שתי
+          // עמודות בטלפון העמודה היא כ-167px, ושני כפתורים ברוחבם הטבעי
+          // היו גולשים מחוץ לכרטיס.
+          className="flex-1 min-w-0 px-2 sm:px-4"
         >
           <Trash2 size={16} strokeWidth={1.75} />
           מחק
