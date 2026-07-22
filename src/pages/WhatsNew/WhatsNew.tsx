@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.18.0',
+    date: 'יולי 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'שיתוף קטגוריה נכשל תמיד בשגיאה. השאילתה ששולפת את הפתקים שבקטגוריה נדחתה על ידי כללי ההרשאות',
+      },
+      {
+        type: 'feature',
+        description:
+          'מקטע "שותף איתי" בדף הבית. פתק ששותף איתך בלי הקטגוריה שלו הגיע למכשיר אך לא הוצג בשום מקום, כי דף הבית בנוי סביב קטגוריות',
+      },
+    ],
+  },
+  {
     version: '1.17.0',
     date: 'יולי 2026',
     changes: [

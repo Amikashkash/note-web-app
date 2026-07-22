@@ -8,6 +8,7 @@ import { Archive, Search, Settings, X } from "lucide-react";
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
+import { SharedWithMe } from '@/components/note/SharedWithMe/SharedWithMe';
 import { CategoryForm } from '@/components/category/CategoryForm/CategoryForm';
 import { ProfileMenu } from '@/components/profile/ProfileMenu';
 
@@ -101,6 +102,10 @@ export const Home: React.FC = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
+        {/* לפני הקטגוריות: פתק ששותף איתך זה עתה הוא הדבר שסביר שחיפשת,
+            ומקטע שמופיע רק כשיש בו תוכן לא דוחף כלום כשהוא ריק. */}
+        <SharedWithMe />
+
         <div className="flex items-center justify-between mb-3 sm:mb-6 gap-2">
           <h2 className="text-base sm:text-xl md:text-2xl font-bold text-ink-light dark:text-ink-dark truncate">הקטגוריות שלי</h2>
           <div className="flex items-center gap-1 flex-shrink-0">

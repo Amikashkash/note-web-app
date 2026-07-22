@@ -18,7 +18,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
+import { auth, db } from '@/services/firebase/config';
 import { getDefaultCategory } from '@/utils/defaults';
 import type { Category, CategoryInput } from '@/types';
 import { toCategory } from './mappers';
@@ -171,8 +171,28 @@ const applySharingToCategoryTree = async (
   categoryId: string,
   operation: ReturnType<typeof arrayUnion> | ReturnType<typeof arrayRemove>
 ): Promise<void> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('משתמש לא מחובר');
+  }
+
+  /**
+   * הסינון לפי `userId` אינו אופטימיזציה - בלעדיו השאילתה נדחית.
+   *
+   * Firestore מעריך כללי הרשאה מול השאילתה עצמה ולא מול התוצאות שהיא
+   * מחזירה. כלל הקריאה לפתקים דורש בעלות או שיתוף, ושאילתה שמסננת לפי
+   * `categoryId` בלבד לא מוכיחה שכל מה שיחזור קריא - אז היא נכשלת
+   * ב-permission-denied, וכל שיתוף קטגוריה נכשל איתה.
+   *
+   * הסינון גם נכון לגופו: אפשר לשתף רק פתקים שבבעלותך. פתק של מישהו
+   * אחר שיושב בקטגוריה משותפת אינו שלך לחלוק הלאה.
+   */
   const notesSnapshot = await getDocs(
-    query(collection(db, NOTES_COLLECTION), where('categoryId', '==', categoryId))
+    query(
+      collection(db, NOTES_COLLECTION),
+      where('categoryId', '==', categoryId),
+      where('userId', '==', userId)
+    )
   );
 
   const targets = [categoryRef(categoryId), ...notesSnapshot.docs.map((noteDoc) => noteDoc.ref)];
