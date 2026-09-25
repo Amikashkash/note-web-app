@@ -1,9 +1,17 @@
 /**
  * LinkPreview Component - Display rich preview cards for URLs
+ *
+ * כרגע תמיד מוצג קישור רגיל: התצוגה העשירה שולפת את הדף דרך פרוקסי של
+ * צד שלישי ולכן כבויה (ראה `LINK_PREVIEW_ENABLED`). הקוד שלה נשאר ב-
+ * `RichLinkPreview`, כדי להחזיר אותה כשהשליפה תעבור דרך שרת משלנו.
  */
 
 import React, { useState, useEffect } from 'react';
-import { fetchLinkPreview, type LinkPreviewData } from '@/services/api/linkPreview';
+import {
+  fetchLinkPreview,
+  LINK_PREVIEW_ENABLED,
+  type LinkPreviewData,
+} from '@/services/api/linkPreview';
 import { logger } from '@/utils/logger';
 
 interface LinkPreviewProps {
@@ -11,7 +19,19 @@ interface LinkPreviewProps {
   className?: string;
 }
 
-export const LinkPreview: React.FC<LinkPreviewProps> = ({ url, className = '' }) => {
+/** קישור רגיל, בלי שום בקשת רשת */
+const PlainLink: React.FC<LinkPreviewProps> = ({ url, className = '' }) => (
+  <a
+    href={url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className={`inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline ${className}`}
+  >
+    🔗 {url}
+  </a>
+);
+
+const RichLinkPreview: React.FC<LinkPreviewProps> = ({ url, className = '' }) => {
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -63,17 +83,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({ url, className = '' })
   }
 
   if (error || !preview) {
-    // Fallback to simple link
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline ${className}`}
-      >
-        🔗 {url}
-      </a>
-    );
+    return <PlainLink url={url} className={className} />;
   }
 
   return (
@@ -142,3 +152,6 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({ url, className = '' })
     </a>
   );
 };
+
+export const LinkPreview: React.FC<LinkPreviewProps> = (props) =>
+  LINK_PREVIEW_ENABLED ? <RichLinkPreview {...props} /> : <PlainLink {...props} />;

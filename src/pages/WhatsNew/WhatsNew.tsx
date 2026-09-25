@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.20.4',
+    date: 'ספטמבר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'פרטיות: קישורים בפתקים כבר לא נשלחים לשירות חיצוני כדי להציג תצוגה מקדימה. הקישור מוצג כקישור רגיל. התצוגה המקדימה תחזור כשתעבור דרך שרת של האפליקציה',
+      },
+    ],
+  },
+  {
     version: '1.20.3',
     date: 'ספטמבר 2026',
     changes: [

@@ -4,6 +4,19 @@
 
 import { logger } from '@/utils/logger';
 
+/**
+ * תצוגה מקדימה של קישורים - כבויה.
+ *
+ * המימוש הנוכחי שולח כל כתובת שמופיעה בפתק לפרוקסי ציבורי של צד שלישי
+ * (corsproxy.io), ואת שם האתר ל-Google לצורך favicon. קישורים פרטיים -
+ * מסמכים משותפים עם token, קישורי איפוס, פגישות - דלפו כך לשירות שאינו
+ * בשליטתנו, בלי שהמשתמש ידע. עד שהשליפה תעבור דרך שרת משלנו (ראה S-2
+ * ב-`thinking/architecture-review.md`) הקישורים מוצגים כקישור רגיל.
+ *
+ * מוגדר כ-`boolean` ולא כ-literal כדי שהקוד שמאחורי הדגל ימשיך להיבדק.
+ */
+export const LINK_PREVIEW_ENABLED: boolean = false;
+
 export interface LinkPreviewData {
   url: string;
   title?: string;
@@ -79,6 +92,11 @@ const extractMetadata = (html: string, url: string): LinkPreviewData => {
  * Fetch link preview data from a URL
  */
 export const fetchLinkPreview = async (url: string): Promise<LinkPreviewData> => {
+  // הגנה כפולה: גם אם קומפוננטה תקרא לכאן, שום בקשה לא יוצאת מהמכשיר
+  if (!LINK_PREVIEW_ENABLED) {
+    return { url, title: url };
+  }
+
   try {
     // Validate URL
     new URL(url); // Throws if invalid
