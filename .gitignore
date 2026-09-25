@@ -43,3 +43,6 @@ service-account*.json
 
 # חבילת מקור של ה-handoff העיצובי - ה-README וקבצי הייחוס מגורסנים, הארכיון לא
 new_design/*.zip
+
+# הגדרות מקומיות של Claude Code - הרשאות אישיות, לא שייכות לריפו
+.claude/settings.local.json
