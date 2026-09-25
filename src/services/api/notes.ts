@@ -13,6 +13,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   Unsubscribe,
   updateDoc,
@@ -25,6 +26,7 @@ import { byPinnedThenOrder, toNote } from './mappers';
 import { findUserIdByEmail } from './users';
 import { logger } from '@/utils/logger';
 import { wrapError } from '@/utils/errors';
+import { appendSnippet, type AppendResult, type SharedSnippet } from '@/utils/templateContent';
 
 const NOTES_COLLECTION = 'notes';
 
@@ -87,6 +89,44 @@ export const updateNote = async (
   } catch (error) {
     logger.error('Error updating note:', error);
     throw wrapError('שגיאה בעדכון הפתק', error);
+  }
+};
+
+/**
+ * הוספת תוכן משותף לפתק קיים, על התוכן העדכני בשרת.
+ *
+ * בתוך transaction ולא על עותק מהזיכרון: הפתק עשוי להשתנות בין הרגע
+ * שבו נבחר בדף השיתוף לבין השמירה (למשל שותף שמסמן פריט), וכתיבה
+ * שמבוססת על עותק ישן הייתה מוחקת את השינוי הזה.
+ *
+ * כשאי אפשר להוסיף (סוג פתק שלא תומך, תוכן לא תקין) לא נכתב דבר,
+ * והסיבה מוחזרת לקורא.
+ */
+export const appendToNote = async (
+  noteId: string,
+  snippet: SharedSnippet
+): Promise<AppendResult> => {
+  try {
+    return await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(noteRef(noteId));
+      if (!snapshot.exists()) {
+        throw new Error('הפתק לא נמצא');
+      }
+
+      const note = toNote(snapshot);
+      const result = appendSnippet(note.content, note.templateType, snippet);
+
+      if (result.ok) {
+        transaction.update(noteRef(noteId), {
+          content: result.content,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      return result;
+    });
+  } catch (error) {
+    logger.error('Error appending to note:', error);
+    throw wrapError('שגיאה בהוספה לפתק', error);
   }
 };
 

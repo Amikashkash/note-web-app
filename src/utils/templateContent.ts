@@ -250,3 +250,62 @@ export const convertContent = (
   const converted = linesToContent(lines, to);
   return converted === null ? FAILED : { ok: true, content: converted };
 };
+
+// ---------------------------------------------------------------------------
+// הוספת תוכן משותף לפתק קיים (דף השיתוף)
+//
+// בגרסה קודמת ההוספה שרשרה טקסט לסוף המחרוזת בכל תבנית. ברשימת משימות
+// או קניות זה הפך JSON תקין לטקסט שבור, והתבנית הציגה רשימה ריקה.
+// כאן כל תבנית מקבלת את התוכן בצורה שלה, ותבניות שאין להן צורה כזו
+// חסומות. הפריטים הקיימים נשמרים כמו שהם - כולל שדות שהגרסה הזו לא
+// מכירה - כי ההוספה עובדת על המערך הגולמי ולא על הפענוח המנורמל.
+// ---------------------------------------------------------------------------
+
+export interface SharedSnippet {
+  title: string;
+  text: string;
+}
+
+export type AppendResult =
+  | { ok: true; content: string }
+  | { ok: false; reason: 'unsupported' | 'unparseable' | 'empty' };
+
+const APPENDABLE = new Set<string>(['plain', 'checklist', 'shopping', 'workplan']);
+
+/** האם אפשר להוסיף תוכן משותף לפתק מהסוג הזה */
+export const canAppendTo = (type: string): boolean => APPENDABLE.has(type);
+
+/** שורה אחת לפריט ברשימה - שדה פריט הוא קלט חד-שורתי */
+const toSingleLine = (text: string): string => text.replace(/\s*\n\s*/g, ' ').trim();
+
+export const appendSnippet = (
+  content: string,
+  type: string,
+  snippet: SharedSnippet
+): AppendResult => {
+  if (!canAppendTo(type)) return { ok: false, reason: 'unsupported' };
+
+  const title = snippet.title.trim();
+  const text = snippet.text.trim();
+  if (!title && !text) return { ok: false, reason: 'empty' };
+
+  if (type === 'plain') {
+    const block = text || title;
+    return { ok: true, content: content.trim() ? `${content}\n\n${block}` : block };
+  }
+
+  const rows = parseObjectArray(content);
+  if (!rows.ok) return { ok: false, reason: 'unparseable' };
+
+  const id = Date.now().toString();
+  const label = toSingleLine([title, text].filter(Boolean).join(' — '));
+
+  const newRow =
+    type === 'checklist'
+      ? { id, text: label, completed: false }
+      : type === 'shopping'
+        ? { id, name: label, quantity: '', checked: false }
+        : { id, header: title || 'קישור משותף', content: text };
+
+  return { ok: true, content: JSON.stringify([...rows.value, newRow]) };
+};

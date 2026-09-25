@@ -14,6 +14,10 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import type { TemplateType } from '@/types/note';
+import { appendToNote } from '@/services/api/notes';
+import { canAppendTo } from '@/utils/templateContent';
+import { getTemplateLabel } from '@/utils/templates';
+import { LENGTH_LIMITS } from '@/utils/constants';
 
 type ActionMode = 'new' | 'append';
 type TemplateMode = 'plain' | 'workplan';
@@ -22,11 +26,9 @@ export const Share: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
-  const { categories } = useCategories();
-  const { allNotes, createNote, updateNote } = useNotes();
+  const { categories, hasLoaded: categoriesLoaded } = useCategories();
+  const { allNotes, createNote } = useNotes();
 
-  const [sharedTitle, setSharedTitle] = useState('');
-  const [sharedText, setSharedText] = useState('');
   const [sharedUrl, setSharedUrl] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -36,7 +38,6 @@ export const Share: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedNoteId, setSelectedNoteId] = useState('');
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [swNotActive, setSwNotActive] = useState(false);
   const [checkingSW, setCheckingSW] = useState(true);
   const [swReady, setSwReady] = useState(false);
@@ -74,6 +75,20 @@ export const Share: React.FC = () => {
     checkServiceWorker();
   }, []);
 
+  /**
+   * שומר את הנתונים המשותפים וממלא מהם את הטופס.
+   * נקרא פעם אחת כשהנתונים מגיעים. קודם זה קרה ב-effect שרץ מחדש בכל
+   * שינוי של המשתמש, ודרס את מה שהמשתמש כבר ערך בטופס.
+   */
+  const applySharedData = (sharedTitleValue: string, text: string, url: string) => {
+    setSharedUrl(url);
+
+    if (sharedTitleValue) {
+      setTitle(sharedTitleValue);
+    }
+    setContent([text, url].filter(Boolean).join('\n\n'));
+  };
+
   // Load shared data from cache or URL params
   useEffect(() => {
     const loadSharedData = async () => {
@@ -87,9 +102,7 @@ export const Share: React.FC = () => {
 
           if (response) {
             const data = await response.json();
-            setSharedTitle(data.title || '');
-            setSharedText(data.text || '');
-            setSharedUrl(data.url || '');
+            applySharedData(data.title || '', data.text || '', data.url || '');
 
             await cache.delete(`/share-data/${shareId}`);
           } else {
@@ -104,9 +117,7 @@ export const Share: React.FC = () => {
         const text = searchParams.get('text') || '';
         const url = searchParams.get('url') || '';
 
-        setSharedTitle(title);
-        setSharedText(text);
-        setSharedUrl(url);
+        applySharedData(title, text, url);
 
         if (!title && !text && !url) {
           logger.warn('No share data found in URL params or cache');
@@ -118,46 +129,16 @@ export const Share: React.FC = () => {
     loadSharedData();
   }, [searchParams]);
 
-  // המנוי לקטגוריות מנוהל ב-`useCategories`; כאן רק מסמנים סיום טעינה
-  useEffect(() => {
-    if (user) {
-      setLoading(false);
-    }
-  }, [user]);
+  // הקטגוריה הראשונה נבחרת כברירת מחדל עד שהמשתמש בוחר אחרת.
+  // נגזר ברינדור ולא נכתב ל-state מתוך effect.
+  const activeCategoryId = selectedCategoryId || categories[0]?.id || '';
 
-  // בחירה אוטומטית של הקטגוריה הראשונה
+  // משתמש לא מחובר מועבר להתחברות
   useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [categories, selectedCategoryId]);
-
-  // Load shared content and decide on smart defaults
-  useEffect(() => {
-    // If not logged in, redirect to login
     if (!user) {
       navigate('/login', { replace: true });
-      return;
     }
-
-    // Set title from shared data
-    if (sharedTitle) {
-      setTitle(sharedTitle);
-    }
-
-    // Build initial content
-    let combinedContent = '';
-    if (sharedText) {
-      combinedContent += sharedText;
-    }
-    if (sharedUrl) {
-      if (combinedContent) {
-        combinedContent += '\n\n';
-      }
-      combinedContent += sharedUrl;
-    }
-    setContent(combinedContent);
-  }, [user, navigate, sharedTitle, sharedText, sharedUrl]);
+  }, [user, navigate]);
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {
@@ -165,7 +146,7 @@ export const Share: React.FC = () => {
       return;
     }
 
-    if (actionMode === 'new' && !selectedCategoryId) {
+    if (actionMode === 'new' && !activeCategoryId) {
       alert('אנא בחר קטגוריה');
       return;
     }
@@ -184,42 +165,30 @@ export const Share: React.FC = () => {
 
     try {
       if (actionMode === 'append') {
-        // Append to existing note
-        const existingNote = allNotes.find(n => n.id === selectedNoteId);
-        if (!existingNote) {
-          throw new Error('לא נמצא פתק');
+        // ההוספה נעשית על התוכן העדכני בשרת ובצורה שמתאימה לסוג הפתק -
+        // פריט ברשימה, סעיף בתכנית עבודה, פסקה בטקסט. ראה `appendSnippet`.
+        const result = await appendToNote(selectedNoteId, { title, text: content });
+
+        if (!result.ok) {
+          const target = allNotes.find((note) => note.id === selectedNoteId);
+          const label = target ? getTemplateLabel(target.templateType) : 'הזה';
+          alert(
+            result.reason === 'unsupported'
+              ? `לא ניתן להוסיף תוכן לפתק מסוג ${label}`
+              : result.reason === 'unparseable'
+                ? 'התוכן של הפתק שנבחר לא תואם לסוג שלו, ולכן לא נוסף אליו דבר. פתח את הפתק כדי להמיר אותו לטקסט'
+                : 'אנא הזן כותרת או תוכן'
+          );
+          setSaving(false);
+          return;
         }
-
-        let updatedContent = existingNote.content;
-
-        // If appending to a workplan note, add as new section
-        if (existingNote.templateType === 'workplan') {
-          try {
-            const sections = JSON.parse(existingNote.content || '[]');
-            const newSection = {
-              id: Date.now().toString(),
-              header: title || 'קישור משותף',
-              content: content,
-            };
-            sections.push(newSection);
-            updatedContent = JSON.stringify(sections);
-          } catch {
-            // If parsing fails, treat as plain text
-            updatedContent = existingNote.content + '\n\n' + content;
-          }
-        } else {
-          // For plain notes, just append
-          updatedContent = existingNote.content + '\n\n' + content;
-        }
-
-        await updateNote(selectedNoteId, { content: updatedContent });
       } else {
         // Create new note
         const templateType: TemplateType = templateMode === 'workplan' ? 'workplan' : 'plain';
 
         // For workplan template, create a section with shared title and content
         let noteContent = content;
-        let noteTitle = title || 'פתק משותף';
+        let noteTitle = title.trim() || 'פתק משותף';
 
         if (templateMode === 'workplan') {
           // Create a work plan section from shared content
@@ -232,10 +201,13 @@ export const Share: React.FC = () => {
           noteTitle = workplanMainTitle; // Use the main title user entered
         }
 
+        // כותרת של דף אינטרנט משותף ארוכה לעיתים קרובות מהמגבלה
+        noteTitle = noteTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE);
+
         await createNote({
           title: noteTitle,
           content: noteContent,
-          categoryId: selectedCategoryId,
+          categoryId: activeCategoryId,
           templateType,
           userId: user.uid,
           tags: [],
@@ -259,9 +231,13 @@ export const Share: React.FC = () => {
     navigate('/', { replace: true });
   };
 
+  // השדה "כותרת" הוא כותרת הפתק רק ביצירת פתק רגיל. בתכנית עבודה הוא
+  // כותרת הסעיף, ובהוספה לפתק קיים הוא חלק מהפריט שנוסף.
+  const isNoteTitle = actionMode === 'new' && templateMode !== 'workplan';
+
   // Get notes for selected category (for append mode)
-  const categoryNotes = selectedCategoryId
-    ? allNotes.filter(n => n.categoryId === selectedCategoryId)
+  const categoryNotes = activeCategoryId
+    ? allNotes.filter(n => n.categoryId === activeCategoryId)
     : [];
 
   // Show loading while checking auth
@@ -277,7 +253,7 @@ export const Share: React.FC = () => {
   }
 
   // Show loading while categories are being fetched
-  if (loading && categories.length === 0) {
+  if (!categoriesLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
@@ -423,7 +399,10 @@ export const Share: React.FC = () => {
               <Input
                 type="text"
                 value={workplanMainTitle}
-                onChange={(e) => setWorkplanMainTitle(e.target.value)}
+                onChange={(e) =>
+                  setWorkplanMainTitle(e.target.value.slice(0, LENGTH_LIMITS.NOTE_TITLE))
+                }
+                maxLength={LENGTH_LIMITS.NOTE_TITLE}
                 placeholder='לדוגמה: "📚 מדריכי React" או "🎬 סרטוני הדרכה"'
                 disabled={saving}
               />
@@ -434,6 +413,11 @@ export const Share: React.FC = () => {
           )}
 
           {/* Title (section title for work plan, note title for others) */}
+          {isNoteTitle && title.length > LENGTH_LIMITS.NOTE_TITLE && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 -mb-2">
+              הכותרת תקוצר ל-{LENGTH_LIMITS.NOTE_TITLE} תווים
+            </p>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {actionMode === 'new' && templateMode === 'workplan' ? 'כותרת הסעיף:' : 'כותרת:'}
@@ -441,7 +425,12 @@ export const Share: React.FC = () => {
             <Input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) =>
+                setTitle(
+                  isNoteTitle ? e.target.value.slice(0, LENGTH_LIMITS.NOTE_TITLE) : e.target.value
+                )
+              }
+              maxLength={isNoteTitle ? LENGTH_LIMITS.NOTE_TITLE : undefined}
               placeholder={
                 actionMode === 'new' && templateMode === 'workplan'
                   ? 'כותרת הקישור/סעיף הראשון...'
@@ -476,7 +465,7 @@ export const Share: React.FC = () => {
                   <Button
                     key={category.id}
                     onClick={() => setSelectedCategoryId(category.id)}
-                    variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
+                    variant={activeCategoryId === category.id ? 'primary' : 'secondary'}
                     disabled={saving}
                     className="justify-start"
                   >
@@ -503,7 +492,7 @@ export const Share: React.FC = () => {
                         setSelectedCategoryId(category.id);
                         setSelectedNoteId('');
                       }}
-                      variant={selectedCategoryId === category.id ? 'primary' : 'secondary'}
+                      variant={activeCategoryId === category.id ? 'primary' : 'secondary'}
                       disabled={saving}
                       className="justify-start text-sm"
                     >
@@ -514,19 +503,22 @@ export const Share: React.FC = () => {
                 </div>
               </div>
 
-              {selectedCategoryId && (
+              {activeCategoryId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     בחר פתק להוספה:
                   </label>
                   {categoryNotes.length > 0 ? (
                     <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border dark:border-gray-700 rounded-lg p-2">
-                      {categoryNotes.map((note) => (
+                      {categoryNotes.map((note) => {
+                        const appendable = canAppendTo(note.templateType);
+                        return (
                         <button
                           key={note.id}
                           onClick={() => setSelectedNoteId(note.id)}
-                          disabled={saving}
-                          className={`p-3 rounded-lg border-2 text-right transition-all ${
+                          disabled={saving || !appendable}
+                          title={appendable ? undefined : `לא ניתן להוסיף לפתק מסוג ${getTemplateLabel(note.templateType)}`}
+                          className={`p-3 rounded-lg border-2 text-right transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                             selectedNoteId === note.id
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
                               : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
@@ -537,10 +529,13 @@ export const Share: React.FC = () => {
                             {note.title}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
-                            {note.content.substring(0, 60)}...
+                            {appendable
+                              ? `${getTemplateLabel(note.templateType)} · ${note.content.substring(0, 60)}...`
+                              : `${getTemplateLabel(note.templateType)} · לא ניתן להוסיף לסוג זה`}
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400 p-4 text-center border dark:border-gray-700 rounded-lg">
@@ -558,7 +553,7 @@ export const Share: React.FC = () => {
               onClick={handleSave}
               disabled={
                 saving ||
-                (actionMode === 'new' && !selectedCategoryId) ||
+                (actionMode === 'new' && !activeCategoryId) ||
                 (actionMode === 'append' && !selectedNoteId) ||
                 (!title.trim() && !content.trim()) ||
                 (actionMode === 'new' && templateMode === 'workplan' && !workplanMainTitle.trim())
