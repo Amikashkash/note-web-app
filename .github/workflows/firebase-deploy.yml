@@ -82,12 +82,34 @@ jobs:
     needs: test
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # `id-token: write` מאפשר ל-GitHub להנפיק OIDC token להרצה הזו, ש-Google
+    # מחליף בהרשאות זמניות (Workload Identity Federation). ניתן רק ל-job
+    # הזה - ה-job של הבדיקות רץ על pull requests ואסור שיוכל לקבל אותו.
+    permissions:
+      contents: read
+      id-token: write
     # פריסה אחת בכל רגע. פריסה שכבר התחילה לא מבוטלת באמצע.
     concurrency:
       group: deploy-main
       cancel-in-progress: false
 
     steps:
+      # נכשל מוקדם ובהודעה ברורה אם משתני ה-WIF חסרים או בפורמט שגוי,
+      # במקום שגיאת אימות סתומה אחרי הבנייה
+      - name: Check Workload Identity configuration
+        env:
+          WIF_PROVIDER: ${{ vars.WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT }}
+        run: |
+          case "$WIF_PROVIDER" in
+            projects/[0-9]*/locations/global/workloadIdentityPools/*/providers/*) ;;
+            *) echo "::error::WIF_PROVIDER must look like projects/<project-number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>. Current value: '$WIF_PROVIDER'"; exit 1 ;;
+          esac
+          case "$WIF_SERVICE_ACCOUNT" in
+            *@*.iam.gserviceaccount.com) ;;
+            *) echo "::error::WIF_SERVICE_ACCOUNT must be a service account email. Current value: '$WIF_SERVICE_ACCOUNT'"; exit 1 ;;
+          esac
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,25 +137,19 @@ jobs:
           # `isPushConfigured` יוצא false ואף מכשיר לא נרשם ל-push.
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
+      # אין מפתח JSON: Google מאמת את ה-token של GitHub מול ה-provider,
+      # שמקבל רק את ה-repo הזה וה-branch `main`, ומנפיק הרשאות זמניות של
+      # `github-deployer` (תפקידים מינימליים). ההגדרה: `thinking/ci-workload-identity.md`.
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: notes-4-me
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          # מגדיר GOOGLE_APPLICATION_CREDENTIALS לשלבים הבאים
+          create_credentials_file: true
 
       # ה-CLI מגיע מ-`firebase-tools` שנעוץ ב-package-lock, ולא מ-action של
-      # צד שלישי (`w9jds/firebase-action@master` קיבל את מפתח השירות
-      # מ-branch שכל אחד עם הרשאה לריפו שלו יכול לשנות).
-      #
-      # המפתח נכתב לקובץ זמני בהרשאות 600 ונמחק בסיום, גם בכישלון.
+      # צד שלישי. Hosting, rules ו-indexes בפקודה אחת.
       # פונקציות הענן עדיין נפרסות ידנית - ה-CI רק בונה ובודק אותן.
-      - name: Deploy Firestore rules and indexes
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          creds="$RUNNER_TEMP/firebase-sa.json"
-          trap 'rm -f "$creds"' EXIT
-          (umask 077 && printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds")
-          GOOGLE_APPLICATION_CREDENTIALS="$creds" \
-            npx --no-install firebase deploy --only firestore --project notes-4-me --non-interactive
+      - name: Deploy Hosting, Firestore rules and indexes
+        run: npx --no-install firebase deploy --only hosting,firestore --project notes-4-me --non-interactive

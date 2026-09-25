@@ -1,6 +1,7 @@
 # מעבר ל-Workload Identity Federation בפריסה מ-GitHub Actions
 
-> הוראות לביצוע ידני ב-Google Cloud. הן לא בוצעו. ה-workflow עדיין עובד עם המפתח `FIREBASE_SERVICE_ACCOUNT`.
+> הוראות לביצוע ידני ב-Google Cloud.
+> **סטטוס:** שלבים 1 עד 5 בוצעו על ידי הבעלים. שלב 6 (ה-workflow) נמצא ב-PR #2 ונכנס לפעולה עם ה-merge. שלב 7 (בדיקה וביטול המפתח) ממתין לפריסה הראשונה.
 > נכתב מול branch `claude/group-b-infra` (צעד B3 ב-`architecture-review.md`).
 
 ## למה
@@ -102,7 +103,7 @@ Settings → Secrets and variables → Actions → **Variables** → New reposit
 
 | שם | ערך |
 |---|---|
-| `WIF_PROVIDER` | הפלט של הפקודה למטה |
+| `WIF_PROVIDER` | **הטקסט שהפקודה למטה מדפיסה** (מתחיל ב-`projects/` ואחריו מספר), ולא המילים "הפלט של הפקודה" |
 | `WIF_SERVICE_ACCOUNT` | `github-deployer@notes-4-me.iam.gserviceaccount.com` |
 
 ```bash
