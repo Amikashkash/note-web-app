@@ -10,7 +10,7 @@ import { useNotes } from './useNotes';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import type { Note, NoteFormData, NoteInput } from '@/types/note';
+import type { Note, NoteFormData, NoteInput, TemplateType } from '@/types/note';
 
 export const useNoteEditor = (categoryId: string) => {
   const user = useAuthStore((state) => state.user);
@@ -72,7 +72,7 @@ export const useNoteEditor = (categoryId: string) => {
 
   /** עדכון חלקי מתוך תצוגת הפתק (עריכה inline) */
   const updateNoteFields = useCallback(
-    (noteId: string, updates: { title?: string; content?: string }) =>
+    (noteId: string, updates: { title?: string; content?: string; templateType?: TemplateType }) =>
       run(() => updateNote(noteId, updates)),
     [run, updateNote]
   );

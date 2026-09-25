@@ -10,6 +10,7 @@ import { Input } from '@/components/common/Input';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { AVAILABLE_COLORS, LENGTH_LIMITS } from '@/utils/constants';
 import { SELECTABLE_TEMPLATES, getTemplateLabel } from '@/utils/templates';
+import { convertContent } from '@/utils/templateContent';
 import { AccountingTemplate } from '@/components/note/templates/AccountingTemplate';
 import { ChecklistTemplate } from '@/components/note/templates/ChecklistTemplate';
 import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
@@ -41,6 +42,35 @@ export const NoteForm: React.FC<NoteFormProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const isEditMode = !!note;
+
+  /**
+   * החלפת תבנית ממירה את התוכן במפורש (שורות טקסט ⇄ פריטים).
+   *
+   * בגרסה קודמת התוכן עבר כמו שהוא, והתבנית החדשה "איתחלה" אותו
+   * כשלא הצליחה לפענח - כך שמעבר מטקסט לרשימת משימות מחק את הטקסט.
+   * כשאין המרה סבירה (חשבונאות, מתכון) מזהירים; התוכן נשאר כמו שהוא
+   * והתבנית מציגה אותו עם אפשרות להמיר חזרה לטקסט.
+   */
+  const handleTemplateChange = (next: TemplateType) => {
+    if (next === templateType) return;
+
+    const converted = convertContent(content, templateType, next);
+    if (converted.ok) {
+      setContent(converted.content);
+      setTemplateType(next);
+      return;
+    }
+
+    const proceed = window.confirm(
+      `לא ניתן להמיר אוטומטית ${getTemplateLabel(templateType)} ל${getTemplateLabel(next)}.
+
+` +
+        'התוכן לא יימחק: הוא יישמר כמו שהוא, ותוכל להמיר אותו חזרה לטקסט. להמשיך?'
+    );
+    if (proceed) setTemplateType(next);
+  };
+
+  const convertToText = () => setTemplateType('plain');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +135,7 @@ export const NoteForm: React.FC<NoteFormProps> = ({
               <button
                 key={template.value}
                 type="button"
-                onClick={() => setTemplateType(template.value)}
+                onClick={() => handleTemplateChange(template.value)}
                 className={`p-3 rounded-lg border-2 text-center transition-all ${
                   templateType === template.value
                     ? 'border-brand bg-brand-soft dark:bg-brand-soft-dark dark:border-brand-dark'
@@ -131,15 +161,15 @@ export const NoteForm: React.FC<NoteFormProps> = ({
             תוכן
           </label>
           {templateType === 'accounting' ? (
-            <AccountingTemplate value={content} onChange={setContent} />
+            <AccountingTemplate value={content} onChange={setContent} onConvertToText={convertToText} />
           ) : templateType === 'checklist' ? (
-            <ChecklistTemplate value={content} onChange={setContent} />
+            <ChecklistTemplate value={content} onChange={setContent} onConvertToText={convertToText} />
           ) : templateType === 'recipe' ? (
-            <RecipeTemplate value={content} onChange={setContent} />
+            <RecipeTemplate value={content} onChange={setContent} onConvertToText={convertToText} />
           ) : templateType === 'shopping' ? (
-            <ShoppingTemplate value={content} onChange={setContent} />
+            <ShoppingTemplate value={content} onChange={setContent} onConvertToText={convertToText} />
           ) : templateType === 'workplan' ? (
-            <WorkPlanTemplate value={content} onChange={setContent} />
+            <WorkPlanTemplate value={content} onChange={setContent} onConvertToText={convertToText} />
           ) : (
             <EnhancedTextarea
               value={content}

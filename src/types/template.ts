@@ -22,3 +22,33 @@ export interface WorkPlanSection {
   header: string;
   content: string;
 }
+
+/** מרווחי חזרה נתמכים לתזכורת. חסר = תזכורת חד-פעמית. */
+export type RepeatRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+/** משימה ברשימת משימות */
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
+  dueTime?: string; // שעת יעד בפורמט HH:MM
+  repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
+}
+
+/** פריט ברשימת קניות */
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  quantity: string;
+  checked: boolean;
+}
+
+/** מתכון */
+export interface RecipeData {
+  servings: string;
+  prepTime: string;
+  cookTime: string;
+  ingredients: string[];
+  instructions: string[];
+}

@@ -5,59 +5,30 @@
 import React, { useMemo } from 'react';
 import { X } from 'lucide-react';
 
-export interface RecipeData {
-  servings: string;
-  prepTime: string;
-  cookTime: string;
-  ingredients: string[];
-  instructions: string[];
-}
+import type { RecipeData } from '@/types/template';
+import { EMPTY_RECIPE, parseRecipe } from '@/utils/templateContent';
+import { UnparseableContent } from './UnparseableContent';
+
+export type { RecipeData };
 
 interface RecipeTemplateProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
+  onConvertToText?: () => void;
 }
 
 export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
+  onConvertToText,
 }) => {
-  const data = useMemo<RecipeData>(() => {
-    const defaultData: RecipeData = {
-      servings: '',
-      prepTime: '',
-      cookTime: '',
-      ingredients: [''],
-      instructions: [''],
-    };
-
-    if (!value) {
-      return defaultData;
-    }
-
-    try {
-      const parsed = JSON.parse(value);
-
-      // Validate and normalize the structure
-      return {
-        servings: parsed.servings || '',
-        prepTime: parsed.prepTime || '',
-        cookTime: parsed.cookTime || '',
-        ingredients: Array.isArray(parsed.ingredients) && parsed.ingredients.length > 0
-          ? parsed.ingredients
-          : [''],
-        instructions: Array.isArray(parsed.instructions) && parsed.instructions.length > 0
-          ? parsed.instructions
-          : Array.isArray(parsed.steps) && parsed.steps.length > 0
-            ? parsed.steps // Support AI format with 'steps' instead of 'instructions'
-            : [''],
-      };
-    } catch {
-      return defaultData;
-    }
-  }, [value]);
+  // פענוח שנכשל אינו "מתכון ריק": טקסט חופשי שהוגדר כמתכון היה מוצג
+  // כטופס ריק, והקלדה ראשונה הייתה דורסת אותו. ראה `templateContent.ts`
+  const parsed = useMemo(() => parseRecipe(value), [value]);
+  const data = parsed.ok ? parsed.value : EMPTY_RECIPE;
 
   const updateData = (updates: Partial<RecipeData>) => {
     onChange(JSON.stringify({ ...data, ...updates }));
@@ -90,6 +61,12 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
   const removeInstruction = (index: number) => {
     updateData({ instructions: data.instructions.filter((_, i) => i !== index) });
   };
+
+  if (!parsed.ok) {
+    return (
+      <UnparseableContent templateType="recipe" value={value} onConvertToText={onConvertToText} />
+    );
+  }
 
   return (
     <div className="space-y-4">

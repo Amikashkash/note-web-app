@@ -9,6 +9,8 @@ import { Button } from '@/components/common/Button';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
 import type { WorkPlanSection } from '@/types/template';
+import { parseWorkPlan } from '@/utils/templateContent';
+import { UnparseableContent } from './UnparseableContent';
 
 export type { WorkPlanSection };
 
@@ -16,25 +18,19 @@ interface WorkPlanTemplateProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
+  onConvertToText?: () => void;
 }
 
 export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
+  onConvertToText,
 }) => {
-  // המרת JSON ממחרוזת למערך.
-  // בדיקת המערך אינה קוסמטית: תוכן שמתפרסר לערך שאינו מערך (מספר,
-  // אובייקט) היה מגיע הלאה עם `length` לא מוגדר, וגם `map` וגם הזריעה
-  // של הסעיף הראשון היו מתנהגים בצורה בלתי צפויה.
-  const sections = useMemo<WorkPlanSection[]>(() => {
-    try {
-      const parsed = value ? JSON.parse(value) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [value]);
+  // פענוח שנכשל אינו "תכנית ריקה" - ראה `templateContent.ts`
+  const parsed = useMemo(() => parseWorkPlan(value), [value]);
+  const sections = useMemo<WorkPlanSection[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
 
   /**
    * תכנית ריקה מקבלת סעיף ראשון אוטומטית.
@@ -44,10 +40,11 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
    * הפוקוס שייך לשדה הכותרת, ובפתק קיים הוא היה מקפיץ מקלדת בנייד.
    */
   useEffect(() => {
-    if (readOnly || sections.length > 0) return;
+    // רק תוכן ריק לגמרי - תוכן שלא פוענח לעולם לא נדרס
+    if (readOnly || value !== '') return;
 
     onChange(JSON.stringify([{ id: Date.now().toString(), header: '', content: '' }]));
-  }, [readOnly, sections.length, onChange]);
+  }, [readOnly, value, onChange]);
 
   const handleAddSection = () => {
     const newSection: WorkPlanSection = {
@@ -82,6 +79,12 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
     [updatedSections[index], updatedSections[newIndex]] = [updatedSections[newIndex], updatedSections[index]];
     onChange(JSON.stringify(updatedSections));
   };
+
+  if (!parsed.ok) {
+    return (
+      <UnparseableContent templateType="workplan" value={value} onConvertToText={onConvertToText} />
+    );
+  }
 
   if (readOnly) {
     return (

@@ -19,8 +19,11 @@ import {
   DATE_STATUS_BORDER_CLASS,
 } from './dueDate';
 
-/** מרווחי חזרה נתמכים. חסר = תזכורת חד-פעמית. */
-export type RepeatRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
+import type { ChecklistItem, RepeatRule } from '@/types/template';
+import { parseChecklist } from '@/utils/templateContent';
+import { UnparseableContent } from './UnparseableContent';
+
+export type { ChecklistItem, RepeatRule };
 
 const REPEAT_LABELS: Record<RepeatRule, string> = {
   daily: 'כל יום',
@@ -29,19 +32,13 @@ const REPEAT_LABELS: Record<RepeatRule, string> = {
   yearly: 'כל שנה',
 };
 
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-  dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
-  dueTime?: string; // שעת יעד בפורמט HH:MM
-  repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
-}
 
 interface ChecklistTemplateProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
+  onConvertToText?: () => void;
 }
 
 interface DuePickerProps {
@@ -105,6 +102,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
+  onConvertToText,
 }) => {
   // מזהה המשימה שצריכה לקבל פוקוס אחרי הרינדור הבא.
   // ref ולא state: זו פעולת DOM בלבד ואינה משפיעה על מה שמוצג,
@@ -113,25 +111,9 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const { warning: notificationWarning, ensureEnabled } = useNotificationOptIn();
 
-  const items = useMemo<ChecklistItem[]>(() => {
-    try {
-      const parsed = value ? JSON.parse(value) : [];
-      if (!Array.isArray(parsed)) return [];
-
-      // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
-      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי
-      return parsed.map((item, index) => ({
-        id: item.id || `item-${index}`,
-        text: item.text || '',
-        completed: item.completed || false,
-        dueDate: item.dueDate,
-        dueTime: item.dueTime,
-        repeat: item.repeat,
-      }));
-    } catch {
-      return [];
-    }
-  }, [value]);
+  // פענוח שנכשל אינו "רשימה ריקה" - ראה `templateContent.ts`
+  const parsed = useMemo(() => parseChecklist(value), [value]);
+  const items = useMemo<ChecklistItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
 
   // רץ אחרי כל רינדור, כי אי אפשר לדעת מראש מתי שדה המשימה החדשה יצורף ל-DOM
   useEffect(() => {
@@ -155,12 +137,14 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
    * קיים הייתה מקפיצה את המקלדת בנייד בכל פעם.
    */
   useEffect(() => {
-    if (readOnly || items.length > 0) return;
+    // רק תוכן ריק לגמרי. `[]` (רשימה שכל משימותיה נמחקו) נשאר כמו שהוא,
+    // ותוכן שלא פוענח לעולם לא נדרס - זה מה שמחק פתקים בגרסה קודמת.
+    if (readOnly || value !== '') return;
 
     onChange(
       JSON.stringify([{ id: Date.now().toString(), text: '', completed: false }])
     );
-  }, [readOnly, items.length, onChange]);
+  }, [readOnly, value, onChange]);
 
   /**
    * עדכון משימה בודדת. נקודת המעבר היחידה לשינוי פריט - קריאה אחת
@@ -217,6 +201,12 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const completedCount = items.filter((item) => item.completed).length;
   const totalCount = items.length;
   const completedPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+  if (!parsed.ok) {
+    return (
+      <UnparseableContent templateType="checklist" value={value} onConvertToText={onConvertToText} />
+    );
+  }
 
   return (
     <div className="space-y-3">

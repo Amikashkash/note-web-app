@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { Eye, Pencil, X } from 'lucide-react';
-import { Note } from '@/types/note';
+import { Note, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
@@ -31,6 +31,8 @@ import * as noteAPI from '@/services/api/notes';
 export interface NoteUpdates {
   title?: string;
   content?: string;
+  /** רק להמרה לטקסט חופשי של תוכן שהתבנית לא פענחה */
+  templateType?: TemplateType;
 }
 
 interface NoteViewProps {
@@ -97,6 +99,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
     saveUpdates.call({ content: newContent });
   };
 
+  /**
+   * המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית שלו.
+   * התוכן לא משתנה - רק האופן שבו מציגים אותו. נשלח מיד ולא בהשהיה,
+   * יחד עם כל שינוי שעוד ממתין.
+   */
+  const handleConvertToText = () => {
+    saveUpdates.call({ templateType: 'plain' });
+    saveUpdates.flush();
+  };
+
   /** סוגר את המודאל אחרי ששמר שינוי שממתין */
   const handleClose = () => {
     saveUpdates.flush();
@@ -141,15 +153,50 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const renderContent = () => {
     switch (note.templateType) {
       case 'accounting':
-        return <AccountingTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+        return (
+          <AccountingTemplate
+            value={content}
+            onChange={handleContentChange}
+            readOnly={false}
+            onConvertToText={handleConvertToText}
+          />
+        );
       case 'checklist':
-        return <ChecklistTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />;
+        return (
+          <ChecklistTemplate
+            value={content}
+            onChange={handleContentChange}
+            readOnly={!isEditMode}
+            onConvertToText={handleConvertToText}
+          />
+        );
       case 'recipe':
-        return <RecipeTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+        return (
+          <RecipeTemplate
+            value={content}
+            onChange={handleContentChange}
+            readOnly={false}
+            onConvertToText={handleConvertToText}
+          />
+        );
       case 'shopping':
-        return <ShoppingTemplate value={content} onChange={handleContentChange} readOnly={false} />;
+        return (
+          <ShoppingTemplate
+            value={content}
+            onChange={handleContentChange}
+            readOnly={false}
+            onConvertToText={handleConvertToText}
+          />
+        );
       case 'workplan':
-        return <WorkPlanTemplate value={content} onChange={handleContentChange} readOnly={!isEditMode} />;
+        return (
+          <WorkPlanTemplate
+            value={content}
+            onChange={handleContentChange}
+            readOnly={!isEditMode}
+            onConvertToText={handleConvertToText}
+          />
+        );
       default:
         return isEditMode ? (
           <EnhancedTextarea

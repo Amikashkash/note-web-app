@@ -6,6 +6,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import type { AccountingRow } from '@/types/template';
+import { parseAccounting } from '@/utils/templateContent';
+import { UnparseableContent } from './UnparseableContent';
 
 export type { AccountingRow };
 
@@ -23,12 +25,15 @@ interface AccountingTemplateProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
+  onConvertToText?: () => void;
 }
 
 export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
+  onConvertToText,
 }) => {
   const [showAll, setShowAll] = useState(false);
 
@@ -37,14 +42,10 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   const pendingFocusIdRef = useRef<string | null>(null);
   const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // המרת JSON ממחרוזת למערך
-  const rows = useMemo<AccountingRow[]>(() => {
-    try {
-      return value ? JSON.parse(value) : [];
-    } catch {
-      return [];
-    }
-  }, [value]);
+  // פענוח שנכשל אינו "טבלה ריקה". בגרסה קודמת JSON שאינו מערך (למשל
+  // מתכון) הגיע כמו שהוא ל-`reduce` והפיל את כל המסך.
+  const parsed = useMemo(() => parseAccounting(value), [value]);
+  const rows = useMemo<AccountingRow[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
 
   // חישוב יתרה רצה
   const rowsWithBalance = useMemo(
@@ -108,6 +109,12 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
 
   const totalBalance = rowsWithBalance[rowsWithBalance.length - 1]?.balance || 0;
   const hiddenRowsCount = rows.length - displayedRows.length;
+
+  if (!parsed.ok) {
+    return (
+      <UnparseableContent templateType="accounting" value={value} onConvertToText={onConvertToText} />
+    );
+  }
 
   return (
     <div className="space-y-4">

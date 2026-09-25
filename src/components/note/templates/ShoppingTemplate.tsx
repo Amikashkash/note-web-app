@@ -15,23 +15,25 @@ import { Trash2 } from 'lucide-react';
 import { useProductSuggestions } from '@/hooks/useProductSuggestions';
 import { normalizeProductName } from '@/services/api/productMatching';
 
-export interface ShoppingItem {
-  id: string;
-  name: string;
-  quantity: string;
-  checked: boolean;
-}
+import type { ShoppingItem } from '@/types/template';
+import { parseShopping } from '@/utils/templateContent';
+import { UnparseableContent } from './UnparseableContent';
+
+export type { ShoppingItem };
 
 interface ShoppingTemplateProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
+  onConvertToText?: () => void;
 }
 
 export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   value,
   onChange,
   readOnly = false,
+  onConvertToText,
 }) => {
   const [draft, setDraft] = useState('');
   const [quantityDraft, setQuantityDraft] = useState('');
@@ -40,24 +42,10 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   const quickAddRef = useRef<HTMLInputElement | null>(null);
   const quantityRef = useRef<HTMLInputElement | null>(null);
 
-  const items = useMemo<ShoppingItem[]>(() => {
-    try {
-      const parsed = value ? JSON.parse(value) : [];
-      if (!Array.isArray(parsed)) return [];
-
-      // מזהה הנגזר מהמיקום ברשימה - יציב בין פענוחים של אותו תוכן,
-      // בניגוד ל-Date.now() שהופך את הפענוח ללא-דטרמיניסטי.
-      // שדה `category` של רשימות ישנות פשוט לא נקרא.
-      return parsed.map((item, index) => ({
-        id: item.id || `item-${index}`,
-        name: item.name || '',
-        quantity: item.quantity || '',
-        checked: item.checked || false,
-      }));
-    } catch {
-      return [];
-    }
-  }, [value]);
+  // פענוח שנכשל אינו "רשימה ריקה": הוספת מוצר לרשימה כזו הייתה
+  // דורסת את התוכן המקורי. ראה `templateContent.ts`
+  const parsed = useMemo(() => parseShopping(value), [value]);
+  const items = useMemo<ShoppingItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
 
   const existingNames = useMemo(() => items.map((item) => item.name), [items]);
   const { suggestions, remember } = useProductSuggestions(draft, existingNames);
@@ -121,6 +109,12 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   const checkedCount = items.filter((item) => item.checked).length;
   const totalCount = items.length;
   const checkedPercent = totalCount > 0 ? (checkedCount / totalCount) * 100 : 0;
+
+  if (!parsed.ok) {
+    return (
+      <UnparseableContent templateType="shopping" value={value} onConvertToText={onConvertToText} />
+    );
+  }
 
   return (
     <div className="space-y-3">
