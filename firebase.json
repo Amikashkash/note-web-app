@@ -12,7 +12,10 @@
     "ignore": [
       "node_modules",
       ".git",
-      "*.log"
+      "*.log",
+      "test",
+      "vitest.config.ts",
+      "tsconfig.test.json"
     ]
   },
   "hosting": {
