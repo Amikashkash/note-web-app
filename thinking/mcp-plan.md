@@ -2,6 +2,7 @@
 
 > מסמך תכנון בלבד. שום קוד קיים לא שונה, שום חבילה לא הותקנה ושום דבר לא נפרס.
 > תאריך: 2026-09-25 · נכתב מול commit `cffeab1` (v1.20.0)
+> **עודכן עם החלטות (2026-09-25):** התשובות לכל 13 השאלות הפתוחות נמצאות בסעיף 9 ושולבו בגוף המסמך. נוספו: DCR בלבד בשלב 1 (בלי CIMD), פתקים רגישים (§3.4), ומודל ה-`items` מ-`architecture-review.md` §11.7 (סעיפים 5 ו-7).
 
 ## 0. תקציר
 
@@ -23,12 +24,12 @@
   - `region: 'us-central1'`: אותו region כמו הפונקציות הקיימות, ו-Hosting rewrite דורש region ידוע.
   - `memory: '256MiB'`, `timeoutSeconds: 30`.
   - `concurrency: 20`: ב-v2 מופע אחד מטפל בכמה בקשות במקביל.
-  - `minInstances`: **שאלה פתוחה.** Claude ממתין 10 שניות לכל היותר ל-discovery, ל-registration ול-token (ו-30 שניות ל-refresh). cold start של Node עם Admin SDK ו-MCP SDK לוקח בדרך כלל 2 עד 5 שניות, כלומר בטווח אבל בלי הרבה מרווח. `minInstances: 1` מבטל את הבעיה ועולה כמה דולרים בחודש. ברירת המחדל שלי: להתחיל עם 0, למדוד ולהחליט.
+  - `minInstances`: **החלטה: בלי `minInstances` בהתחלה, ומודדים** (שלב 13 ב-8.3). Claude ממתין 10 שניות לכל היותר ל-discovery, ל-registration ול-token (ו-30 שניות ל-refresh). cold start של Node עם Admin SDK ו-MCP SDK לוקח בדרך כלל 2 עד 5 שניות, כלומר בטווח אבל בלי הרבה מרווח. `minInstances: 1` מבטל את הבעיה ועולה כמה דולרים בחודש. ברירת המחדל שלי: להתחיל עם 0, למדוד ולהחליט.
 
 ### 1.2 MCP SDK ו-Transport
 
 - ה-SDK הרשמי ל-TypeScript. **בנקודת הזמן הנוכחית** v2 מפוצל לחבילות (`@modelcontextprotocol/server`, `@modelcontextprotocol/node`, `@modelcontextprotocol/express`) ועדיין מסומן beta/alpha. v1 (`@modelcontextprotocol/sdk`) יציב.
-  - **המלצה:** לבדוק בזמן המימוש. אם v2 יצא ל-stable, להשתמש בו. אחרת להשתמש ב-v1.x העדכני, ולנעול גרסה מדויקת (בלי `^`).
+  - **החלטה:** הגרסה ה-**stable** העדכנית בזמן המימוש (לא beta/alpha), **נעולה לגרסה מדויקת** (בלי `^`). אם v2 עדיין לא stable, משתמשים ב-v1.x.
   - בכל מקרה לא להשתמש בעוזרי ה-Authorization Server של ה-SDK (ראו 2.4).
 - **Streamable HTTP, stateless:**
   - `StreamableHTTPServerTransport` עם `sessionIdGenerator: undefined`.
@@ -54,7 +55,7 @@
 - URL קריא שהמשתמש מדביק ב-claude.ai: `https://notes-4-me.web.app/mcp`.
 - ה-consent רץ באותו origin שבו המשתמש כבר מחובר ל-Firebase Auth, ולכן אין צורך להתחבר שוב.
 
-**חלופה:** להשתמש ישירות ב-URL של הפונקציה (`*.run.app`). זה פשוט יותר, בלי שינוי ב-`firebase.json`, אבל ה-URL מכוער וה-consent יושב ב-origin אחר. ראו שאלה פתוחה.
+**החלטה: `notes-4-me.web.app`**, דרך rewrites ב-Hosting. החלופה שנדחתה: ה-URL הישיר של הפונקציה (`*.run.app`).
 
 דרישות נלוות:
 - `Cache-Control: no-store` על כל תשובה של הפונקציה, כדי שה-CDN של Hosting לא ישמור אותה.
@@ -82,6 +83,12 @@
 - Refresh ריאקטיבי אחרי 401, ופרואקטיבי עד 5 דקות לפני התפוגה. עבור public clients חובה לסובב (rotate) refresh tokens. refresh token לא תקף מחזיר `invalid_grant`.
 - Claude מוסיף `offline_access` ל-scopes אם ה-AS מפרסם אותו.
 
+**החלטה לשלב 1: DCR בלבד, עם allowlist של redirect URIs. CIMD נדחה.**
+- CIMD מחייב את השרת להוריד מסמכים מ-URL שהלקוח שולח. זה משטח SSRF שאין בו צורך כל עוד Claude עובד היטב עם DCR.
+- ה-metadata **לא** מפרסם `client_id_metadata_document_supported`, ולכן Claude נופל ל-DCR (כמתועד אצלם).
+- **הוספה בהמשך:** מממשים את ההורדה עם ההגנות שתוארו בגרסה הקודמת של המסמך: allowlist של hosts, HTTPS בלבד, timeout של 3 שניות, 5KB, בלי redirects, ובדיקה שה-`client_id` זהה ל-URL. אחר כך מפרסמים `client_id_metadata_document_supported: true`.
+- החריגה מה-spec מודעת: DCR הוא MAY ועדיין נתמך, ו-CIMD הוא SHOULD.
+
 ### 2.2 הבעיה
 
 Firebase Auth הוא לא OAuth Authorization Server. אין לו `/authorize` או `/token` ללקוחות צד שלישי, אין DCR, ו-ID token שלו מיועד (audience) לפרויקט Firebase ולא ל-MCP server. לפי ה-spec, לשרת MCP **אסור** לקבל tokens שלא הונפקו עבורו (token passthrough). לכן אי אפשר פשוט להעביר ל-Claude את ה-ID token של Firebase.
@@ -94,7 +101,7 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
   |<-- 401 WWW-Authenticate: Bearer resource_metadata=... |                         |
   |  GET /.well-known/oauth-protected-resource/mcp        |                         |
   |  GET /.well-known/oauth-authorization-server          |                         |
-  |  [CIMD: client_id=URL]  או  POST /oauth/register (DCR)|                         |
+  |  POST /oauth/register (DCR, redirect allowlist)       |                         |
   |  browser -> GET /oauth/authorize?...&code_challenge&resource&state             |
   |                       |-- validate, store request --> 302 /connect?req=<id>    |
   |                       |                               |-- existing login ------>|
@@ -138,26 +145,23 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
   "token_endpoint_auth_methods_supported": ["none"],
   "revocation_endpoint_auth_methods_supported": ["none"],
   "scopes_supported": ["notes.read", "notes.write", "offline_access"],
-  "client_id_metadata_document_supported": true,
   "authorization_response_iss_parameter_supported": true
 }
 ```
 
-**3. רישום לקוח: CIMD כברירת מחדל, ו-DCR לתאימות.**
-- **CIMD:** כש-`client_id` הוא URL מסוג HTTPS, ה-AS מוריד אותו ומאמת את ה-metadata ואת `redirect_uris`.
-  - הגנת SSRF: רק hosts מתוך allowlist (בהתחלה `claude.ai`), רק HTTPS, timeout של 3 שניות, גודל מקסימלי 5KB, בלי לעקוב אחרי redirects.
-  - cache של המסמך ב-Firestore ל-24 שעות.
-  - ה-`client_id` שבמסמך חייב להיות זהה ל-URL שממנו הוא הורד.
+**3. רישום לקוח: DCR בלבד (שלב 1). CIMD נדחה, ראו 2.1.**
+- `client_id` בפורמט URL נדחה ב-`/oauth/authorize` עם `invalid_client`. השרת לא מוריד אותו.
 - **DCR (RFC 7591):** `POST /oauth/register`.
   - רק `token_endpoint_auth_method: "none"` (public client) ורק `grant_types` של authorization_code ו-refresh_token.
   - **ה-`redirect_uris` מוגבלים ל-allowlist:** `https://claude.ai/api/mcp/auth_callback` ו-loopback (`http://localhost/*`, `http://127.0.0.1/*`).
   - מחזיר `client_id` אקראי.
   - rate limit לכל IP.
   - לקוח שלא הונפק לו token תוך 24 שעות נמחק (Firestore TTL).
-  - ההגבלה ל-allowlist מונעת מתוקף לרשום redirect משלו ולגנוב codes דרך מסך הסכמה שנראה לגיטימי. **שאלה פתוחה:** האם בכלל לפתוח לקוחות שאינם Claude.
+  - ההגבלה ל-allowlist מונעת מתוקף לרשום redirect משלו ולגנוב codes דרך מסך הסכמה שנראה לגיטימי.
+  - **החלטה: Claude בלבד.** ה-allowlist הוא בדיוק הכתובות של Claude: claude.ai, ו-loopback בשביל Claude Code. לקוחות MCP אחרים לא יכולים להירשם.
 
 **4. `GET /oauth/authorize`**
-- מאמת: `response_type=code`, `client_id` ידוע (או CIMD תקין), `redirect_uri` רשום בהתאמה מדויקת (מלבד port ב-loopback), `code_challenge` עם method `S256`, ו-`resource` זהה ל-canonical URI.
+- מאמת: `response_type=code`, `client_id` ידוע (שנרשם ב-DCR), `redirect_uri` רשום בהתאמה מדויקת (מלבד port ב-loopback), `code_challenge` עם method `S256`, ו-`resource` זהה ל-canonical URI.
 - `scope` הוא תת-קבוצה של הנתמכים. `state` לא חובה אבל מועבר הלאה.
 - שגיאה ב-`client_id` או ב-`redirect_uri` מוצגת כדף שגיאה בלי redirect (מניעת open redirect). שגיאות אחרות חוזרות ל-redirect_uri עם `error` ו-`iss`.
 - שומר בקשה ממתינה `oauthRequests/{reqId}` (TTL של 10 דקות) ומפנה ל-`/connect?req=<reqId>`.
@@ -170,8 +174,16 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 - השרת:
   - מריץ `verifyIdToken(token, checkRevoked=true)`.
   - דורש `auth_time` של פחות מ-24 שעות. אחרת ה-SPA מבקש התחברות מחדש.
+  - **בודק את ה-allowlist של משתמשים** (ראו למטה). משתמש שלא ברשימה מקבל "הגישה ל-Claude עדיין לא פתוחה לחשבון שלך", ולא מונפק code.
   - מריץ את ה-decision ב-transaction, פעם אחת לכל `reqId`.
   - מנפיק code ומחזיר JSON עם `redirectTo`. ה-SPA מבצע `window.location.assign`.
+- **allowlist של משתמשים (החלטה):**
+  - הקוד נכתב נכון לריבוי משתמשים: `UserScope` וכל הבדיקות לפי `uid`.
+  - אבל בהתחלה רק החשבון של הבעלים מורשה.
+  - הרשימה נשמרת ב-`config/mcp` ב-Firestore (`allowedUids: string[]`, ו-`openToAll: boolean` לפתיחה בעתיד), ולא בריפו הציבורי.
+  - rules: `read, write: if false`. עריכה רק מה-console.
+  - **fail-closed:** מסמך חסר או ריק פירושו שאף אחד לא מורשה.
+  - נבדק גם ב-`/oauth/decision` וגם ב-`requireMcpAuth` (9). הסרה מהרשימה מנתקת מיד.
 - **למה POST עם ID token ולא cookie:** אין session cookie בפרויקט. ה-ID token מוכיח זהות, ו-`reqId` חד-פעמי שנשמר בשרת מונע CSRF.
 
 **6. Authorization code**
@@ -187,7 +199,7 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
   - **rotation:** ה-refresh token הישן מסומן `used` וה-token החדש מוחזר באותה תשובה.
   - **reuse detection:** שימוש ב-refresh token שכבר סומן `used` מבטל את כל המשפחה (`grantId`).
   - token לא תקף מחזיר `invalid_grant`.
-- זמני חיים: access token לשעה. refresh token ל-30 יום sliding, עם תקרה מוחלטת של 90 יום מההסכמה. **שאלה פתוחה.**
+- זמני חיים (**אושר**): access token לשעה. refresh token ל-30 יום sliding, עם תקרה מוחלטת של 90 יום מההסכמה.
 - יעד latency: פחות משנייה. זה 2 עד 3 פעולות Firestore ב-transaction אחד.
 
 **8. Tokens אטומים (opaque) ולא JWT**
@@ -197,12 +209,13 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
   - revocation מיידי מחייב בדיקה ב-DB בכל מקרה.
   - JWT מחייב מפתח חתימה, ואז צריך secret, rotation וניהול מפתחות.
   - tokens אטומים לא דורשים **שום secret**, וזה מתאים לריפו ציבורי.
-- עלות: קריאת Firestore אחת לכל בקשת MCP. אפשר להוסיף cache בזיכרון של המופע ל-30 עד 60 שניות, בתמורה ל-revocation שמתעכב עד דקה (ראו שאלות).
+- עלות: קריאת Firestore אחת לכל בקשת MCP. **החלטה: אין cache של אימות tokens בזיכרון.** ביטול חייב להיות מיידי, והעלות זניחה בהיקף הזה.
 
 **9. אימות בכל בקשה ל-`/mcp`** (middleware אחד, `requireMcpAuth`)
 - `Authorization: Bearer` בלבד. token ב-query string נדחה.
 - hash, קריאה של `oauthTokens/{hash}`, ובדיקה של `type == 'access'`, `expiresAt > now`, `revoked == false` ו-**`resource == canonical`** (audience, RFC 8707). אחר כך בדיקה שה-grant לא בוטל.
-- `admin.auth().getUser(uid)`, בדיקה ש-`disabled != true`, ובדיקה ש-`tokensValidAfterTime` לא מאוחר מהנפקת ה-grant. כך "התנתק מכל המכשירים" ב-Firebase מבטל גם את Claude. אפשר לשמור את התוצאה ב-cache קצר.
+- `admin.auth().getUser(uid)`, בדיקה ש-`disabled != true`, ובדיקה ש-`tokensValidAfterTime` לא מאוחר מהנפקת ה-grant. כך "התנתק מכל המכשירים" ב-Firebase מבטל גם את Claude. בלי cache (ראו 8).
+- בדיקת ה-allowlist של משתמשים (`config/mcp`, ראו 5).
 - כשל מחזיר 401 עם `WWW-Authenticate`. חוסר scope מחזיר 403 עם `error="insufficient_scope", scope="notes.write"`.
 
 **10. Revocation**
@@ -221,7 +234,8 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 
 | collection | מפתח | תוכן עיקרי | TTL |
 |---|---|---|---|
-| `oauthClients/{clientId}` | אקראי / URL-hash | `clientName`, `redirectUris`, `source: 'dcr'\|'cimd'`, `createdAt` | 24 שעות אם לא בשימוש |
+| `oauthClients/{clientId}` | אקראי | `clientName`, `redirectUris`, `source: 'dcr'` (בעתיד גם `'cimd'`), `createdAt` | 24 שעות אם לא בשימוש |
+| `config/mcp` | קבוע | `allowedUids`, `openToAll` | אין |
 | `oauthRequests/{reqId}` | אקראי | פרמטרי authorize, `expiresAt` | 10 דקות |
 | `oauthCodes/{sha256}` | hash | `uid`, `clientId`, `grantId`, `codeChallenge`, `redirectUri`, `resource`, `scope`, `used` | 60 שניות (+ TTL לניקוי) |
 | `oauthGrants/{grantId}` | אקראי | `uid`, `clientId`, `clientName`, `scope`, `createdAt`, `lastUsedAt`, `revoked` | אין |
@@ -264,14 +278,16 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 5. **הרשאות ה-MCP הן תת-קבוצה של `firestore.rules`, אף פעם לא יותר.** המיפוי מוגדר בטבלה אחת (`permissions.ts`):
    - `read`: בעלים או שיתוף.
    - `update content/title/pin`: בעלים או שיתוף.
-   - `archive`, `move`: בעלים בלבד (ראו שאלה פתוחה).
+   - `archive`, `move`: **בעלים בלבד** (החלטה). זה מחמיר יותר מה-rules של היום, ויהיה זהה אחרי R-2 ב-review.
+   - `create` בקטגוריה: **רק בקטגוריה שבבעלות המשתמש** (החלטה). יצירה בקטגוריה משותפת של מישהו אחר אסורה בינתיים (ראו 5).
+   - `isSensitive`: אף פעם לא נכתב מ-MCP (ראו 3.4).
    - `userId`, `sharedWith`: אף פעם לא נכתבים.
    - כל write עובר דרך `sanitizeNotePatch()` עם **allowlist** של שדות, ולא blocklist.
-6. **קטגוריית יעד** (ב-`create_note` או ב-`move_note_to_category`) נבדקת ב-`loadCategoryForUser`, באותו דפוס.
+6. **קטגוריית יעד** (ב-`create_note` או ב-`move_note_to_category`) נבדקת ב-`loadCategoryForUser(categoryId, 'owner')`, באותו דפוס. קטגוריה רגישה מחזירה `NotFound` (3.4).
 7. **אכיפה סטטית:**
    - כלל ESLint `no-restricted-imports` ב-`functions/` אוסר `firebase-admin/firestore` מחוץ ל-`notesCore/store.ts` ו-`oauth/store.ts`. גם הקבצים הקיימים (`index.ts`) מוחרגים במפורש.
    - ל-`functions/` אין כרגע ESLint. הוספה של config מינימלי היא חלק מהמשימה.
-8. **בדיקת רגרסיה גנרית:** test שעובר על **כל tool רשום** (מתוך `listTools`), מריץ אותו עם `noteId` ו-`categoryId` של משתמש זר (על ה-emulator), ומצפה ל-`NotFound`. tool חדש שנוסף מכוסה אוטומטית.
+8. **בדיקת רגרסיה גנרית:** test שעובר על **כל tool רשום** (מתוך `listTools`), מריץ אותו עם `noteId` ו-`categoryId` של משתמש זר (על ה-emulator), ומצפה ל-`NotFound`. tool חדש שנוסף מכוסה אוטומטית. **אותה בדיקה רצה גם מול פתק רגיש ומול קטגוריה רגישה** (3.4).
 
 ### 3.3 אבטחה נוספת
 
@@ -292,6 +308,37 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 - **CORS:** לא נדרש ל-`/mcp`, כי Claude קורא מצד השרת. `/oauth/decision` מקבל רק מה-origin של האפליקציה.
 
 ---
+
+### 3.4 פתקים רגישים: בלתי נראים ל-MCP
+
+ההגדרה המלאה של התכונה והצד של האפליקציה נמצאים ב-`architecture-review.md` §12 (צעד C6).
+
+- **רגישות אפקטיבית** = `note.isSensitive || category(note.categoryId).isSensitive`.
+  - הקטגוריה נקראת בזמן הבקשה. לכן פתק שנוסף לקטגוריה רגישה אחרי שסומנה מוסתר גם הוא.
+- **בלתי נראה, לא "קריאה בלבד":**
+  - פתקים רגישים לא מופיעים ב-`list_notes`, ב-`search_notes` ולא נספרים ב-`noteCount`.
+  - קטגוריות רגישות לא מופיעות ב-`list_categories`.
+  - גישה ישירה לפי מזהה (`get_note` וכל tool כתיבה) מחזירה את **אותו `NotFound`** כמו פתק של משתמש זר. אין דרך להבחין ש"יש כאן משהו מוסתר".
+  - קטגוריה רגישה כיעד ל-`create_note` או ל-`move_note_to_category` מחזירה גם היא `NotFound`.
+- **נאכף במקום אחד: `UserScope`.**
+  - `listAccessibleNotes`, `listAccessibleCategories`, `loadNoteForUser` ו-`loadCategoryForUser` מסננים דרך פונקציה אחת, `isVisibleToMcp(note, categoriesById)`.
+  - אף tool לא בודק רגישות בעצמו, ואין tool שיכול לעקוף.
+  - החיפוש רץ רק על מה ש-`listAccessibleNotes` מחזיר, כך שלא יכולה לזלוג התאמה בטקסט של פתק רגיש.
+- **פתק משותף:** הדגל של הבעלים חל על כל משתמש.
+  - `UserScope` רץ עם Admin SDK ולכן טוען את הקטגוריה של **הבעלים** לפי `categoryId`, גם כשהיא לא משותפת עם המשתמש המבקש.
+- **fail-closed:**
+  - פתק שהקטגוריה שלו לא נמצאת (נמחקה, או מזהה שבור) נחשב רגיש ומוסתר.
+  - עדיף שפתק יתום לא יהיה נגיש ל-Claude, מאשר שפתק מקטגוריה רגישה שנמחקה יחשף.
+- **אין שום tool שמשנה `isSensitive`.** השדה לא ב-allowlist של `sanitizeNotePatch`. הוא נקבע רק באפליקציה, על ידי הבעלים, ונאכף ב-`firestore.rules` (review §12.2).
+- **Audit log:** אין רשומות על פתקים רגישים, כי אין גישה אליהם. אם פתק הפך לרגיש אחרי שנכתב, רשומות ה-audit הקודמות נשארות (הן של הבעלים, לא נחשפות ל-MCP).
+- **בדיקות** (בנוסף ל-3.2.8), כל אחת כפי שהמשתמש המבקש רואה אותה:
+  - פתק עם דגל משלו.
+  - פתק בקטגוריה רגישה.
+  - פתק שנוסף לקטגוריה רגישה **אחרי** הסימון.
+  - פתק משותף שהקטגוריה של הבעלים שלו רגישה, מנקודת המבט של המשתמש שאיתו שותף.
+  - קטגוריה רגישה ב-`list_categories`.
+  - חיפוש של מילה שמופיעה רק בפתק רגיש: אפס תוצאות.
+  - פתק עם `categoryId` שבור: מוסתר.
 
 ## 4. ארכיטקטורה
 
@@ -314,7 +361,7 @@ functions/src/
     audit.ts               ← writeAudit(tx, entry)
     errors.ts              ← NotFound / Forbidden / Conflict / Invalid: שגיאות דומיין
   oauth/                   ← Authorization Server
-    metadata.ts authorize.ts decision.ts token.ts register.ts revoke.ts cimd.ts
+    metadata.ts authorize.ts decision.ts token.ts register.ts revoke.ts   (cimd.ts - נדחה, 2.1)
     tokens.ts              ← יצירה, hash ואימות
     store.ts               ← גישה ל-collections של oauth*
     verify.ts              ← requireMcpAuth middleware → AuthContext
@@ -341,7 +388,7 @@ functions/src/
 - **מראות (mirrors):**
   - `functions/` היא חבילה נפרדת ולא יכולה לייבא מ-`src/`, בדיוק כמו `reminderPayload.ts` היום.
   - כל מראה מסומן בהערה שמפנה למקור.
-  - **שאלה פתוחה:** האם לחלץ עכשיו חבילה משותפת או לקבל מראות.
+  - **החלטה: מראות מתועדות עכשיו, בלי חבילה משותפת.** כל קובץ מראה מפנה בהערה לקובץ המקור ב-`src/` (למשל `src/utils/templateContent.ts`), ושינוי באחד מחייב שינוי בשני. חבילה משותפת נשקלת רק אם המראות יתחילו להתפצל בפועל.
 - **`ChecklistItem` מוגדר היום פעמיים** (בלקוח וב-`functions/src/index.ts`). ה-codec החדש לא נוגע ב-`index.ts`. הוא מגדיר type משלו שתואם את שניהם.
 
 ### 4.3 `defineTool`
@@ -366,7 +413,12 @@ defineTool({
 
 ## 5. Tools
 
-כל ה-tools מחזירים מזהים, כדי ש-Claude ישרשר קריאות. תאריכים ב-ISO. שדה `access: 'owner' | 'shared'` בכל פתק.
+כל ה-tools מחזירים מזהים, כדי ש-Claude ישרשר קריאות. תאריכים ב-ISO. שדה `access: 'owner' | 'shared'` בכל פתק. פתקים וקטגוריות רגישים לא קיימים מבחינת ה-tools (3.4).
+
+**מודל התוכן:** הכתיבות בנויות על מודל ה-`items` מ-`architecture-review.md` §11.7.
+- **תבניות רשימה** (checklist, shopping, workplan, accounting): `items` כ-map במסמך הפתק, עם `contentFormat: 2`. כל שינוי פריט הוא כתיבת field-path (`items.<id>.<field>`). מחיקה היא tombstone. הסדר לפי `pos`.
+- **טקסט חופשי:** מחרוזת עם `revision`.
+- הקריאה עוברת דרך ה-codec, שקורא גם את הפורמט הישן (`content` כ-JSON) וגם את החדש. לכן שלב 1 (קריאה) לא תלוי במיגרציה, ושלב 2 (כתיבה) תלוי בה (צעדים D4 ו-E1 ב-review).
 
 ### שלב 1: קריאה בלבד (`notes.read`)
 
@@ -381,10 +433,10 @@ defineTool({
 
 | Tool | קלט | התנהגות |
 |---|---|---|
-| `create_note` | `categoryId`, `title`, `templateType` (ברירת מחדל `plain`), `text?` או `items?` | בונה `content` דרך ה-codec. `userId=uid`, `sharedWith: []`, `isPinned:false`, `isArchived:false`, `order` = מספר הפתקים בקטגוריה, `tags: []`, `color: null`, ו-`createdAt`/`updatedAt` מהשרת. זהה ל-`useNoteEditor.saveNote`. **קטגוריית יעד משותפת:** ראו שאלה פתוחה. |
-| `add_checklist_item` | `noteId`, `text`, `dueDate?` (`YYYY-MM-DD`), `dueTime?` (`HH:MM`), `repeat?` (`daily\|weekly\|monthly\|yearly`) | רק ל-`templateType == 'checklist'` (או תוכן שזוהה כ-checklist). `id = Date.now().toString()`, כמו בלקוח, עם הגנה מהתנגשות. ולידציה: `repeat` דורש `dueDate` ו-`dueTime` (כך בממשק). התאריך נבדק עם `localDateTimeToDate`. **נוסף ב-transaction לתוכן העדכני, בלי `revision`** (פעולת append בטוחה). הטריגר הקיים `syncNoteReminders` רואה את הכתיבה ויוצר תזכורת, **בלי שום שינוי בו**. פלט: `{noteId,itemId,revision,reminderScheduled: boolean, remindAt?}`. |
-| `update_note` | `noteId`, `expectedRevision`, ואחד או יותר מ: `title`, `text` (plain), `items` (רשימה מלאה), `itemPatches` (`[{itemId, text?, completed?, dueDate?, dueTime?, repeat?\|null}]`), `isPinned` | `itemPatches` הוא הדרך המועדפת: שינוי לפי `itemId` ששומר פריטים אחרים ושדות לא מוכרים. החלפה מלאה (`text`/`items`) מחייבת `expectedRevision` תואם. |
-| `move_note_to_category` | `noteId`, `categoryId` | בעלים בלבד. היעד חייב להיות נגיש. מעדכן `categoryId` ו-`order` (סוף הקטגוריה). **לא** משנה `sharedWith` (בדיוק כמו `moveToCategory` בלקוח). ראו שאלה פתוחה לגבי שיתוף. |
+| `create_note` | `categoryId`, `title`, `templateType` (ברירת מחדל `plain`), `text?` או `items?` | בונה את התוכן דרך ה-codec (תבנית רשימה נכתבת ישר כ-`items` עם `contentFormat: 2`). `userId=uid`, `sharedWith: []`, `isPinned:false`, `isArchived:false`, `isSensitive:false`, `isEmpty` מחושב, `revision: 1`, `updatedBy: 'mcp:<clientId>'`, `pos`/`order` בסוף הקטגוריה, `tags: []`, `color: null`, ו-`createdAt`/`updatedAt` מהשרת. **קטגוריית היעד חייבת להיות בבעלות המשתמש** (החלטה). קטגוריה משותפת של מישהו אחר אסורה בינתיים. |
+| `add_checklist_item` | `noteId`, `text`, `dueDate?` (`YYYY-MM-DD`), `dueTime?` (`HH:MM`), `repeat?` (`daily\|weekly\|monthly\|yearly`) | רק ל-`templateType == 'checklist'` (או תוכן שזוהה כ-checklist). `id = Date.now().toString()`, כמו בלקוח, עם הגנה מהתנגשות. ולידציה: `repeat` דורש `dueDate` ו-`dueTime` (כך בממשק). התאריך נבדק עם `localDateTimeToDate`. **כתיבת שדה אחת:** `items.<newId> = {...}` + `revision: increment(1)` + `updatedBy`, בתוך ה-transaction של ה-tool (בשביל `loadNoteForUser` וה-audit). אין קריאה-שינוי-כתיבה של רשימה, ואין `expectedRevision`. פתק בפורמט הישן מומר ל-`items` באותה transaction (מיגרציה עצלה, review E1). הטריגר הקיים `syncNoteReminders` רואה את הכתיבה ויוצר תזכורת, **בלי שום שינוי בו**. פלט: `{noteId,itemId,revision,reminderScheduled: boolean, remindAt?}`. |
+| `update_note` | `noteId`, `expectedRevision?`, ואחד או יותר מ: `title`, `text` (plain), `itemPatches` (`[{itemId, text?, completed?, dueDate?, dueTime?, repeat?\|null, deleted?}]`), `isPinned` | **`itemPatches`**: כתיבות field-path ל-`items.<id>.<field>`, ומחיקה כ-tombstone. לא דורש `expectedRevision`, ולא נוגע בפריטים אחרים או בשדות לא מוכרים. **`text`** (plain): דורש `expectedRevision`, שנבדק ב-transaction בצד השרת, כי Admin SDK עוקף את ה-rule (7.2). אי-התאמה מחזירה `Conflict`. **`title`**: last-write-wins. אין "החלפת כל הרשימה". |
+| `move_note_to_category` | `noteId`, `categoryId` | **בעלים בלבד** (החלטה). היעד חייב להיות קטגוריה **בבעלות המשתמש** ולא רגישה (אותו כלל כמו ב-`create_note`). מעדכן `categoryId` ו-`pos` (סוף הקטגוריה). **לא** משנה `sharedWith`, עד להחלטת SH-3 ב-review. |
 | `archive_note` | `noteId` | `isArchived:true`, `archivedAt: serverTimestamp()`, כמו `archiveNote` בלקוח. הטריגר מוחק את התזכורות. בעלים בלבד. אפשר לשחזר מהאפליקציה. |
 
 **אין `delete_note` ואין שום נתיב קוד שקורא ל-`.delete()` על notes או categories.** בדיקה סטטית ב-CI: grep על `notesCore/` שנכשל אם יש `delete(`.
@@ -412,7 +464,7 @@ defineTool({
   },
   summary: 'נוספה משימה "לקנות חלב" (יעד 2026-09-26 09:00)',
   revisionBefore, revisionAfter,
-  expiresAt                          // TTL, למשל 180 יום (שאלה פתוחה)
+  expiresAt                          // TTL: 180 יום (החלטה)
 }
 ```
 - **ערך קודם מלא** נשמר עבור השדות שהשתנו בלבד. זה מאפשר שחזור ידני ובעתיד tool של `undo_last_change`. גודל מסמך ב-Firestore מוגבל ל-1MB, ולכן לתוכן גדול מ-400KB נשמר hash ו-diff ברמת פריט.
@@ -425,43 +477,42 @@ defineTool({
 
 ## 7. Concurrency
 
-### 7.1 המצב היום (חשוב)
+> **עודכן:** הסעיף נבנה עכשיו על מודל ה-`items` מ-`architecture-review.md` §11.7, ולא על merge של מחרוזת JSON. הגרסה הקודמת הציעה `runTransaction` בלקוח, שלא עובד offline, ולכן נדחתה.
 
-- `NoteView` מחזיק טיוטה מקומית (`title`, `content`) ו**מסתנכרן לפי מזהה הפתק בלבד**. זו החלטה מכוונת, כדי שהמאזין לא ידרוס הקלדה.
-- כל שינוי שולח אחרי 600ms את **כל מחרוזת ה-`content`** (`updateNote(noteId, { content })`).
-- **תרחיש האובדן:**
+### 7.1 המצב היום
+
+- `NoteView` מחזיק טיוטה מקומית ו**מסתנכרן לפי מזהה הפתק בלבד**, וכל שינוי שולח את **כל מחרוזת ה-`content`** (C-1 ב-review).
+  - A1 עד A3 (v1.20.1 עד v1.20.3) תיקנו את אובדן העדכונים ב-debounce, את דריסת תוכן שלא פוענח ואת ההוספה מדף השיתוף. **את הדריסה של הטיוטה המלאה הם לא תיקנו.**
+- **תרחיש האובדן** נשאר:
   1. המשתמש פותח פתק checklist.
   2. Claude מוסיף משימה.
   3. המשתמש מסמן V על משימה אחרת.
-  4. ה-save של הלקוח כותב את הטיוטה הישנה, שאין בה את המשימה של Claude, והמשימה של Claude נמחקת בשקט.
-- אותה בעיה קיימת כבר היום בין שני משתמשים משותפים. MCP רק יהפוך אותה לשכיחה.
+  4. הטיוטה הישנה נכתבת, והמשימה של Claude נמחקת.
 
 ### 7.2 צד השרת (בשליטת ה-MCP)
 
-1. **שדה `revision` מספרי בפתק.**
-   - כל כתיבה של MCP עושה `revision: FieldValue.increment(1)`.
-   - פתקים ישנים בלי השדה נחשבים `0`.
-   - `get_note` מחזיר את הערך.
-2. **כל write של MCP הוא read-modify-write בתוך `runTransaction`.** transaction של Admin SDK נועל את המסמך, ולכן אין מרוץ בין שתי כתיבות שרת.
-3. **פעולות ברמת פריט** (`add_checklist_item`, `itemPatches`) מוחלות על התוכן **העדכני** בתוך ה-transaction. הן לא דורשות `expectedRevision`, כי הן לא דורסות פריטים אחרים.
-4. **החלפה מלאה** (`text`, `items`, `title`) דורשת `expectedRevision`. אי-התאמה מחזירה `Conflict` עם ההודעה: "הפתק השתנה מאז שקראת אותו - קרא שוב עם get_note".
-5. **"עריכה פעילה":** אם `editingUntil > now` (ראו 7.3), כתיבה של החלפה מלאה נדחית עם הודעה ש-"המשתמש עורך את הפתק כרגע". פעולות ברמת פריט עדיין מותרות, כי 7.3 ממזג אותן.
+1. **כל write של MCP רץ ב-`runTransaction` בצד השרת**, דרך שכבת הכתיבה של `notesCore`. זה המקום היחיד שכותב. בתוכו:
+   - `loadNoteForUser` (הרשאה + רגישות).
+   - הכתיבה.
+   - רשומת ה-audit.
+2. **תבניות רשימה:** כתיבות field-path ל-`items.<id>.<field>` + `revision: increment(1)` + `updatedBy: 'mcp:<clientId>'`.
+   - כתיבה כזו לא דורסת פריטים אחרים, ולא מתנגשת עם כתיבות של הלקוח לפריטים אחרים. גם כתיבות offline שמגיעות מאוחר יותר מתמזגות ברמת השדה.
+3. **טקסט חופשי: בדיקת `revision` בתוך ה-transaction של השרת.**
+   - ה-Admin SDK **עוקף את `firestore.rules`**, ולכן ה-rule של `revision == old + 1` (review §11.7ב) לא חל על MCP.
+   - השרת אוכף את אותו כלל בעצמו: `expectedRevision` חייב להיות שווה ל-`revision` הנוכחי, והכתיבה היא `revision + 1`. אחרת `Conflict`, עם ההודעה "הפתק השתנה מאז שקראת אותו - קרא שוב עם get_note".
+   - ראו review §11.7ד.
+4. **פתק בפורמט הישן** (`contentFormat` חסר): מומר ל-`items` באותה transaction, לפני הכתיבה.
+5. **Presence (`editingUntil`): לא בתכנית.** עם כתיבות ברמת שדה אין בו צורך. נשקל מחדש רק אם יתגלו התנגשויות בטקסט חופשי.
 
-### 7.3 צד הלקוח (נדרש לשלב 2, שינוי קוד באפליקציה)
+### 7.3 צד הלקוח: תנאי מוקדם לשלב 2 (החלטה)
 
-בלי זה, השרת לא יכול למנוע מהלקוח לדרוס. מוצע:
+שלב 2 (כתיבה) לא נפתח לפני ש**צעדים E1, E2 ו-E2b ב-review** נמצאים ב-production:
+- **E1:** הלקוח כותב field-path לתבניות רשימה, ו-`NoteView` מציג את ה-snapshot החי.
+- **E2:** rule של `revision` + `draftJournal` + "שמירת שתי הגרסאות" לטקסט חופשי.
+- **E2b:** offline persistence.
+- **תנאי מקדים שלהם:** D4 (`contentFormat: 2` + `minClientVersion`).
 
-1. **כל כתיבה של הלקוח מעלה את `revision`** (`increment(1)` ב-`updateNote`, `archiveNote` וכו'). זה נכון גם ל-`reorderNotes`, או לפחות לכתיבות של `content`/`title`.
-2. **`NoteView` זוכר `baseRevision`** מרגע פתיחת הטיוטה. כשמגיע עדכון מהמאזין עם `revision` גבוה יותר:
-   - **אם אין שינוי מקומי שממתין:** מאמצים את התוכן החדש, כלומר מסתנכרנים.
-   - **אם יש שינוי ממתין בתבנית מבוססת פריטים** (checklist, shopping, workplan, accounting): **3-way merge ברמת פריט לפי `id`** בין base, local ו-remote. פריטים שנוספו משני הצדדים נשמרים. שינוי שדות באותו פריט: הלקוח מנצח בשדה שהוא שינה. מחיקה מקומית מנצחת.
-   - **אם יש שינוי ממתין ב-plain או ב-recipe:** מציגים הודעה "הפתק עודכן ברקע" עם בחירה.
-3. **ה-save של הלקוח עובר ל-`runTransaction`** שבודק `revision == baseRevision`. אם לא, מבצעים merge ומנסים שוב.
-4. **Presence (אופציונלי):** בזמן `isEditMode` הלקוח כותב `editingBy: uid` ו-`editingUntil: now+60s`, ומחדש כל 30 שניות. כך השרת מקבל את 7.2.5. עלות: כתיבה כל 30 שניות בזמן עריכה. לשקול.
-
-**שקלתי ונדחה: לפצל את התוכן ל-subcollection של פריטים.** זה פותר concurrency מהשורש, אבל שובר את כל האפליקציה, את הגיבויים ואת הטריגר. זה מחוץ ל-scope.
-
-**המלצה:** בשלב 1 אין בעיה, כי אין כתיבה. שלב 2 יוצא יחד עם 7.3.1 עד 7.3.3. עד אז אפשר לשחרר רק `add_checklist_item` ו-`archive_note`, בידיעה שקיים חלון סיכון בפתק שפתוח בעריכה.
+**המלצה:** שלב 1 לא תלוי בזה, כי אין בו כתיבה והקריאה עוברת דרך codec שמכיר את שני הפורמטים. שלב 2 מחכה ל-E, בלי חריגים. הגרסה הקודמת הציעה לשחרר את `add_checklist_item` מוקדם, וזה בוטל.
 
 ---
 
@@ -483,7 +534,10 @@ match /auditLog/{id} {
   allow read: if isOwner(resource.data.uid) || isOwner(resource.data.noteOwnerId);
   allow write: if false;
 }
+// allowlist של משתמשים (2.3.5): נערך רק מה-console
+match /config/{id}         { allow read, write: if false; }
 ```
+- **`isSensitive`:** הכללים ב-`notes` וב-`categories` (רק הבעלים משנה את הדגל, ושותף לא משנה `categoryId`) הם חלק מצעד C6 ב-review (§12.2), ונפרסים לפני שלב 1 ולא כאן.
 - `allow ... if false` הוא ברירת המחדל ב-Firestore. הכללים נכתבים במפורש לתיעוד, כמו `reminders`.
 - **notes:** אם 7.3 יתווסף, שותף ששולח `revision` צריך להיות מותר. `ownershipUnchanged()` כבר מתיר כל שדה חוץ מבעלות, ולכן אין שינוי נדרש. אפשר להוסיף `request.resource.data.get('revision',0) >= resource.data.get('revision',0)` כהגנה.
 
@@ -502,7 +556,7 @@ match /auditLog/{id} {
 
 ### 8.3 סדר מימוש
 
-כל שלב נכנס ב-commit נפרד עם העלאת גרסה ורשומה ב-WhatsNew, לפי `CLAUDE_GUIDELINES.md`.
+כל שלב נכנס ב-commit נפרד עם העלאת גרסה ורשומה ב-WhatsNew, לפי `CLAUDE_GUIDELINES.md`. **החלטה (שאלה 12): branch ו-PR לכל שלב (0, 1א, 1ב, 1ג, 2). הבעלים עושה review לפני merge.** אין דחיפה ישירה ל-`main`.
 
 **שלב 0: תשתית (בלי השפעה על משתמשים)**
 1. ESLint מינימלי ל-`functions/` + כלל `no-restricted-imports` (3.2.7).
@@ -510,12 +564,12 @@ match /auditLog/{id} {
 3. `notesCore/content/*` + `render.ts` + בדיקות יחידה על דוגמאות מכל תבנית, כולל תוכן "לא תואם לסוג" ושדות לא מוכרים שנשמרים.
 
 **שלב 1א: שכבת נתונים לקריאה**
-4. `notesCore/store.ts` (`UserScope`, `loadNoteForUser`, `listAccessible*`), `permissions.ts`, `search.ts`.
+4. `notesCore/store.ts` (`UserScope`, `loadNoteForUser`, `listAccessible*`, `isVisibleToMcp`), `permissions.ts`, `search.ts`. **תלוי ב-C6 ב-review** (השדה `isSensitive` קיים והבעלים יכול לסמן לפני שהשרת עולה).
 5. בדיקות emulator: משתמש A, משתמש B, פתק משותף, קטגוריה משותפת, פתק זר.
 
 **שלב 1ב: OAuth**
 6. `oauth/tokens.ts`, `oauth/store.ts`, metadata endpoints.
-7. `register` (DCR עם allowlist), `cimd`.
+7. `register` (DCR עם allowlist של redirect URIs של Claude). בלי CIMD (2.1). `config/mcp` עם allowlist של משתמשים (החשבון של הבעלים בלבד).
 8. `authorize`, `decision`, route `/connect` ב-SPA (מסך הסכמה בסגנון העיצוב הקיים).
 9. `token` (code + refresh rotation + reuse detection), `revoke`, `verify.ts`.
 10. Firestore rules (8.1) ו-TTL policies.
@@ -527,7 +581,7 @@ match /auditLog/{id} {
 14. "אפליקציות מחוברות" בפרופיל + `revokeMcpGrant` callable.
 
 **שלב 2: כתיבה**
-15. `revision` ו-merge בלקוח (7.3). **משוחרר לפני** tools הכתיבה.
+15. **תנאי מקדים:** review D4, E1, E2 ו-E2b ב-production (7.3). לא חלק מה-branch של MCP.
 16. `audit.ts` + rules ל-`auditLog`.
 17. `add_checklist_item` → בדיקה שהתזכורת נוצרת ונשלחת.
 18. `create_note`, `update_note`, `move_note_to_category`, `archive_note`.
@@ -543,7 +597,8 @@ match /auditLog/{id} {
 
 **אינטגרציה (emulator)**
 - **הרשאות (החשוב ביותר):**
-  - הבדיקה הגנרית "כל tool × פתק זר → NotFound" (3.2.8).
+  - הבדיקה הגנרית "כל tool × פתק זר → NotFound" (3.2.8), **וגם "כל tool × פתק רגיש / קטגוריה רגישה → NotFound"** (3.4).
+  - allowlist של משתמשים: משתמש שלא ברשימה לא מקבל code, ו-token קיים שלו נדחה אחרי הסרה מהרשימה.
   - שותף יכול לקרוא ולעדכן תוכן, אבל לא לארכב או להעביר.
   - אף tool לא משנה `userId` או `sharedWith` (בדיקה על המסמך אחרי כל tool).
 - **OAuth flow מלא** בלי דפדפן: register → authorize → decision (עם ID token מ-Auth emulator) → token → `/mcp` → refresh → revoke → 401.
@@ -576,18 +631,22 @@ match /auditLog/{id} {
 
 ---
 
-## 9. שאלות פתוחות
+## 9. החלטות (היו שאלות פתוחות)
 
-1. **דומיין:** ה-issuer וה-MCP URL תחת `notes-4-me.web.app` (דורש שינוי ב-`firebase.json`), או ישירות על `*.run.app` של הפונקציה? יש או מתוכנן דומיין מותאם? מעבר דומיין אחרי שמשתמשים חיברו מחייב חיבור מחדש.
-2. **מי רשאי להתחבר:** רק Claude (allowlist של redirect URIs ל-claude.ai ול-loopback), או כל לקוח MCP (למשל ChatGPT, Cursor)? פתיחה מגדילה את שטח התקיפה של DCR.
-3. **מי המשתמשים:** השרת לשימושך בלבד, או לכל משתמשי האפליקציה? אם רק לך, אפשר להוסיף allowlist של `uid` כשכבת הגנה נוספת בשלב הראשון.
-4. **הרשאות שותפים:** האם שותף (לא בעלים) יכול דרך Claude לארכב או להעביר פתק? `firestore.rules` מתיר לו לארכב היום. אני מציע "בעלים בלבד" ב-MCP, כלומר מחמיר יותר מהאפליקציה.
-5. **`create_note` בקטגוריה משותפת של מישהו אחר:** בלקוח היום נוצר פתק עם `sharedWith: []`, והבעלים של הקטגוריה לא רואה אותו. לשכפל את ההתנהגות הזו, לאסור, או לרשת את השיתוף של הקטגוריה (שינוי התנהגות שכדאי שיגיע גם לאפליקציה)? אותה שאלה ל-`move_note_to_category`.
-6. **זמני חיים:** access token לשעה, refresh token ל-30 יום sliding עם תקרה של 90 יום. מתאים? כמה זמן לשמור audit log (הצעה: 180 יום)?
-7. **cache של אימות token בזיכרון** (חוסך קריאה לכל בקשה, revocation מתעכב עד 60 שניות): כן או לא?
-8. **`minInstances: 1`** (בערך כמה דולרים בחודש, מבטל cold start מול מגבלת 10 השניות של Claude): להתחיל בלי ולמדוד?
-9. **Concurrency בלקוח (7.3):** מוכן לשינוי ב-`NoteView` ובתבניות (revision + merge) כתנאי לשלב 2? ו-presence (`editingUntil`): כן או לא?
-10. **מראות מול חבילה משותפת:** לקבל שכפול מתועד של codecs, mappers ו-search ב-`functions/` (כמו `reminderPayload.ts`), או להשקיע עכשיו ב-`packages/notes-core` משותף ל-SPA ול-functions? (השני טוב ל"פרויקט עתידי", אבל מסבך את ה-build.)
-11. **גרסת MCP SDK:** אם v2 עדיין beta בזמן המימוש, ללכת על v1.x היציב?
-12. **Push:** `CLAUDE_GUIDELINES.md` אומר לא לדחוף בלי אישור וב-branch בפורמט `claude/...`. להמשך המימוש, לעבוד ב-branch עם PR, או ישירות על `main` כמו במשימה הזו?
-13. **תיעוד מיושן:** `CLAUDE_GUIDELINES.md` מזכיר ש-`reminderPending` "חייב תמיד להיכתב", אבל הטריגר הנוכחי מפרסר את התוכן ולא משתמש בשדה (נשאר רק סקריפט backfill). לעדכן את ההנחיות בהזדמנות?
+| # | נושא | החלטה | איפה במסמך |
+|---|---|---|---|
+| 1 | דומיין | `notes-4-me.web.app`, דרך rewrites ב-Hosting | 1.3 |
+| 2 | מי רשאי להתחבר | **Claude בלבד**, לפי allowlist של redirect URIs (claude.ai + loopback של Claude Code). **DCR בלבד** בשלב 1. CIMD נדחה (משטח SSRF) ויתווסף בהמשך דרך `client_id_metadata_document_supported` | 2.1, 2.3.3 |
+| 3 | מי המשתמשים | קוד נכון לריבוי משתמשים, אבל **allowlist של `uid`** ב-`config/mcp`, ובהתחלה רק החשבון של הבעלים. fail-closed | 2.3.5, 2.3.9 |
+| 4 | הרשאות שותפים | ארכוב והעברה: **בעלים בלבד** | 3.2.5, 5 |
+| 5 | `create_note` בקטגוריה משותפת של אחר | **אסור בינתיים.** אותו כלל ליעד של `move_note_to_category` | 3.2.5, 5 |
+| 6 | זמני חיים | access token לשעה, refresh token ל-30 יום sliding עם תקרה של 90: **אושר**. audit log: **180 יום** | 2.3.7, 6 |
+| 7 | cache של אימות tokens | **אין** | 2.3.8 |
+| 8 | `minInstances` | **בלי בהתחלה, מודדים** | 1.1, 8.4 |
+| 9 | concurrency בלקוח | **כן, תנאי מקדים לשלב 2.** מבוסס על מודל ה-`items` (review §11.7, צעדים D4/E1/E2/E2b). presence לא בתכנית | 7.3 |
+| 10 | מראות מול חבילה משותפת | **מראות מתועדות עכשיו**, בלי חבילה משותפת | 4.2 |
+| 11 | גרסת SDK | **stable, נעולה לגרסה מדויקת** | 1.2 |
+| 12 | עבודה עם git | **branch ו-PR לכל שלב**, והבעלים עושה review לפני merge | 8.3 |
+| 13 | תיעוד מיושן | לעדכן את `CLAUDE_GUIDELINES.md` (כולל `reminderPending`) **ב-commit נפרד** | review X-4 / C5 |
+
+**נוסף אחרי ההחלטות:** פתקים רגישים, בלתי נראים ל-MCP (3.4, review §12).
