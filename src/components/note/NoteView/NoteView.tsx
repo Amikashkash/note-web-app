@@ -23,7 +23,7 @@ import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
-import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
+import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
@@ -82,7 +82,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
 
-  const saveUpdates = useDebouncedCallback((updates: NoteUpdates) => {
+  const saveUpdates = useDebouncedPatch<NoteUpdates>((updates) => {
     onUpdate?.(note.id, updates);
   }, AUTOSAVE_DELAY_MS);
 

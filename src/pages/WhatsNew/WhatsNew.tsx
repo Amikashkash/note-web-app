@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.20.1',
+    date: 'ספטמבר 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'שינוי בכותרת פתק ומיד אחריו שינוי בתוכן (למשל סימון משימה) שמר רק את התוכן - הכותרת החדשה לא נשמרה. עכשיו כל השינויים שנעשו ברצף נשמרים יחד',
+      },
+    ],
+  },
+  {
     version: '1.20.0',
     date: 'יולי 2026',
     changes: [
