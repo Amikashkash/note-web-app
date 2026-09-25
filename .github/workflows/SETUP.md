@@ -1,88 +1,49 @@
-# GitHub Actions Auto-Deploy Setup Guide
+# GitHub Actions: CI and deploy
 
-This guide will help you set up automatic deployment to Firebase when you push to GitHub.
+The workflow in `firebase-deploy.yml` has two jobs:
 
-## Step 1: Generate Firebase Service Account
+- **test**: runs on every pull request and on every push to `main`. It lints, type-checks and builds the client and the Cloud Functions, runs both unit test suites, and runs the Firestore rules tests on the emulator. It uses no secrets.
+- **deploy**: runs only on `main` (push or manual run), and only after **test** passed. It builds with the production environment variables, deploys Hosting, then deploys Firestore rules and indexes.
 
-1. Go to [Firebase Console](https://console.firebase.google.com/project/notes-4-me/settings/serviceaccounts/adminsdk)
-2. Click "Generate new private key"
-3. Save the JSON file securely (it contains sensitive credentials)
-4. Copy the entire content of the JSON file
+Cloud Functions are **not** deployed by CI. They are built and tested there, and deployed manually:
+`firebase deploy --only functions:<name>`.
 
-## Step 2: Add Service Account to GitHub Secrets
+## Secrets
 
-1. Go to your GitHub repository: https://github.com/[YOUR-USERNAME]/notes-app
-2. Click **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Name: `FIREBASE_SERVICE_ACCOUNT`
-5. Value: Paste the entire JSON content from Step 1
-6. Click **Add secret**
+Settings → Secrets and variables → Actions:
 
-## Step 3: Generate Firebase CI Token (for Firestore rules)
+| Secret | Used by | Notes |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | deploy | JSON key of a service account. Planned to be replaced by Workload Identity Federation, see `thinking/ci-workload-identity.md` |
+| `VITE_FIREBASE_*` (6 values) | deploy build | Web app config from Firebase Console → Project settings → General |
+| `VITE_FIREBASE_VAPID_KEY` | deploy build | Cloud Messaging → Web Push certificates. Without it the build succeeds but push reminders silently stop |
 
-1. Open a terminal/command prompt
-2. Run: `firebase login:ci`
-3. A browser window will open - log in with your Google account
-4. Copy the token from the terminal
+`FIREBASE_TOKEN` (from `firebase login:ci`) is no longer used and can be deleted.
 
-## Step 4: Add Firebase Token to GitHub Secrets
+## Supply chain
 
-1. Go back to GitHub: **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `FIREBASE_TOKEN`
-4. Value: Paste the token from Step 3
-5. Click **Add secret**
+- Every action is pinned to a full commit SHA, with the version in a comment. A tag can be moved, and a moved tag would receive the deploy credentials.
+- The Firebase CLI comes from `firebase-tools`, pinned in `package-lock.json`, not from a third-party action.
+- To update an action: resolve the new release tag to its commit SHA
+  (`gh api repos/<owner>/<repo>/git/ref/tags/<tag>`, and dereference annotated tags), review the diff, and update the SHA and the comment together.
 
-## Step 5: Push the Workflow File
+## Running the same checks locally
 
 ```bash
-git add .github/workflows/firebase-deploy.yml
-git commit -m "Add GitHub Actions auto-deploy workflow"
-git push
+npm ci && (cd functions && npm ci)
+npm run lint
+npm run build
+npm test
+(cd functions && npm run build && npm run typecheck && npm test)
+npm run test:rules   # needs Java 21+; starts and stops the Firestore emulator
 ```
 
-## Step 6: Verify Deployment
+## Manual run
 
-1. Go to your GitHub repository
-2. Click **Actions** tab
-3. You should see the workflow running
-4. Wait for it to complete (green checkmark)
-5. Check https://notes-4-me.web.app to verify the deployment
-
-## How It Works
-
-- **Trigger**: Automatically runs when you push to `main` branch
-- **Build**: Installs dependencies and builds the project
-- **Deploy Hosting**: Deploys to Firebase Hosting
-- **Deploy Firestore**: Updates Firestore rules and indexes
-
-## Manual Trigger
-
-You can also manually trigger deployment:
-1. Go to **Actions** tab
-2. Click **Deploy to Firebase Hosting**
-3. Click **Run workflow**
-4. Select branch and click **Run workflow**
+Actions → **CI and deploy** → **Run workflow** → branch `main`. A manual run on any other branch runs only the tests.
 
 ## Troubleshooting
 
-### Build Fails
-- Check the Actions log for error messages
-- Make sure all dependencies are in package.json
-- Verify the build works locally: `npm run build`
-
-### Deploy Fails
-- Check that secrets are set correctly
-- Verify Firebase project ID is correct in firebase-deploy.yml
-- Make sure service account has proper permissions
-
-### Firestore Deploy Fails
-- Check FIREBASE_TOKEN is valid
-- Try regenerating the token: `firebase login:ci`
-
-## Security Notes
-
-⚠️ **Never commit the service account JSON or Firebase token to Git!**
-- These are sensitive credentials
-- Keep them only in GitHub Secrets
-- Rotate them periodically for security
+- **test fails, deploy skipped**: this is the gate working. Open the failing step's log.
+- **Rules tests fail after changing `firestore.rules`**: a "KNOWN HOLE" test failing means a planned fix flipped it. Invert the assertion and move it to the regular tests. Any other failure is a regression.
+- **Firestore deploy fails with a permissions error**: the service account needs Firebase Rules Admin and Cloud Datastore Index Admin.
