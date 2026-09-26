@@ -94,6 +94,8 @@ beforeEach(async () => {
     const db = context.firestore();
     await setDoc(doc(db, 'notes/note-1'), baseNote);
     await setDoc(doc(db, 'notes/private-1'), { ...baseNote, sharedWith: [] });
+    await setDoc(doc(db, 'notes/note-1/versions/v1'), { content: 'ישן', authoredBy: OWNER });
+    await setDoc(doc(db, 'notes/private-1/versions/v1'), { content: 'ישן', authoredBy: OWNER });
     await setDoc(doc(db, 'categories/cat-1'), baseCategory);
     await setDoc(doc(db, 'reminders/note-1__item-1'), { userId: OWNER, noteId: 'note-1', sent: false });
     await setDoc(doc(db, `users/${OWNER}`), { uid: OWNER, email: 'owner@example.com' });
@@ -160,6 +162,44 @@ describe('notes', () => {
     });
     await assertSucceeds(getDoc(doc(as(OWNER), 'notes/legacy-1')));
     await assertFails(getDoc(doc(as(STRANGER), 'notes/legacy-1')));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// notes/{noteId}/versions - נכתב רק ע"י הטריגר
+// ---------------------------------------------------------------------------
+
+describe('note versions', () => {
+  it('can be read by whoever can read the note', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER), 'notes/note-1/versions/v1')));
+    await assertSucceeds(getDoc(doc(as(SHARED), 'notes/note-1/versions/v1')));
+    await assertSucceeds(getDocs(collection(as(SHARED), 'notes/note-1/versions')));
+  });
+
+  it('cannot be read by someone who cannot read the note', async () => {
+    await assertFails(getDoc(doc(as(STRANGER), 'notes/note-1/versions/v1')));
+    await assertFails(getDocs(collection(as(STRANGER), 'notes/note-1/versions')));
+    await assertFails(getDoc(doc(as(SHARED), 'notes/private-1/versions/v1')));
+    await assertFails(getDoc(doc(anonymous(), 'notes/note-1/versions/v1')));
+  });
+
+  it('is no longer readable after the user is removed from the share', async () => {
+    await updateDoc(doc(as(OWNER), 'notes/note-1'), { sharedWith: [], updatedBy: OWNER });
+    await assertFails(getDoc(doc(as(SHARED), 'notes/note-1/versions/v1')));
+  });
+
+  it('can never be written by a client, not even the owner', async () => {
+    for (const uid of [OWNER, SHARED]) {
+      const db = as(uid);
+      await assertFails(setDoc(doc(db, 'notes/note-1/versions/new'), { content: 'fake' }));
+      await assertFails(updateDoc(doc(db, 'notes/note-1/versions/v1'), { content: 'changed' }));
+      await assertFails(deleteDoc(doc(db, 'notes/note-1/versions/v1')));
+    }
+  });
+
+  it('cannot be read once the note is deleted', async () => {
+    await deleteDoc(doc(as(OWNER), 'notes/note-1'));
+    await assertFails(getDoc(doc(as(OWNER), 'notes/note-1/versions/v1')));
   });
 });
 

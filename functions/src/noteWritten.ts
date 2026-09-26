@@ -11,6 +11,7 @@
 
 import type { DocumentData, Firestore } from 'firebase-admin/firestore';
 import { remindersNeedSync, syncRemindersForNote } from './reminders';
+import { syncVersionsForNote } from './versions';
 
 export interface NoteWrite {
   db: Firestore;
@@ -29,6 +30,9 @@ export const handleNoteWritten = async ({ db, noteId, before, after, now }: Note
   if (remindersNeedSync(before, after)) {
     tasks.push(syncRemindersForNote(db, noteId, after, now));
   }
+
+  // היסטוריית גרסאות. יוצאת מוקדם בעצמה כשלא השתנה שדה תוכן.
+  tasks.push(syncVersionsForNote(db, noteId, before, after, now));
 
   await Promise.all(tasks);
 };
