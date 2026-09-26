@@ -21,6 +21,8 @@ import { RecipeTemplate } from '@/components/note/templates/RecipeTemplate';
 import { ShoppingTemplate } from '@/components/note/templates/ShoppingTemplate';
 import { WorkPlanTemplate } from '@/components/note/templates/WorkPlanTemplate';
 import { ShareManagement } from '@/components/common/ShareManagement';
+import { NoteHistory } from '@/components/note/NoteHistory/NoteHistory';
+import type { NoteVersion } from '@/types/version';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
 import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
@@ -61,6 +63,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const TemplateIcon = getTemplateMeta(note.templateType).Icon;
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showShareManagement, setShowShareManagement] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [title, setTitle] = useState(note.title);
@@ -107,6 +110,25 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const handleConvertToText = () => {
     saveUpdates.call({ templateType: 'plain' });
     saveUpdates.flush();
+  };
+
+  /**
+   * פתיחת ההיסטוריה שומרת קודם את מה שממתין, כדי שהעריכה האחרונה תיכלל
+   * בגרסאות ולא תדרוס שחזור שייעשה מתוך החלון.
+   */
+  const handleOpenHistory = () => {
+    saveUpdates.flush();
+    setShowHistory(true);
+  };
+
+  /**
+   * אחרי שחזור, הטיוטה המקומית מתחלפת בתוכן המשוחזר. בלי זה העריכה
+   * הבאה הייתה שולחת את הטיוטה הישנה - ומבטלת את השחזור בשקט.
+   */
+  const handleRestored = (version: NoteVersion) => {
+    saveUpdates.cancel();
+    setTitle(version.title);
+    setContent(version.content);
   };
 
   /** סוגר את המודאל אחרי ששמר שינוי שממתין */
@@ -407,11 +429,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
               🗑 מחק
             </Button>
           </div>
+          <Button variant="outline" onClick={handleOpenHistory} className="w-full">
+            🕘 היסטוריה
+          </Button>
           <Button variant="secondary" onClick={handleClose} className="w-full">
             ✕ סגור
           </Button>
         </div>
       </div>
+
+      {showHistory && (
+        <NoteHistory note={note} onClose={() => setShowHistory(false)} onRestored={handleRestored} />
+      )}
 
       {showShareManagement && (
         <ShareManagement

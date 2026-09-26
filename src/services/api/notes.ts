@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase/config';
 import { Note, NoteInput } from '@/types/note';
+import type { NoteVersion } from '@/types/version';
 import { byPinnedThenOrder, toNote } from './mappers';
 import { findUserIdByEmail } from './users';
 import { logger } from '@/utils/logger';
@@ -143,6 +144,31 @@ export const appendToNote = async (
   } catch (error) {
     logger.error('Error appending to note:', error);
     throw wrapError('שגיאה בהוספה לפתק', error);
+  }
+};
+
+/**
+ * שחזור גרסה קודמת - עדכון רגיל של שדות התוכן.
+ *
+ * `restoredFrom`/`restoredAt` מסמנים לטריגר שזה שחזור, כדי שישמור את
+ * המצב שלפניו כגרסה גם בתוך חלון עשר הדקות. כך אפשר לבטל שחזור, כמו
+ * כל שינוי אחר. קטגוריה וארכוב לא משוחזרים: אלה פעולות נפרדות.
+ */
+export const restoreNoteVersion = async (noteId: string, version: NoteVersion): Promise<void> => {
+  try {
+    await updateDoc(noteRef(noteId), {
+      title: version.title,
+      content: version.content,
+      templateType: version.templateType,
+      tags: version.tags,
+      color: version.color,
+      restoredFrom: version.id,
+      restoredAt: serverTimestamp(),
+      ...writeStamp(),
+    });
+  } catch (error) {
+    logger.error('Error restoring note version:', error);
+    throw wrapError('שגיאה בשחזור הגרסה', error);
   }
 };
 
