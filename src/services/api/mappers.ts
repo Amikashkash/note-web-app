@@ -13,6 +13,7 @@
 import { DocumentData, DocumentSnapshot, QueryDocumentSnapshot, Timestamp } from 'firebase/firestore';
 import type { Note, TemplateType } from '@/types/note';
 import type { Category } from '@/types';
+import type { NoteVersion, VersionReason } from '@/types/version';
 
 type AnySnapshot = QueryDocumentSnapshot<DocumentData> | DocumentSnapshot<DocumentData>;
 
@@ -60,6 +61,7 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     isPinned: asBoolean(data.isPinned),
     isArchived: asBoolean(data.isArchived),
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
+    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
   };
 };
 
@@ -81,6 +83,32 @@ export const toCategory = (snapshot: AnySnapshot): Category => {
     sharedWith: asStringArray(data.sharedWith),
     createdAt,
     updatedAt: asTimestamp(data.updatedAt, createdAt),
+  };
+};
+
+const VERSION_REASONS: readonly VersionReason[] = ['archive', 'template', 'move', 'restore', 'writer', 'time'];
+
+/**
+ * המרת מסמך גרסה ל-`NoteVersion` מנורמל
+ */
+export const toNoteVersion = (snapshot: AnySnapshot): NoteVersion => {
+  const data = snapshot.data() ?? {};
+  const capturedAt = asTimestamp(data.capturedAt, Timestamp.now());
+
+  return {
+    id: snapshot.id,
+    title: asString(data.title),
+    content: asString(data.content),
+    templateType: asString(data.templateType, 'plain') as TemplateType,
+    tags: asStringArray(data.tags),
+    color: typeof data.color === 'string' ? data.color : null,
+    categoryId: asString(data.categoryId),
+    isArchived: asBoolean(data.isArchived),
+    authoredBy: typeof data.authoredBy === 'string' ? data.authoredBy : null,
+    authoredAt: asOptionalTimestamp(data.authoredAt),
+    replacedBy: typeof data.replacedBy === 'string' ? data.replacedBy : null,
+    reason: VERSION_REASONS.includes(data.reason) ? data.reason : 'time',
+    capturedAt,
   };
 };
 

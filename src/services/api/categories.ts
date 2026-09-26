@@ -201,7 +201,8 @@ const applySharingToCategoryTree = async (
   for (let i = 0; i < targets.length; i += BATCH_LIMIT) {
     const batch = writeBatch(db);
     for (const ref of targets.slice(i, i + BATCH_LIMIT)) {
-      batch.update(ref, { sharedWith: operation, updatedAt: serverTimestamp() });
+      // `updatedBy` נדרש ע"י ה-rules בכל כתיבה לפתק; בקטגוריה הוא רק תיעוד
+      batch.update(ref, { sharedWith: operation, updatedBy: userId, updatedAt: serverTimestamp() });
     }
     await batch.commit();
   }

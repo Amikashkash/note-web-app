@@ -14,7 +14,9 @@
       ".git",
       "*.log",
       "test",
+      "test-emulator",
       "vitest.config.ts",
+      "vitest.emulator.config.ts",
       "tsconfig.test.json"
     ]
   },

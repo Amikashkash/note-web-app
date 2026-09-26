@@ -984,7 +984,7 @@ notes/{id} {
 - **UI:**
   - "היסטוריה" בתפריט הפתק: רשימה לפי זמן ומי שינה, תצוגה מקדימה, וכפתור **"שחזר"**. זו החלטה אמיתית, ולכן כפתור מותר.
   - שחזור הוא update רגיל, שבעצמו יוצר גרסה, ולכן גם שחזור ניתן לביטול.
-- **מחיקה סופית מהארכיון:** מוחקת גם את `versions` (onDelete trigger), אחרי 30 יום של "סל".
+- **מחיקה סופית מהארכיון:** מוחקת גם את `versions`, מיד, באותו טריגר (`onNoteWritten`). **מומש כך ב-B6**: מחיקה סופית היא החלטה מפורשת, ואין סיבה להשאיר עותקים של פתק שנמחק.
 - **עלות:**
   - כל כתיבה: קריאה אחת (הגרסה האחרונה), ולעיתים כתיבה.
   - לאחד עם `syncNoteReminders` ל-dispatcher יחיד, `onNoteWritten`, עם יציאה מוקדמת (F-4). אחרת יש שתי הרצות פונקציה לכל autosave.
@@ -1098,12 +1098,13 @@ notes/{id} {
 
 | צעד | תוכן | בדיקה |
 |---|---|---|
-| B1 | T-1: `vitest` ללקוח ול-functions + בדיקות pure (recurrence, timezone, debounce, productMatching, backupFormat) | `npm test` ירוק מקומית |
-| B2 | X-3: CI עם build ו-typecheck של `functions/`, `npm test`, `pull_request` trigger, Node 22 | PR פתוח מריץ את הכל |
-| B3 | S-7: נעיצת actions ל-SHA, החלפת `w9jds`, ו-WIF אם אפשר | deploy ל-main עובד |
-| B4 | Emulator + `@firebase/rules-unit-testing` + בדיקות rules ראשונות (מצב קיים) | בדיקות מתעדות את ההתנהגות הנוכחית |
-| B5 | E-1: דיווח שגיאות (לקוח) + התראת לוגים (functions) | שגיאה יזומה מגיעה לדיווח |
-| B6 | §11.8 שכבה 3: היסטוריית גרסאות בשרת (`notes/{id}/versions` מטריגר, coalescing, TTL) + rules. **מוקדם בכוונה:** רשת ביטחון לבאגים הקיימים ולמיגרציה של E1. אם אפשר, איחוד עם `syncNoteReminders` ל-`onNoteWritten` + יציאה מוקדמת (F-4) | emulator: 20 כתיבות בדקה → גרסה אחת. כותב אחר → גרסה נוספת. לקוח לא יכול לכתוב ל-`versions` |
+| B1 ✅ | T-1: `vitest` ללקוח ול-functions + בדיקות pure (recurrence, timezone, debounce, productMatching, backupFormat) | `npm test` ירוק מקומית |
+| B2 ✅ | X-3: CI עם build ו-typecheck של `functions/`, `npm test`, `pull_request` trigger, Node 22 | PR פתוח מריץ את הכל |
+| B3 ✅ | S-7: נעיצת actions ל-SHA, החלפת `w9jds`, ו-WIF אם אפשר. **בוצע כולל WIF** (PR #2 עד #4) | deploy ל-main עובד |
+| B4 ✅ | Emulator + `@firebase/rules-unit-testing` + בדיקות rules ראשונות (מצב קיים) | בדיקות מתעדות את ההתנהגות הנוכחית |
+| B5 | E-1: דיווח שגיאות (לקוח) + התראת לוגים (functions). **השוואת אפשרויות נכתבה** (`thinking/error-reporting-options.md`), ממתין להחלטה | שגיאה יזומה מגיעה לדיווח |
+| B6 ✅ | **בוצע ב-`claude/b6-version-history`**, כולל `updatedBy` (rules בשלב 1: אם נכתב חייב להיות המשתמש המחובר, חסר מותר) ו-UI להיסטוריה (v1.21.0). §11.8 שכבה 3: היסטוריית גרסאות בשרת (`notes/{id}/versions` מטריגר, coalescing, TTL) + rules. **מוקדם בכוונה:** רשת ביטחון לבאגים הקיימים ולמיגרציה של E1. אם אפשר, איחוד עם `syncNoteReminders` ל-`onNoteWritten` + יציאה מוקדמת (F-4) | emulator: 20 כתיבות בדקה → גרסה אחת. כותב אחר → גרסה נוספת. לקוח לא יכול לכתוב ל-`versions` |
+| B6b | **`updatedBy` חובה (שלב 2).** `writerStampPhase1` ב-`firestore.rules` מוחלף ב-`request.resource.data.get('updatedBy', null) == request.auth.uid` ב-create וב-update. **תנאי:** כל המכשירים של הבעלים (וכל משתמש אחר) מציגים v1.21.0 ומעלה. אם `minClientVersion` (D4) כבר קיים עד אז, מעלים אותו ל-1.21.0 **לפני** השינוי, כדי שלקוח ישן יתבקש לרענן במקום להיכשל בשמירה. PR קטן נפרד | 6 בדיקות מתהפכות: 4 המסומנות "expected to flip in B6b", ו-2 בדיקות "absent is allowed" של שלב 1 (create ו-update). נבדק מראש מול הכללים המחמירים: בדיוק 6 נכשלות, 34 עוברות |
 
 ### קבוצה C: אבטחה ושיתוף (לפני MCP)
 

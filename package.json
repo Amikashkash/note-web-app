@@ -1,6 +1,6 @@
 {
   "name": "notes-app",
-  "version": "1.20.5",
+  "version": "1.21.0",
   "description": "אפליקציית פתקים מאורגנים בקטגוריות",
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-notes-4-me \"vitest run -c vitest.rules.config.ts\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-notes-4-me \"vitest run -c vitest.rules.config.ts\"",
+    "test:functions:emulator": "firebase emulators:exec --only firestore --project demo-notes-4-me \"npm --prefix functions run test:emulator\""
   },
   "keywords": [
     "notes",
