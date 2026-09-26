@@ -211,6 +211,48 @@ const applySharingToCategoryTree = async (
 };
 
 /**
+ * הנמען מסיר את עצמו מקטגוריה משותפת (SH-1).
+ *
+ * שיתוף קטגוריה מעתיק את `sharedWith` לכל הפתקים שבה, ולכן היציאה
+ * מסירה את הנמען גם מהם - אחרת הפתקים היו נשארים אצלו כיתומים בלי
+ * הקטגוריה. זה כולל גם פתק שבמקרה שותף איתו גם בנפרד: אי אפשר להבחין
+ * בין השניים (SH-3 בסקירה), וזה מה שמצופה ממי שיוצא מקטגוריה.
+ *
+ * הפתקים קודם והקטגוריה אחרונה: אם משהו נכשל באמצע, הקטגוריה עוד
+ * מופיעה ואפשר לנסות שוב.
+ */
+export const leaveSharedCategory = async (categoryId: string): Promise<void> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('משתמש לא מחובר');
+  }
+
+  try {
+    const sharedNotes = await getDocs(
+      query(
+        collection(db, NOTES_COLLECTION),
+        where('categoryId', '==', categoryId),
+        where('sharedWith', 'array-contains', userId)
+      )
+    );
+
+    const stamp = { sharedWith: arrayRemove(userId), updatedBy: userId, updatedAt: serverTimestamp() };
+    const targets = [...sharedNotes.docs.map((noteDoc) => noteDoc.ref), categoryRef(categoryId)];
+
+    for (let i = 0; i < targets.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      for (const ref of targets.slice(i, i + BATCH_LIMIT)) {
+        batch.update(ref, stamp);
+      }
+      await batch.commit();
+    }
+  } catch (error) {
+    logger.error('Error leaving shared category:', error);
+    throw wrapError('שגיאה ביציאה מהקטגוריה המשותפת', error);
+  }
+};
+
+/**
  * שיתוף קטגוריה (וכל הפתקים שבה) עם משתמש אחר לפי אימייל
  */
 export const shareCategoryWithUser = async (

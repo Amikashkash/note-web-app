@@ -401,6 +401,78 @@ describe('userLookup (C1 / S-1)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// נמען מסיר את עצמו משיתוף (C2 / SH-1)
+// ---------------------------------------------------------------------------
+
+describe('leaving a share (C2 / SH-1)', () => {
+  const seedGroupShare = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'notes/group-1'), { ...baseNote, sharedWith: [SHARED, STRANGER] });
+      await setDoc(doc(db, 'categories/group-cat'), { ...baseCategory, sharedWith: [SHARED, STRANGER] });
+    });
+
+  // היה "known hole": לנמען לא הייתה דרך להיפטר מפתק ששותף איתו
+  it('a recipient can remove themselves from a shared note', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+    await assertFails(getDoc(doc(as(SHARED), 'notes/note-1')));
+  });
+
+  it('a recipient can remove themselves from a shared category', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'categories/cat-1'), { sharedWith: arrayRemove(SHARED) }));
+    await assertFails(getDoc(doc(as(SHARED), 'categories/cat-1')));
+  });
+
+  it('removing yourself leaves the other recipients in place', async () => {
+    await seedGroupShare();
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+    await assertSucceeds(getDoc(doc(as(STRANGER), 'notes/group-1')));
+  });
+
+  it('a recipient cannot remove someone else', async () => {
+    await seedGroupShare();
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: SHARED })
+    );
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/group-cat'), { sharedWith: arrayRemove(STRANGER) }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: [], updatedBy: SHARED }));
+  });
+
+  it('leaving cannot be combined with any other change', async () => {
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), {
+        sharedWith: arrayRemove(SHARED),
+        content: 'last edit on the way out',
+        updatedBy: SHARED,
+      })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'categories/cat-1'), { sharedWith: arrayRemove(SHARED), name: 'renamed' })
+    );
+  });
+
+  it('someone the note is not shared with cannot use it to join or change anything', async () => {
+    await assertFails(
+      updateDoc(doc(as(STRANGER), 'notes/note-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: STRANGER })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayUnion(SHARED, STRANGER), updatedBy: SHARED })
+    );
+  });
+
+  it('the owner can still remove anyone', async () => {
+    await seedGroupShare();
+    await assertSucceeds(
+      updateDoc(doc(as(OWNER), 'notes/group-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: OWNER })
+    );
+  });
+});
+
 describe('rateLimits (findUserByEmail counters)', () => {
   it('are never readable or writable by a client', async () => {
     await assertFails(getDoc(doc(as(OWNER), `rateLimits/findUserByEmail_${OWNER}`)));
@@ -413,10 +485,6 @@ describe('rateLimits (findUserByEmail counters)', () => {
 // ---------------------------------------------------------------------------
 
 describe('known holes (current behavior, expected to change)', () => {
-  knownHole('C2 (SH-1)', 'a recipient cannot remove themselves from a shared note', async () => {
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED }));
-  });
-
   knownHole('C6 (R-2 / SH-2)', "a shared user can move the owner's note to another category", async () => {
     await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED }));
   });

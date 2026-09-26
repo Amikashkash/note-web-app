@@ -2,7 +2,7 @@
  * קומפוננטה המציגה כרטיס פתק בודד
  */
 
-import { Eye, GripVertical, Pin, Trash2 } from 'lucide-react';
+import { Eye, GripVertical, LogOut, Pin, Trash2 } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Button } from '@/components/common/Button';
 import { getNotePreview } from '@/utils/notePreview';
@@ -10,7 +10,12 @@ import { getNotePreview } from '@/utils/notePreview';
 interface NoteCardProps {
   note: Note;
   onView: (note: Note) => void;
-  onDelete: (noteId: string) => void;
+  onDelete?: (noteId: string) => void;
+  /**
+   * פתק של מישהו אחר: "הסר אותי מהשיתוף" במקום "מחק".
+   * כשמועבר, הכפתור מחליף את המחיקה.
+   */
+  onLeave?: (note: Note) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onDragStart?: (note: Note) => void;
   onDragEnd?: () => void;
@@ -32,6 +37,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   note,
   onView,
   onDelete,
+  onLeave,
   onTogglePin,
   onDragStart,
   onDragEnd,
@@ -46,7 +52,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm('האם אתה בטוח שברצונך למחוק פתק זה?')) {
+    if (onDelete && window.confirm('האם אתה בטוח שברצונך למחוק פתק זה?')) {
       onDelete(note.id);
     }
   };
@@ -180,21 +186,38 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           <Eye size={16} strokeWidth={1.75} />
           הצג
         </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-          // `min-w-0` מאפשר לכפתור להתכווץ מתחת לרוחב תוכנו. ברשת של שתי
-          // עמודות בטלפון העמודה היא כ-167px, ושני כפתורים ברוחבם הטבעי
-          // היו גולשים מחוץ לכרטיס.
-          className="flex-1 min-w-0 px-2 sm:px-4"
-        >
-          <Trash2 size={16} strokeWidth={1.75} />
-          מחק
-        </Button>
+        {onLeave ? (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLeave(note);
+            }}
+            className="flex-1 min-w-0 px-2 sm:px-4"
+          >
+            <LogOut size={16} strokeWidth={1.75} />
+            הסר אותי
+          </Button>
+        ) : (
+          onDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              // `min-w-0` מאפשר לכפתור להתכווץ מתחת לרוחב תוכנו. ברשת של שתי
+              // עמודות בטלפון העמודה היא כ-167px, ושני כפתורים ברוחבם הטבעי
+              // היו גולשים מחוץ לכרטיס.
+              className="flex-1 min-w-0 px-2 sm:px-4"
+            >
+              <Trash2 size={16} strokeWidth={1.75} />
+              מחק
+            </Button>
+          )
+        )}
       </div>
     </div>
   );

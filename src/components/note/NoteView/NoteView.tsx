@@ -29,6 +29,7 @@ import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
+import { getErrorMessage } from '@/utils/errors';
 
 export interface NoteUpdates {
   title?: string;
@@ -40,7 +41,8 @@ export interface NoteUpdates {
 interface NoteViewProps {
   note: Note;
   onClose: () => void;
-  onDelete: (noteId: string) => void;
+  /** ארכוב - רק לבעלים. מי שאינו בעלים מקבל "הסר אותי" במקומו */
+  onDelete?: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onUpdate?: (noteId: string, updates: NoteUpdates) => void;
   onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
@@ -144,8 +146,32 @@ export const NoteView: React.FC<NoteViewProps> = ({
       )
     ) {
       saveUpdates.cancel();
-      onDelete(note.id);
+      onDelete?.(note.id);
       onClose();
+    }
+  };
+
+  /**
+   * נמען שמסיר את עצמו מהשיתוף. מחליף את "מחק" אצל מי שאינו בעלים:
+   * מחיקה (ארכוב) של פתק של מישהו אחר היא לא ההחלטה שלו.
+   */
+  const handleLeave = async () => {
+    if (
+      !window.confirm(
+        `להסיר אותך מהשיתוף של "${note.title || 'ללא כותרת'}"?
+
+הפתק יפסיק להופיע אצלך. הבעלים יוכל לשתף אותו איתך שוב.`
+      )
+    ) {
+      return;
+    }
+
+    saveUpdates.cancel();
+    try {
+      await noteAPI.leaveSharedNote(note.id);
+      onClose();
+    } catch (error) {
+      window.alert(getErrorMessage(error));
     }
   };
 
@@ -425,9 +451,15 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 📁 העבר
               </Button>
             )}
-            <Button variant="danger" onClick={handleDelete} className="flex-1">
-              🗑 מחק
-            </Button>
+            {isOwner ? (
+              <Button variant="danger" onClick={handleDelete} className="flex-1">
+                🗑 מחק
+              </Button>
+            ) : (
+              <Button variant="danger" onClick={handleLeave} className="flex-1">
+                🚪 הסר אותי
+              </Button>
+            )}
           </div>
           <Button variant="outline" onClick={handleOpenHistory} className="w-full">
             🕘 היסטוריה

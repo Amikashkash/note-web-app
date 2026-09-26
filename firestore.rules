@@ -30,6 +30,17 @@ service cloud.firestore {
         && request.resource.data.get('sharedWith', []) == sharedUsers(resource.data);
     }
 
+    // נמען שמסיר את עצמו משיתוף (SH-1). העדכון היחיד המותר: להוריד את
+    // עצמו מ-`sharedWith` - לא אחרים, לא להוסיף, ולא לגעת בשום שדה אחר
+    // חוץ מחותמת הכותב. בלי זה לנמען לא הייתה דרך להיפטר מפתק ששותף איתו.
+    function isLeavingShare() {
+      return isSharedWithMe(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['sharedWith', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('sharedWith', []).toSet()
+          == sharedUsers(resource.data).toSet().difference([request.auth.uid].toSet());
+    }
+
     match /categories/{categoryId} {
       allow read: if isOwner(resource.data.userId) || isSharedWithMe(resource.data);
 
@@ -37,7 +48,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid;
 
       allow update: if isOwner(resource.data.userId)
-        || (isSharedWithMe(resource.data) && ownershipUnchanged());
+        || (isSharedWithMe(resource.data) && ownershipUnchanged())
+        || isLeavingShare();
 
       allow delete: if isOwner(resource.data.userId);
     }
@@ -74,7 +86,8 @@ service cloud.firestore {
 
       allow update: if writerStampPhase1()
         && (isOwner(resource.data.userId)
-          || (isSharedWithMe(resource.data) && ownershipUnchanged()));
+          || (isSharedWithMe(resource.data) && ownershipUnchanged())
+          || isLeavingShare());
 
       allow delete: if isOwner(resource.data.userId);
 

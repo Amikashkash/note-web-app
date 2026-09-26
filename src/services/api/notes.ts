@@ -369,6 +369,25 @@ export const shareNoteWithUser = async (noteId: string, userEmail: string): Prom
 };
 
 /**
+ * הנמען מסיר את עצמו משיתוף פתק (SH-1).
+ *
+ * הבעלים יכול לשתף שוב בכל רגע. ה-rules מתירים לנמען רק את זה: להוריד
+ * את עצמו מ-`sharedWith`, בלי לגעת בשום שדה אחר.
+ */
+export const leaveSharedNote = async (noteId: string): Promise<void> => {
+  const stamp = writeStamp();
+  try {
+    await updateDoc(noteRef(noteId), {
+      sharedWith: arrayRemove(stamp.updatedBy),
+      ...stamp,
+    });
+  } catch (error) {
+    logger.error('Error leaving shared note:', error);
+    throw wrapError('שגיאה בהסרה מהשיתוף', error);
+  }
+};
+
+/**
  * הסרת משתמש משיתוף פתק
  */
 export const unshareNoteWithUser = async (noteId: string, userId: string): Promise<void> => {
