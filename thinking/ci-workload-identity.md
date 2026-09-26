@@ -158,3 +158,4 @@ echo "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github/p
 | `The given credential is rejected by the attribute condition` | ההרצה לא מ-`main`, או ששם ה-repo בתנאי לא מדויק (רגיש לאותיות גדולות) |
 | `HTTP 403 ... firebaserules` / `datastore` | חסר תפקיד משלב 2 |
 | `Unable to acquire ID token` | חסר `id-token: write` ב-permissions של ה-job |
+| `Failed to authenticate, have you run firebase login?` (בשלב ה-deploy) | הודעה כללית של firebase-tools שבולעת את הסיבה האמיתית. מאז `token_format: access_token`, תקלות ב-provider, בתנאי או ב-binding נכשלות כבר בשלב ה-auth, עם הודעה מפורשת. אם ה-auth עובר וה-deploy עדיין נכשל, הקבוצה "firebase-debug.log" בלוג של השלב מציגה את שורות השגיאה (ה-tokens מוסתרים). "Premature close" פירושו באג ה-Node של [nodejs/node#63989](https://github.com/nodejs/node/issues/63989), והפתרון הוא לנעוץ את Node לגרסה מדויקת |
