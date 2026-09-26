@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { safeReturnPath } from '@/utils/returnTo';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Input } from '@/components/common';
 import { isValidEmail, isValidPassword } from '@/utils/validators';
@@ -12,14 +13,18 @@ import { logger } from '@/utils/logger';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signUp, signInWithGoogle, error: authError, isAuthenticated } = useAuth();
 
-  // Redirect if already authenticated
+  // אחרי התחברות - חזרה למקום שממנו נשלחנו לכאן (למשל שיתוף נכנס),
+  // ורק אם אין כזה לדף הבית. `safeReturnPath` מקבל רק נתיב פנימי.
+  const returnTo = safeReturnPath(location.state);
+
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      navigate(returnTo, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, returnTo]);
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');

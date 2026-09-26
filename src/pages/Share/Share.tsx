@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { loginRedirectState } from '@/utils/returnTo';
 import { useAuthStore } from '@/store/authStore';
 import { useCategories } from '@/hooks/useCategories';
 import { useNotes } from '@/hooks/useNotes';
@@ -25,6 +26,7 @@ type TemplateMode = 'plain' | 'workplan';
 export const Share: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const { categories, hasLoaded: categoriesLoaded } = useCategories();
   const { allNotes, createNote } = useNotes();
@@ -136,9 +138,10 @@ export const Share: React.FC = () => {
   // משתמש לא מחובר מועבר להתחברות
   useEffect(() => {
     if (!user) {
-      navigate('/login', { replace: true });
+      // עם היעד, כדי לחזור לתוכן המשותף אחרי ההתחברות (ST-4)
+      navigate('/login', { replace: true, state: loginRedirectState(location) });
     }
-  }, [user, navigate]);
+  }, [user, navigate, location]);
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {

@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.22.2',
+    date: 'ספטמבר 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'מי שלא היה מחובר ופתח שיתוף נכנס או התראה, הגיע אחרי ההתחברות לדף הבית והשיתוף אבד. עכשיו ההתחברות מחזירה למקום שממנו הגיע',
+      },
+    ],
+  },
+  {
     version: '1.22.1',
     date: 'ספטמבר 2026',
     changes: [
