@@ -111,7 +111,8 @@ export const getUserCategories = async (userId: string): Promise<Category[]> => 
  */
 export const subscribeToCategories = (
   userId: string,
-  callback: (categories: Category[]) => void
+  callback: (categories: Category[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe => {
   let owned: Category[] = [];
   let shared: Category[] = [];
@@ -139,6 +140,7 @@ export const subscribeToCategories = (
       logger.error('Error in owned categories subscription:', error);
       ownedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -153,6 +155,7 @@ export const subscribeToCategories = (
       logger.error('Error in shared categories subscription:', error);
       sharedLoaded = true;
       emit();
+      onError(error);
     }
   );
 

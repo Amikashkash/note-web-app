@@ -12,13 +12,17 @@ import { create } from 'zustand';
 import { Unsubscribe } from 'firebase/firestore';
 import { Note, NoteInput } from '@/types/note';
 import * as noteAPI from '@/services/api/notes';
-import { getErrorMessage } from '@/utils/errors';
+import { getErrorMessage, loadErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 
 interface NoteState {
   // מצב
   notes: Note[];
   isLoading: boolean;
+  /** האם התקבלה תשובה ראשונה מהמאזין (נתונים או שגיאה) */
+  hasLoaded: boolean;
+  /** שגיאת טעינה מהמאזין. נפרד מ-`error`, ששייך לפעולות כתיבה */
+  loadError: string | null;
   error: string | null;
 
   // ניהול מנוי פנימי - לא לשימוש ישיר מקומפוננטות
@@ -29,6 +33,8 @@ interface NoteState {
   // מנוי
   subscribe: (userId: string) => void;
   unsubscribe: () => void;
+  /** הקמה מחדש של המאזין אחרי שגיאת טעינה */
+  retry: () => void;
 
   // פעולות
   createNote: (noteInput: NoteInput) => Promise<string>;
@@ -55,9 +61,33 @@ export const useNoteStore = create<NoteState>((set, get) => {
     }
   };
 
+  /**
+   * מקים את המאזין. המאזין הקודם, אם יש, נסגר ע"י הקורא.
+   *
+   * שגיאה לא מרוקנת את הרשימה: אם רק אחד משני המאזינים (בבעלות /
+   * משותפים) נכשל, מה שכן נטען נשאר מוצג, יחד עם הודעת השגיאה.
+   */
+  const startListener = (userId: string) => {
+    set({ isLoading: true, hasLoaded: false, loadError: null });
+
+    const unsubscribe = noteAPI.subscribeToNotes(
+      userId,
+      (notes) => {
+        set((state) => ({ notes, isLoading: false, hasLoaded: true, loadError: state.loadError }));
+      },
+      (error) => {
+        set({ isLoading: false, hasLoaded: true, loadError: loadErrorMessage('הפתקים', error) });
+      }
+    );
+
+    set({ _unsubscribe: unsubscribe });
+  };
+
   return {
     notes: [],
     isLoading: false,
+    hasLoaded: false,
+    loadError: null,
     error: null,
 
     _unsubscribe: null,
@@ -80,17 +110,20 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
       logger.debug('Subscribing to notes for user:', userId);
       set({
-        isLoading: true,
         notes: [],
         _subscribedUserId: userId,
         _subscriberCount: 1,
       });
 
-      const unsubscribe = noteAPI.subscribeToNotes(userId, (notes) => {
-        set({ notes, isLoading: false, error: null });
-      });
+      startListener(userId);
+    },
 
-      set({ _unsubscribe: unsubscribe });
+    retry: () => {
+      const { _subscribedUserId, _unsubscribe } = get();
+      if (!_subscribedUserId) return;
+
+      if (_unsubscribe) _unsubscribe();
+      startListener(_subscribedUserId);
     },
 
     unsubscribe: () => {
@@ -111,6 +144,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
       set({
         notes: [],
         isLoading: false,
+        hasLoaded: false,
+        loadError: null,
         _unsubscribe: null,
         _subscribedUserId: null,
         _subscriberCount: 0,
@@ -136,6 +171,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
       set({
         notes: [],
         isLoading: false,
+        hasLoaded: false,
+        loadError: null,
         error: null,
         _unsubscribe: null,
         _subscribedUserId: null,

@@ -11,7 +11,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common';
 import { subscribeToArchivedNotes, restoreNote, permanentlyDeleteNote } from '@/services/api/notes';
 import { TemplateIcon } from '@/components/common/TemplateIcon/TemplateIcon';
-import { getErrorMessage } from '@/utils/errors';
+import { getErrorMessage, loadErrorMessage } from '@/utils/errors';
+import { LoadError } from '@/components/common/LoadError';
 import { logger } from '@/utils/logger';
 import { Note } from '@/types/note';
 
@@ -21,19 +22,38 @@ export const Archive: React.FC = () => {
   const userId = user?.uid;
   const [archivedNotes, setArchivedNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /** מגדילים כדי להקים את המאזין מחדש אחרי שגיאה */
+  const [attempt, setAttempt] = useState(0);
 
   // תלוי במזהה ולא באובייקט המשתמש, כדי לא לפתוח מנוי מחדש
   // בכל פעם שנתוני המשתמש מתעדכנים
   useEffect(() => {
     if (!userId) return;
 
-    const unsubscribe = subscribeToArchivedNotes(userId, (notes) => {
-      setArchivedNotes(notes);
-      setLoading(false);
-    });
+    // שגיאה מסיימת את הטעינה עם הודעה. קודם היא נבלעה, והמסך נשאר על
+    // "טוען..." לנצח (ST-1).
+    const unsubscribe = subscribeToArchivedNotes(
+      userId,
+      (notes) => {
+        setArchivedNotes(notes);
+        setLoadError(null);
+        setLoading(false);
+      },
+      (error) => {
+        setLoadError(loadErrorMessage('הארכיון', error));
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, attempt]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setLoadError(null);
+    setAttempt((previous) => previous + 1);
+  };
 
   const handleRestore = async (noteId: string) => {
     try {
@@ -87,7 +107,9 @@ export const Archive: React.FC = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {archivedNotes.length === 0 ? (
+        {loadError ? (
+          <LoadError message={loadError} onRetry={handleRetry} />
+        ) : archivedNotes.length === 0 ? (
           <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-e1 p-8 text-center">
             <ArchiveIcon size={56} strokeWidth={1.25} className="mx-auto mb-4 text-ink-3-light dark:text-ink-3-dark" />
             <h2 className="text-xl font-bold text-ink-light dark:text-ink-dark mb-2">הארכיון ריק</h2>

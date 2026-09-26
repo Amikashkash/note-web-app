@@ -32,3 +32,22 @@ export const getFirebaseErrorCode = (error: unknown): string | null => {
   }
   return null;
 };
+
+/**
+ * הודעה למשתמש כשמאזין בזמן אמת נכשל (ST-1).
+ *
+ * `what` הוא מה שלא נטען ("הפתקים", "הקטגוריות"). הקוד המקורי קובע את
+ * ההסבר: הרשאה (למשל אחרי שינוי rules או חיבור שפג), רשת, או כללי.
+ */
+export const loadErrorMessage = (what: string, error: unknown): string => {
+  switch (getFirebaseErrorCode(error)) {
+    case 'permission-denied':
+      return `אין הרשאה לטעון את ${what}. נסו להתנתק ולהתחבר מחדש.`;
+    case 'unavailable':
+      return `אין חיבור לשרת, ולכן ${what} לא נטענו. בדקו את החיבור ונסו שוב.`;
+    case 'resource-exhausted':
+      return `השרת עמוס כרגע, ולכן ${what} לא נטענו. נסו שוב בעוד רגע.`;
+    default:
+      return `לא הצלחנו לטעון את ${what}.`;
+  }
+};

@@ -205,7 +205,8 @@ export const getNotesByCategory = async (categoryId: string): Promise<Note[]> =>
  */
 export const subscribeToNotes = (
   userId: string,
-  callback: (notes: Note[]) => void
+  callback: (notes: Note[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe => {
   let ownedNotes: Note[] = [];
   let sharedNotes: Note[] = [];
@@ -237,9 +238,11 @@ export const subscribeToNotes = (
     },
     (error) => {
       logger.error('Error in owned notes subscription:', error);
-      // מסמנים כ"נטען" כדי שכישלון של מאזין אחד לא יתקע את השני
+      // מסמנים כ"נטען" כדי שכישלון של מאזין אחד לא יתקע את השני, ומדווחים
+      // לקורא - בלי זה הממשק הציג רשימה ריקה כאילו אין פתקים (ST-1)
       ownedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -254,6 +257,7 @@ export const subscribeToNotes = (
       logger.error('Error in shared notes subscription:', error);
       sharedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -268,7 +272,8 @@ export const subscribeToNotes = (
  */
 export const subscribeToArchivedNotes = (
   userId: string,
-  callback: (notes: Note[]) => void
+  callback: (notes: Note[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe =>
   onSnapshot(
     query(notesRef(), where('userId', '==', userId), where('isArchived', '==', true)),
@@ -278,7 +283,10 @@ export const subscribeToArchivedNotes = (
         .sort((a, b) => (b.archivedAt?.toMillis() ?? 0) - (a.archivedAt?.toMillis() ?? 0));
       callback(notes);
     },
-    (error) => logger.error('Error in archived notes subscription:', error)
+    (error) => {
+      logger.error('Error in archived notes subscription:', error);
+      onError(error);
+    }
   );
 
 /**
