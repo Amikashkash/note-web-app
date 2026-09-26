@@ -77,6 +77,10 @@ jobs:
       - name: Firestore rules tests (emulator)
         run: npm run test:rules
 
+      # הטריגר של הפתקים (תזכורות, גרסאות) מול Firestore Emulator
+      - name: Functions integration tests (emulator)
+        run: npm run test:functions:emulator
+
   deploy:
     name: Deploy to Firebase
     needs: test

@@ -13,7 +13,8 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test:emulator": "vitest run -c vitest.emulator.config.ts"
   },
   "dependencies": {
     "firebase-admin": "^13.0.2",
