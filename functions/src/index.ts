@@ -15,6 +15,7 @@
  * הרצה נפרדת בכל שמירה, ושמירה אוטומטית כותבת הרבה.
  */
 
+import { setGlobalOptions } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions';
@@ -24,6 +25,22 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { isRepeatRule, nextOccurrence } from './recurrence';
 import { handleNoteWritten } from './noteWritten';
 import type { ReminderPushData } from './reminderPayload';
+
+/**
+ * region אחד לכל הפונקציות, זהה למיקום מסד הנתונים.
+ *
+ * לפני התיקון הזה `onNoteWritten` (טריגר Firestore) הוצב אוטומטית ב-
+ * `europe-west1` לצד ה-DB, בעוד `sendDueReminders` (מתוזמנת) ישבה ב-
+ * ברירת המחדל `us-central1` וקראה את Firestore ביבשת אחרת בכל דקה -
+ * השהיה וחיוב cross-region על כל הרצה, בלי שום סיבה.
+ *
+ * מיקום ה-DB אומת דרך `firebase firestore:databases:get "(default)"`
+ * ודרך `gcloud firestore databases describe`, ולא הונח.
+ *
+ * פונקציה עתידית (כמו שרת ה-MCP, ראו `thinking/mcp-plan.md` §1.1)
+ * יורשת את ה-region הזה אוטומטית ולא צריכה לציין אותו בנפרד.
+ */
+setGlobalOptions({ region: 'europe-west1' });
 
 initializeApp();
 
