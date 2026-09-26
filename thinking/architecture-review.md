@@ -1103,7 +1103,8 @@ notes/{id} {
 | B3 ✅ | S-7: נעיצת actions ל-SHA, החלפת `w9jds`, ו-WIF אם אפשר. **בוצע כולל WIF** (PR #2 עד #4) | deploy ל-main עובד |
 | B4 ✅ | Emulator + `@firebase/rules-unit-testing` + בדיקות rules ראשונות (מצב קיים) | בדיקות מתעדות את ההתנהגות הנוכחית |
 | B5 | E-1: דיווח שגיאות (לקוח) + התראת לוגים (functions). **השוואת אפשרויות נכתבה** (`thinking/error-reporting-options.md`), ממתין להחלטה | שגיאה יזומה מגיעה לדיווח |
-| B6 ✅ | **בוצע ב-`claude/b6-version-history`**, כולל `updatedBy` נאכף ב-rules ו-UI להיסטוריה (v1.21.0). §11.8 שכבה 3: היסטוריית גרסאות בשרת (`notes/{id}/versions` מטריגר, coalescing, TTL) + rules. **מוקדם בכוונה:** רשת ביטחון לבאגים הקיימים ולמיגרציה של E1. אם אפשר, איחוד עם `syncNoteReminders` ל-`onNoteWritten` + יציאה מוקדמת (F-4) | emulator: 20 כתיבות בדקה → גרסה אחת. כותב אחר → גרסה נוספת. לקוח לא יכול לכתוב ל-`versions` |
+| B6 ✅ | **בוצע ב-`claude/b6-version-history`**, כולל `updatedBy` (rules בשלב 1: אם נכתב חייב להיות המשתמש המחובר, חסר מותר) ו-UI להיסטוריה (v1.21.0). §11.8 שכבה 3: היסטוריית גרסאות בשרת (`notes/{id}/versions` מטריגר, coalescing, TTL) + rules. **מוקדם בכוונה:** רשת ביטחון לבאגים הקיימים ולמיגרציה של E1. אם אפשר, איחוד עם `syncNoteReminders` ל-`onNoteWritten` + יציאה מוקדמת (F-4) | emulator: 20 כתיבות בדקה → גרסה אחת. כותב אחר → גרסה נוספת. לקוח לא יכול לכתוב ל-`versions` |
+| B6b | **`updatedBy` חובה (שלב 2).** `writerStampPhase1` ב-`firestore.rules` מוחלף ב-`request.resource.data.get('updatedBy', null) == request.auth.uid` ב-create וב-update. **תנאי:** כל המכשירים של הבעלים (וכל משתמש אחר) מציגים v1.21.0 ומעלה. אם `minClientVersion` (D4) כבר קיים עד אז, מעלים אותו ל-1.21.0 **לפני** השינוי, כדי שלקוח ישן יתבקש לרענן במקום להיכשל בשמירה. PR קטן נפרד | 6 בדיקות מתהפכות: 4 המסומנות "expected to flip in B6b", ו-2 בדיקות "absent is allowed" של שלב 1 (create ו-update). נבדק מראש מול הכללים המחמירים: בדיוק 6 נכשלות, 34 עוברות |
 
 ### קבוצה C: אבטחה ושיתוף (לפני MCP)
 

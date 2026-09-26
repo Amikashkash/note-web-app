@@ -167,38 +167,74 @@ describe('notes', () => {
 });
 
 // ---------------------------------------------------------------------------
-// updatedBy - מי כתב אחרון, לא ניתן לזיוף
+// updatedBy - שלב 1: אם נכתב, חייב להיות המשתמש המחובר
 // ---------------------------------------------------------------------------
 
-describe('notes: updatedBy must be the signed-in user', () => {
-  it('rejects creating a note without updatedBy, or with someone else in it', async () => {
+describe('notes: updatedBy, phase 1 (optional, but never someone else)', () => {
+  it('create: absent is allowed, present and correct is allowed, present and wrong is denied', async () => {
     const { updatedBy: _omitted, ...withoutWriter } = baseNote;
-    await assertFails(setDoc(doc(as(OWNER), 'notes/n-a'), withoutWriter));
-    await assertFails(setDoc(doc(as(OWNER), 'notes/n-b'), { ...baseNote, updatedBy: SHARED }));
-    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-c'), baseNote));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-absent'), withoutWriter));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-correct'), baseNote));
+    await assertFails(setDoc(doc(as(OWNER), 'notes/n-wrong'), { ...baseNote, updatedBy: SHARED }));
   });
 
-  it("a shared user cannot leave the owner's name on their change", async () => {
-    // בלי לשלוח updatedBy הערך הקודם (הבעלים) נשאר - ונדחה
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x' }));
+  it('update: absent is allowed (an old client keeps saving)', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'from an old client' }));
   });
 
-  it('a shared user cannot claim to be the owner', async () => {
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: OWNER }));
+  it('update: present and correct is allowed', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: SHARED }));
   });
 
-  it('omitting it is accepted only when the previous writer was the same user', async () => {
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'still mine' }));
+  it("update: present and wrong is denied - a shared user cannot write a third user's name", async () => {
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: STRANGER }));
+  });
+
+  it('update: after a shared user wrote, the owner cannot put the shared user back by hand', async () => {
     await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { title: 'theirs', updatedBy: SHARED }));
-    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine again' }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', updatedBy: STRANGER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', updatedBy: OWNER }));
   });
 
-  it('a legacy note without updatedBy can be edited once the writer sends it', async () => {
+  it('update: a legacy note without updatedBy accepts the correct value, not a foreign one', async () => {
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'notes/legacy-2'), { title: 'ישן', userId: OWNER });
     });
-    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x' }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', updatedBy: SHARED }));
     await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', updatedBy: OWNER }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updatedBy - שלב 2 (צעד B6b): שדה חובה. ההתנהגות הנוכחית, שתתהפך.
+//
+// כל אחת מהבדיקות כאן מתעדת מה שלב 1 עדיין מתיר. כשהכלל של שלב 2 ייכנס
+// הן ייכשלו - וזה הסימן להפוך אותן ל-assertFails.
+// ---------------------------------------------------------------------------
+
+/** "שלב 2": ההתנהגות של שלב 1, שאמורה להשתנות כש-updatedBy יהפוך לחובה */
+const phase2 = (name: string, fn: () => Promise<unknown>) =>
+  knownHole('B6b (updatedBy required)', name, fn);
+
+describe('notes: updatedBy, phase 2 (expected to flip)', () => {
+  phase2('a note can be created without updatedBy', async () => {
+    const { updatedBy: _omitted, ...withoutWriter } = baseNote;
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-phase2'), withoutWriter));
+  });
+
+  phase2("a shared user's change without updatedBy keeps the owner's name on it", async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x' }));
+  });
+
+  phase2("a shared user re-sending the owner's current name is indistinguishable from omitting it", async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: OWNER }));
+  });
+
+  phase2('a legacy note can be edited without ever setting updatedBy', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/legacy-3'), { title: 'ישן', userId: OWNER });
+    });
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-3'), { title: 'x' }));
   });
 });
 

@@ -49,15 +49,30 @@ service cloud.firestore {
     match /notes/{noteId} {
       allow read: if canReadNote(resource.data);
 
-      // `updatedBy` חייב להיות המשתמש המחובר בכל כתיבה. בעדכון, שדה שלא
-      // נשלח נשאר עם הערך הקודם - ולכן מי שלא כתב אחרון חייב לשלוח אותו,
-      // ושותף לא יכול להשאיר את שם הבעלים על שינוי שהוא עשה.
-      // היסטוריית הגרסאות מייחסת שינויים לפי השדה הזה.
+      // `updatedBy` - מי כתב אחרון. היסטוריית הגרסאות מייחסת שינויים לפיו.
+      //
+      // שלב 1 (עכשיו): אם הכתיבה קובעת את השדה, הוא חייב להיות המשתמש
+      // המחובר - אי אפשר לרשום שינוי בשם של מישהו אחר. כתיבה שלא נוגעת בו
+      // מותרת כמו קודם, כדי שלקוח ישן (PWA שעוד לא התרענן) ימשיך לשמור
+      // בלי לאבד טקסט. המחיר: כתיבה כזו משאירה את שם הכותב הקודם.
+      //
+      // שלב 2 (צעד B6b בסקירה, אחרי שכל המכשירים על v1.21.0 ומעלה): השדה
+      // חובה בכל כתיבה, ו-`writerStampPhase1` מוחלף בבדיקה ישירה. הבדיקות
+      // של שלב 2 כבר כתובות ב-`tests/rules` ומסומנות כצפויות להתהפך.
+      //
+      // אם הכתיבה לא משנה את השדה, rules לא יכולים לדעת אם הוא נשלח עם
+      // הערך הקיים או לא נשלח בכלל - שני המקרים נראים זהים.
+      function writerStampPhase1() {
+        return request.resource.data.get('updatedBy', null) == request.auth.uid
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']);
+      }
+
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.get('updatedBy', null) == request.auth.uid;
+        && (!('updatedBy' in request.resource.data)
+          || request.resource.data.updatedBy == request.auth.uid);
 
-      allow update: if request.resource.data.get('updatedBy', null) == request.auth.uid
+      allow update: if writerStampPhase1()
         && (isOwner(resource.data.userId)
           || (isSharedWithMe(resource.data) && ownershipUnchanged()));
 
