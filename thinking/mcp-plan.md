@@ -21,7 +21,7 @@
 - ב-`functions/src/index.ts` נוסף רק שורת export אחת לפונקציה חדשה, `mcp`. כל הקוד שלה יושב בתיקיות חדשות (ראו סעיף 4). **את `syncNoteReminders` ואת `sendDueReminders` לא נוגעים.**
 - `onRequest` מ-`firebase-functions/v2/https`, עם אפליקציית Express קטנה. Express כבר מגיעה כתלות של `firebase-functions`, אבל נוסיף אותה במפורש ל-`package.json`.
 - אפשרויות לפונקציה:
-  - `region: 'us-central1'`: אותו region כמו הפונקציות הקיימות, ו-Hosting rewrite דורש region ידוע.
+  - `region`: **לא מצוין בנפרד** - `functions/src/index.ts` קורא ל-`setGlobalOptions({ region: 'europe-west1' })` (branch `claude/housekeeping`, אחרי בדיקה מול `firebase firestore:databases:get`), וכל פונקציה חדשה יורשת אותו אוטומטית. זה גם מיקום מסד הנתונים, כך שהפונקציה קוראת Firestore מקומית ולא חוצה יבשת. Hosting rewrite עדיין דורש לציין את ה-region המפורש (`europe-west1`) בקובץ ה-rewrite עצמו - `setGlobalOptions` לא משפיע עליו.
   - `memory: '256MiB'`, `timeoutSeconds: 30`.
   - `concurrency: 20`: ב-v2 מופע אחד מטפל בכמה בקשות במקביל.
   - `minInstances`: **החלטה: בלי `minInstances` בהתחלה, ומודדים** (שלב 13 ב-8.3). Claude ממתין 10 שניות לכל היותר ל-discovery, ל-registration ול-token (ו-30 שניות ל-refresh). cold start של Node עם Admin SDK ו-MCP SDK לוקח בדרך כלל 2 עד 5 שניות, כלומר בטווח אבל בלי הרבה מרווח. `minInstances: 1` מבטל את הבעיה ועולה כמה דולרים בחודש. ברירת המחדל שלי: להתחיל עם 0, למדוד ולהחליט.
