@@ -8,7 +8,7 @@ This file contains important guidelines for Claude when working on this project.
 
 **NEVER reuse the same version number!**
 
-When making changes, ALWAYS increment the version so the user can verify they have the latest code.
+When a change reaches users, ALWAYS increment the version so the user can verify they have the latest code.
 
 **Version Update Checklist:**
 - [ ] Update `package.json` version — this is the ONLY place the number lives
@@ -31,21 +31,29 @@ Good: v1.0.4 → v1.0.5 (clear difference)
 ### Version Numbering Scheme
 
 - **Major (1.x.x)**: Breaking changes, major features
-- **Minor (x.1.x)**: New features, non-breaking changes
+- **Minor (x.1.x)**: New features the user can see
 - **Patch (x.x.1)**: Bug fixes, small improvements
 
-For this project, increment patch version for each change.
+**Bump only when the app changes.** Tests, CI, documentation, Cloud Functions
+refactors with identical behavior, and dependency updates that change nothing
+the user sees get no version and no WhatsNew entry. (An earlier version of this
+file said "increment patch for each change"; in practice that produced version
+numbers for changes no user could observe.)
 
 ## Git Workflow
 
-### Branch Naming
-- Branch names must start with `claude/` and end with session ID
-- Format: `claude/description-SESSIONID`
-- Example: `claude/add-search-feature-011CUrYBh1agrcjAuGUzqP9R`
+### Branches and Pull Requests
+- One branch per task or stage, named `claude/<topic>` (for example
+  `claude/group-c-security`). No session IDs.
+- Each logical step is its own commit.
+- Push the branch and open a PR when the task says so. **Never merge** — the
+  owner reviews and merges.
+- Merging to `main` triggers CI: tests, then a deploy of Hosting and Firestore
+  rules/indexes (see `.github/workflows/SETUP.md`).
 
 ### Commit Messages
 - Clear, descriptive commit messages
-- Include version number in commit message
+- Include the version number when there is one
 - Mention what was changed and why
 - Example:
   ```
@@ -56,28 +64,27 @@ For this project, increment patch version for each change.
   - Fix async loading issue
   ```
 
-### Push Approval Workflow ⚠️ IMPORTANT
-- **NEVER push to GitHub automatically**
-- **ALWAYS wait for user approval before pushing**
-- After making changes and committing locally:
-  1. Run build to verify changes work
-  2. Inform user about changes made
-  3. Tell user to test locally first
-  4. Wait for user's explicit approval to push
-  5. Only push after user confirms everything works
-
 ### Push Retry Strategy
-- If push fails with 403: branch name doesn't match session ID
-- If push fails with network error: retry with exponential backoff (2s, 4s, 8s, 16s)
+- If push fails with a network error: retry with exponential backoff (2s, 4s, 8s, 16s)
 
 ## Testing Changes
 
 ### Before Committing
-1. **Type check**: `npx tsc --noEmit` — must be clean
+Run everything that applies (CI runs all of it on every PR):
+
+1. **Type check**: `npx tsc --noEmit` — must be clean (includes test files)
 2. **Lint**: `npm run lint` — must be clean (zero warnings; `--max-warnings 0`)
-3. **Build check**: `npm run build` — this runs `tsc && vite build` and must pass
-4. **Visual check**: Verify in browser if possible
-5. **Version check**: Confirm version number is updated
+3. **Build**: `npm run build` — runs `tsc && vite build` and must pass
+4. **Client unit tests**: `npm test`
+5. **Functions**: `cd functions && npm run build && npm run typecheck && npm test`
+6. **Rules tests**: `npm run test:rules` (Firestore emulator)
+7. **Functions integration tests**: `npm run test:functions:emulator`
+   (Firestore + Auth emulators)
+8. **Version check**: confirm the version is updated if the app changed
+
+The emulator suites need Java 21+. Use Node 22 (`.nvmrc`, `engines`) — the
+functions runtime is `nodejs22`, and running code discovery under another major
+version has made deploys time out.
 
 > Historical note: earlier versions of this file instructed using `npx vite build`
 > to bypass TypeScript errors. Those errors came from `services/firebase/config.ts`
@@ -86,24 +93,24 @@ For this project, increment patch version for each change.
 > ref callback that TypeScript rejected.
 
 ### After Pushing
-1. Instruct user to pull with clear commands
-2. Tell user what version number to look for
-3. Provide verification steps
+1. Tell the user what version number to look for
+2. Give exact verification steps, and any manual deploy steps in order
 
 ## Debugging Approach
 
 ### When Feature Doesn't Work
-1. **Add targeted debug logs** with version number
+1. **Add targeted debug logs** with version number, through `logger.debug`
    ```typescript
-   console.log('🔍 v1.0.5 - Searching for:', query);
+   logger.debug('🔍 v1.0.5 - Searching for:', query);
    ```
-2. **Log key data**: state values, loaded data, matches found
+2. **Log key data**: state values, loaded data, matches found — never note
+   contents or emails
 3. **Increment version** so user knows they have debug version
 4. **Ask user for console output** to diagnose
 
 ### Common Issues
-- **Async loading**: Check if data is loaded before using it
-- **Cache**: Remind user to hard refresh (Ctrl+Shift+R)
+- **Async loading**: Check if data is loaded before using it (`hasLoaded`)
+- **Cache**: Remind user to hard refresh (Ctrl+Shift+R); the PWA may run old code
 - **Wrong branch**: User might be on old branch
 
 ## Communication with User
@@ -118,12 +125,6 @@ For this project, increment patch version for each change.
 - Always tell user what version to look for
 - Have them confirm they see the version number
 - If version doesn't match, troubleshoot git/pull issues first
-
-### Debug Collaboration
-- Ask user to open console (F12)
-- Request specific log outputs
-- Explain what each log means
-- Use emojis in logs for easy identification (🔍 ✅ ❌ 📋)
 
 ## Code Quality
 
@@ -144,37 +145,53 @@ For this project, increment patch version for each change.
 - Services throw `Error` objects with a Hebrew message for the user and the
   original error attached as `cause` — never swallow the underlying error,
   it's what tells you a failure was actually `permission-denied`.
+- Listener errors go to the store's `loadError` (separate from write
+  `error`), and the UI shows loading, error and empty as different states
+  (`LoadError` component). An error must never look like "no data".
 - Components surface errors inline where practical; `window.alert` is still
   used in a few places and is fair game to replace with a toast.
 
 ## File Organization
 
 ### Test Files
-- Place tests next to source files: `Button.tsx` → `Button.test.tsx`
-- Test utilities in `/src/test/` directory
-- Mock files in `/src/test/mocks/`
+- Client: next to the source file, `foo.ts` → `foo.test.ts` (Vitest, node env)
+- Functions unit tests: `functions/test/` (not `src/`, so they are not built
+  into `lib/` or deployed)
+- Functions integration tests against the emulators: `functions/test-emulator/`
+- Firestore rules tests: `tests/rules/`
+- **Known holes**: rules tests may assert current, wrong behavior with the
+  `knownHole('<step>', ...)` helper. When the fix lands the test fails — invert
+  it and move it into the regular tests. Never delete one to make CI green.
 
 ### Documentation
 - Keep README.md user-facing
 - This file (CLAUDE_GUIDELINES.md) is for Claude's reference
+- Plans and reviews live in `thinking/` (`architecture-review.md` has the fix
+  order; `mcp-plan.md` the MCP server design)
 - Update guidelines when learning new patterns
 
 ## Project-Specific Notes
 
 ### Current Architecture
-- **Framework**: React 18 + TypeScript + Vite
+- **Framework**: React 19 + TypeScript + Vite (PWA via `vite-plugin-pwa`,
+  `injectManifest`, own Service Worker in `src/sw.ts`)
 - **State**: Zustand stores
-- **Backend**: Firebase (Firestore + Auth)
+- **Backend**: Firebase (Firestore, Auth, FCM) and Cloud Functions v2
+  (`firebase-functions` 7), region **europe-west1** — same as the database,
+  set once with `setGlobalOptions`
 - **Styling**: Tailwind CSS with dark mode
 - **Routing**: React Router v7
 
 ### Key Files
-- `src/pages/Home/Home.tsx` - Main app page with search
-- `src/components/category/CategoryList/CategoryList.tsx` - Category filtering
-- `src/components/category/CategoryItem/CategoryItem.tsx` - Note filtering
-- `package.json` - Version number
+- `package.json` — the version number
+- `src/services/api/*` — every Firestore read and write; `mappers.ts` normalizes documents
+- `src/store/noteStore.ts`, `categoryStore.ts` — the shared listeners
+- `src/utils/templateContent.ts` — parsing, converting and appending template content
+- `firestore.rules` and `tests/rules/firestore.rules.test.ts`
+- `functions/src/index.ts` — function wiring; logic lives in the modules next to it
+- `thinking/architecture-review.md` — findings and fix order
 
-### Architecture Rules (added in v1.5.0)
+### Architecture Rules
 
 **Firestore subscriptions** — `noteStore` and `categoryStore` each own a
 single listener with a subscriber count. Components subscribe via `useNotes`
@@ -191,8 +208,19 @@ once there instead of scattering `?.` and `|| []` through components.
 spread a whole note object into it: it overwrites concurrent edits from other
 users and writes junk fields into the document.
 
+**Writer stamp** — every note write goes through `writeStamp()` in
+`src/services/api/notes.ts`, which adds `updatedBy` (the signed-in uid) and
+`updatedAt`. The rules reject a foreign `updatedBy`; version history
+attributes changes by it. (Phase 2, making it mandatory, is step B6b.)
+
 **Array fields** — `sharedWith` is only ever modified with `arrayUnion` /
-`arrayRemove`. Read-modify-write loses concurrent shares.
+`arrayRemove`. Read-modify-write loses concurrent shares. A recipient may
+remove only themselves (`isLeavingShare` in the rules).
+
+**Template content** — never write content a template could not parse.
+Parsers return `{ ok: false }` rather than an empty value, and templates
+initialize only `''`. Converting between templates goes through
+`convertContent`; appending shared content through `appendSnippet`.
 
 **Backup rendering** — `src/utils/backupFormat.ts` is pure (no Firebase calls,
 no React) so it can be exercised directly. Content renderers dispatch on the
@@ -204,84 +232,55 @@ unrecognized JSON is emitted as a fenced code block rather than dropped.
 There used to be four separate copies of that map and one had already fallen
 out of sync (`aisummary` was missing).
 
-**Reminders** — scheduling happens in a scheduled Cloud Function
-(`functions/src/index.ts`), never in the browser. An earlier version armed a
-`setTimeout` inside the Service Worker; browsers evict idle workers within
-seconds and every pending timer died with them, so no reminder past the
-eviction window ever fired. Two consequences worth keeping in mind:
+**Finding users** — sharing by email calls the `findUserByEmail` callable
+(Firebase Auth, verified accounts only, rate-limited). `userLookup` is read
+only by id (`get`) for display names; a `list` query against it is denied.
 
-- `reminderPending` must always be written, including as `false`. A Firestore
-  query does not return documents that lack the field entirely, so a note
-  missing it is invisible to the function and its reminder never sends.
-- The function sends **data-only** FCM messages. This app owns its Service
-  Worker (`injectManifest`) and renders notifications itself; adding a
-  `notification` block would make the browser display one too — a duplicate.
+**Note trigger** — `onNoteWritten` is the single Firestore trigger on
+`notes/{noteId}`. It decides from `before`/`after` what the write needs and
+exits early otherwise: reminder sync (`reminders.ts`) and version history
+(`versions.ts`). Versions are written only there; clients can read, never write.
+
+**Reminders** — scheduling happens in Cloud Functions, never in the browser.
+An earlier version armed a `setTimeout` inside the Service Worker; browsers
+evict idle workers within seconds and every pending timer died with them.
+- The trigger derives reminders from the checklist content itself, into the
+  `reminders` collection; there is no flag on the note to keep in sync.
+  (`reminderPending` was used by an older design and is no longer read.)
+- `sendDueReminders` sends **data-only** FCM messages. This app owns its
+  Service Worker and renders notifications itself; adding a `notification`
+  block would make the browser display one too — a duplicate.
+- `sendDueReminders` sends before it marks reminders sent (F-1 in the
+  review): two schedulers running at once can double-send. Never have two
+  deployed at the same time.
+
+**Cloud Functions deploy** — manual, from the owner's machine
+(`firebase deploy --only functions:<name>`), with Node 22. CI only builds and
+tests them. When a change needs both a function and new rules, the order
+matters and belongs in the PR description.
 
 ### Known Issues
-- Search requires notes to load asynchronously from Firebase
-- Any signed-in user can read the `userLookup` collection, which allows
-  checking whether an email is registered. Closing that requires moving the
-  email lookup into a Cloud Function.
-- The main JS bundle is ~986 kB (257 kB gzipped) — worth code-splitting.
+See `thinking/architecture-review.md` for the full list and fix order. Still open:
+- The main JS bundle is ~1 MB — worth code-splitting.
+- `sendDueReminders` is not idempotent (F-1).
 
 ## Session Context
 
-### Current State (as of v1.5.0)
-- `npm run build`, `npx tsc --noEmit` and `npm run lint` are all clean
-- ESLint migrated to flat config (`eslint.config.js`); the old
-  `.eslintrc.cjs` was silently not being loaded by ESLint 9 at all,
-  so linting had effectively been off
-- Firestore rules hardened: shared users can edit content but not take
-  ownership; full user documents are owner-only
-- Reminders are delivered by server-side Push (scheduled Cloud Function →
-  FCM → SW `push` handler), not by in-worker timers
-- Working branch: `main`
-
-### Recent Changes (v1.5.0)
-- **Correctness**: debounced inline editing; shared subscription with
-  reference counting; atomic reorder via `writeBatch`; `arrayUnion`/
-  `arrayRemove` for sharing; document normalization layer
-- **Security**: Firestore rules rewritten; `userLookup` collection split out
-  so `users/{uid}` is no longer world-readable
-- **Bugs fixed**: sign-out button (referenced a store field that never
-  existed), markdown parser dropping formatting before a link, crash on
-  notes missing `tags`/`updatedAt`, template label map missing `aisummary`
-- **Cleanup**: central `logger`, `errors`, `templates`, `search`,
-  `notePreview` modules; removed dead code (`Template` type, unused
-  template constants, duplicate `DEFAULT_USER_SETTINGS`, vestigial
-  `getRedirectResult` handling — Google sign-in uses a popup, not redirect)
-
-### Previous Changes (v1.4.6)
-- **Note Cards**: Fixed width issue on screens below 640px - cards now display with horizontal scroll
-- **Checklist Template**:
-  - Removed accordion date card, replaced with icon-based date/time pickers
-  - Date icon (📅) and time icon (🕐) placed next to trash icon
-  - Clicking icons opens native date/time pickers
-  - Added delete buttons (X) for date/time
-  - Dark mode styling for tasks, borders, and checkboxes
-  - Auto-focus new task input when pressing Enter
-- **Documentation**: Complete README overhaul with all implemented features
-
-### Previous State (v1.4.4-1.4.5)
-- About, Privacy, Terms, What's New pages added
-- Profile menu implemented
-- Pinned notes alignment fixed in collapsed mode
-- Category full-screen view with vertical note list
-- Dark mode fixes for textarea
-- Mobile responsive improvements
+The change history lives in `src/pages/WhatsNew/WhatsNew.tsx` (user-facing)
+and in git history and PR descriptions (technical). Earlier versions of this
+file kept a hand-written "current state" section here; it went stale by fifteen
+minor versions and has been removed rather than updated again.
 
 ---
 
 ## Quick Checklist for Each Change
 
-- [ ] Increment version number (package.json + UI)
-- [ ] Make code changes
-- [ ] Test/build locally
-- [ ] Commit with clear message including version
-- [ ] Push to correct branch (claude/*-SESSIONID)
-- [ ] Provide clear pull instructions
-- [ ] Tell user what version to verify
-- [ ] If debugging: explain console logs to check
+- [ ] Make code changes on a `claude/<topic>` branch
+- [ ] Run the checks and test suites listed above
+- [ ] If the app changed: increment the version and add a WhatsNew entry
+- [ ] Commit each logical step separately, with the version in the message
+- [ ] Push and open a PR when asked; do not merge
+- [ ] Tell the user what version to verify, and any manual deploy steps in order
 
 ---
 
