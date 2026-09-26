@@ -7,6 +7,8 @@
  *
  * `sendDueReminders` - רצה כל דקה, שולפת תזכורות שהגיע מועדן ושולחת push.
  *
+ * `findUserByEmail` - callable לשיתוף לפי אימייל (`userLookup.ts`).
+ *
  * למה בטריגר ולא בלקוח: יש כמה מסלולים ששומרים פתק (טופס הפתק, עריכה
  * inline, קליטת שיתוף, ובעתיד MCP), וטריגר רואה כל כתיבה בהגדרה - גם
  * מחיקה וארכוב - בלי קוד ייעודי בכל מסלול.
@@ -18,12 +20,15 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { isRepeatRule, nextOccurrence } from './recurrence';
 import { handleNoteWritten } from './noteWritten';
+import { lookupUserByEmail } from './userLookup';
 import type { ReminderPushData } from './reminderPayload';
 
 /**
@@ -70,6 +75,22 @@ export const onNoteWritten = onDocumentWritten('notes/{noteId}', async (event) =
     noteId: event.params.noteId,
     before: before?.exists ? before.data() : undefined,
     after: after?.exists ? after.data() : undefined,
+  });
+});
+
+// ==================== חיפוש משתמש לשיתוף ====================
+
+export const findUserByEmail = onCall({ memory: '256MiB', timeoutSeconds: 10 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'יש להתחבר כדי לשתף');
+  }
+
+  return lookupUserByEmail({
+    db,
+    auth: getAuth(),
+    callerUid: request.auth.uid,
+    email: (request.data as { email?: unknown } | undefined)?.email,
+    now: Date.now(),
   });
 });
 

@@ -123,19 +123,32 @@ service cloud.firestore {
       }
     }
 
-    // אינדקס מינימלי לחיפוש משתמש לפי אימייל, לצורך שיתוף.
-    // מכיל רק אימייל ושם תצוגה - בלי הגדרות או מידע אישי אחר.
+    // שם תצוגה ואימייל לפי מזהה משתמש - להצגת "משותף עם" בשמות.
     //
-    // הערה: כל משתמש מחובר יכול לקרוא כאן, וזה מאפשר בדיקה אם אימייל
-    // מסוים רשום למערכת. זה המחיר של חיפוש לפי אימייל ישירות מהלקוח.
-    // כדי לסגור גם את זה צריך להעביר את החיפוש ל-Cloud Function
-    // ולחסום קריאה ישירה לקולקציה.
+    // רק `get` (לפי מזהה ידוע), לעולם לא `list`: קודם כל משתמש מחובר יכול
+    // היה לשלוף את כל הקולקציה, כלומר את האימיילים של כל המשתמשים.
+    // חיפוש לפי אימייל לצורך שיתוף עבר ל-callable `findUserByEmail`,
+    // שבודק מול Firebase Auth ומגביל קצב.
+    //
+    // כתיבה: רק לרשומה של עצמך, ורק עם האימייל שלך, ורק אם הוא מאומת.
+    // קודם אפשר היה לרשום אימייל של מישהו אחר ולקבל את השיתופים שלו.
+    // `lower()` כי האימייל נשמר מנורמל, וב-token הוא עשוי להכיל אותיות גדולות.
     match /userLookup/{userId} {
-      allow read: if isAuthenticated();
+      allow get: if isAuthenticated();
+      allow list: if false;
 
-      allow write: if isOwner(userId)
+      allow create, update: if isOwner(userId)
+        && request.auth.token.email_verified == true
         && request.resource.data.keys().hasOnly(['email', 'displayName'])
-        && request.resource.data.email is string;
+        && request.resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.displayName is string;
+
+      allow delete: if isOwner(userId);
+    }
+
+    // מוני הגבלת קצב של `findUserByEmail`. Admin SDK בלבד.
+    match /rateLimits/{key} {
+      allow read, write: if false;
     }
   }
 }

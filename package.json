@@ -1,6 +1,6 @@
 {
   "name": "notes-app",
-  "version": "1.21.0",
+  "version": "1.21.1",
   "description": "אפליקציית פתקים מאורגנים בקטגוריות",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore --project demo-notes-4-me \"vitest run -c vitest.rules.config.ts\"",
-    "test:functions:emulator": "firebase emulators:exec --only firestore --project demo-notes-4-me \"npm --prefix functions run test:emulator\""
+    "test:functions:emulator": "firebase emulators:exec --only firestore,auth --project demo-notes-4-me \"npm --prefix functions run test:emulator\""
   },
   "keywords": [
     "notes",

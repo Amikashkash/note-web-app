@@ -219,7 +219,7 @@ export const shareCategoryWithUser = async (
 ): Promise<void> => {
   const targetUserId = await findUserIdByEmail(userEmail);
   if (!targetUserId) {
-    throw new Error('משתמש לא נמצא במערכת');
+    throw new Error('לא נמצא משתמש עם האימייל הזה. אם הוא נרשם עם אימייל וסיסמה, ייתכן שעוד לא אימת את הכתובת');
   }
 
   try {
