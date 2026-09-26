@@ -12,8 +12,20 @@
     "ignore": [
       "node_modules",
       ".git",
-      "*.log"
+      "*.log",
+      "test",
+      "vitest.config.ts",
+      "tsconfig.test.json"
     ]
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   },
   "hosting": {
     "public": "dist",
