@@ -158,39 +158,5 @@ jobs:
       # ה-CLI מגיע מ-`firebase-tools` שנעוץ ב-package-lock, ולא מ-action של
       # צד שלישי. Hosting, rules ו-indexes בפקודה אחת.
       # פונקציות הענן עדיין נפרסות ידנית - ה-CI רק בונה ובודק אותן.
-      #
-      # TODO(wif-deploy): הפריסה הראשונה עם WIF נכשלה ב-"Failed to authenticate"
-      # (run 36250404452). ההודעה זהה לבאג ידוע, אבל הוא לא חל כאן כמו שהוא:
-      # - https://github.com/firebase/firebase-tools/issues/10716
-      # - https://github.com/firebase/firebase-tools/issues/10726
-      # שניהם נסגרו כמתוקנים. הגורם היה באג ב-Node.js
-      # (https://github.com/nodejs/node/issues/63989, גרסאות 22.23.0 ו-24.17.0),
-      # ו-firebase-tools 15.22.3 הוסיף עקיפה. אצלנו רצים Node 22.23.2 ו-15.31.0,
-      # כלומר אחרי שני התיקונים. לכן במקום לנעוץ גרסה ישנה, השלב הזה מדפיס את
-      # השגיאה האמיתית שנבלעת. כשהפריסה עוברת - להסיר את ה-TODO ואת בלוק
-      # האבחון, ולהשאיר את `token_format` (בדיקה מוקדמת וזולה).
-      # אם הלוג מראה "Premature close" - לנעוץ את Node לגרסה מדויקת.
       - name: Deploy Hosting, Firestore rules and indexes
-        run: |
-          if ! npx --no-install firebase deploy --only hosting,firestore --project notes-4-me --non-interactive; then
-            # הלוג של ריפו ציבורי גלוי לכולם: רק שורות שגיאה, ו-tokens מוסתרים.
-            # החשוב מכולם הוא ה-OIDC token של GitHub (JWT שמתחיל ב-eyJ): בחלון
-            # התוקף שלו כל מי שקורא את הלוג יכול להחליף אותו ב-STS, והוא עובר
-            # את ה-attribute condition כי הוא נושא את ה-repo ואת main. לכן כל
-            # מחרוזת בצורת JWT מוסתרת, בכל הקשר - שדה JSON, גוף URL-encoded או
-            # בתוך הודעת שגיאה - ולא רק לפי שם שדה.
-            echo "::group::firebase-debug.log (error lines only, tokens redacted)"
-            if [ -f firebase-debug.log ]; then
-              grep -iE "error|denied|premature|sts\.googleapis|iamcredentials|status|invalid|forbidden|unauthori|permission|credential" firebase-debug.log \
-                | sed -E \
-                    -e 's/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[REDACTED_JWT]/g' \
-                    -e 's/(ya29\.|Bearer +)[A-Za-z0-9._~+\/=-]+/\1[REDACTED]/g' \
-                    -e 's/((subject_token|access_token|id_token|token)=)[^&"[:space:]]*/\1[REDACTED]/g' \
-                    -e 's/"(access_token|id_token|subject_token|token|accessToken|idToken|subjectToken)" *: *"[^"]*"/"\1":"[REDACTED]"/g' \
-                | tail -n 80
-            else
-              echo "firebase-debug.log was not written"
-            fi
-            echo "::endgroup::"
-            exit 1
-          fi
+        run: npx --no-install firebase deploy --only hosting,firestore --project notes-4-me --non-interactive
