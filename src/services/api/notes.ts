@@ -20,7 +20,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
+import { auth, db } from '@/services/firebase/config';
 import { Note, NoteInput } from '@/types/note';
 import { byPinnedThenOrder, toNote } from './mappers';
 import { findUserIdByEmail } from './users';
@@ -46,7 +46,23 @@ const IMMUTABLE_FIELDS: readonly string[] = [
   'sharedWith',
   'createdAt',
   'updatedAt',
+  'updatedBy',
 ];
+
+/**
+ * חותמת הכותב לכל כתיבה לפתק: מי ומתי.
+ *
+ * `updatedBy` חובה בכל כתיבה - `firestore.rules` דוחים כתיבה שבה הוא לא
+ * שווה למשתמש המחובר, כך ששותף לא יכול להתחזות לבעלים. היסטוריית הגרסאות
+ * (בטריגר בענן) נשענת עליו כדי לדעת מי שינה, ולפתוח גרסה כשהכותב מתחלף.
+ */
+const writeStamp = () => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    throw new Error('משתמש לא מחובר');
+  }
+  return { updatedBy: uid, updatedAt: serverTimestamp() };
+};
 
 const stripImmutableFields = (updates: Partial<NoteInput>): Record<string, unknown> =>
   Object.fromEntries(
@@ -62,7 +78,7 @@ export const createNote = async (noteInput: NoteInput): Promise<string> => {
       ...noteInput,
       isArchived: false,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
     return docRef.id;
   } catch (error) {
@@ -84,7 +100,7 @@ export const updateNote = async (
   try {
     await updateDoc(noteRef(noteId), {
       ...stripImmutableFields(updates),
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
   } catch (error) {
     logger.error('Error updating note:', error);
@@ -119,7 +135,7 @@ export const appendToNote = async (
       if (result.ok) {
         transaction.update(noteRef(noteId), {
           content: result.content,
-          updatedAt: serverTimestamp(),
+          ...writeStamp(),
         });
       }
       return result;
@@ -248,7 +264,7 @@ export const reorderNotes = async (orderedIds: string[]): Promise<void> => {
   try {
     const batch = writeBatch(db);
     orderedIds.forEach((noteId, index) => {
-      batch.update(noteRef(noteId), { order: index, updatedAt: serverTimestamp() });
+      batch.update(noteRef(noteId), { order: index, ...writeStamp() });
     });
     await batch.commit();
   } catch (error) {
@@ -271,7 +287,7 @@ export const archiveNote = async (noteId: string): Promise<void> => {
     await updateDoc(noteRef(noteId), {
       isArchived: true,
       archivedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
   } catch (error) {
     logger.error('Error archiving note:', error);
@@ -287,7 +303,7 @@ export const restoreNote = async (noteId: string): Promise<void> => {
     await updateDoc(noteRef(noteId), {
       isArchived: false,
       archivedAt: null,
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
   } catch (error) {
     logger.error('Error restoring note:', error);
@@ -318,7 +334,7 @@ export const shareNoteWithUser = async (noteId: string, userEmail: string): Prom
   try {
     await updateDoc(noteRef(noteId), {
       sharedWith: arrayUnion(targetUserId),
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
   } catch (error) {
     logger.error('Error sharing note:', error);
@@ -333,7 +349,7 @@ export const unshareNoteWithUser = async (noteId: string, userId: string): Promi
   try {
     await updateDoc(noteRef(noteId), {
       sharedWith: arrayRemove(userId),
-      updatedAt: serverTimestamp(),
+      ...writeStamp(),
     });
   } catch (error) {
     logger.error('Error unsharing note:', error);

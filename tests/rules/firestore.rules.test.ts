@@ -57,6 +57,7 @@ const baseNote = {
   sharedWith: [SHARED],
   isPinned: false,
   isArchived: false,
+  updatedBy: OWNER,
 };
 
 const baseCategory = {
@@ -114,19 +115,19 @@ describe('notes', () => {
   it('owner reads, updates and deletes their note', async () => {
     const db = as(OWNER);
     await assertSucceeds(getDoc(doc(db, 'notes/note-1')));
-    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { title: 'חדש' }));
+    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { title: 'חדש', updatedBy: OWNER }));
     await assertSucceeds(deleteDoc(doc(db, 'notes/note-1')));
   });
 
   it('a user the note is shared with can read it and edit content', async () => {
     const db = as(SHARED);
     await assertSucceeds(getDoc(doc(db, 'notes/note-1')));
-    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { content: '[{"id":"1"}]', title: 'x' }));
+    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { content: '[{"id":"1"}]', title: 'x', updatedBy: SHARED }));
   });
 
   it('a stranger cannot read or update, and an anonymous user cannot read', async () => {
     await assertFails(getDoc(doc(as(STRANGER), 'notes/note-1')));
-    await assertFails(updateDoc(doc(as(STRANGER), 'notes/note-1'), { title: 'x' }));
+    await assertFails(updateDoc(doc(as(STRANGER), 'notes/note-1'), { title: 'x', updatedBy: STRANGER }));
     await assertFails(getDoc(doc(anonymous(), 'notes/note-1')));
   });
 
@@ -136,8 +137,8 @@ describe('notes', () => {
 
   it('a shared user cannot take ownership or change who it is shared with', async () => {
     const db = as(SHARED);
-    await assertFails(updateDoc(doc(db, 'notes/note-1'), { userId: SHARED }));
-    await assertFails(updateDoc(doc(db, 'notes/note-1'), { sharedWith: arrayUnion(STRANGER) }));
+    await assertFails(updateDoc(doc(db, 'notes/note-1'), { userId: SHARED, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(db, 'notes/note-1'), { sharedWith: arrayUnion(STRANGER), updatedBy: SHARED }));
   });
 
   it('a shared user cannot delete the note', async () => {
@@ -145,8 +146,8 @@ describe('notes', () => {
   });
 
   it('a note can only be created with the creator as owner', async () => {
-    await assertSucceeds(setDoc(doc(as(STRANGER), 'notes/new-1'), { ...baseNote, userId: STRANGER, sharedWith: [] }));
-    await assertFails(setDoc(doc(as(STRANGER), 'notes/new-2'), { ...baseNote, userId: OWNER }));
+    await assertSucceeds(setDoc(doc(as(STRANGER), 'notes/new-1'), { ...baseNote, userId: STRANGER, sharedWith: [], updatedBy: STRANGER }));
+    await assertFails(setDoc(doc(as(STRANGER), 'notes/new-2'), { ...baseNote, userId: OWNER, updatedBy: STRANGER }));
   });
 
   it('queries must be scoped to owned or shared notes', async () => {
@@ -162,6 +163,42 @@ describe('notes', () => {
     });
     await assertSucceeds(getDoc(doc(as(OWNER), 'notes/legacy-1')));
     await assertFails(getDoc(doc(as(STRANGER), 'notes/legacy-1')));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updatedBy - מי כתב אחרון, לא ניתן לזיוף
+// ---------------------------------------------------------------------------
+
+describe('notes: updatedBy must be the signed-in user', () => {
+  it('rejects creating a note without updatedBy, or with someone else in it', async () => {
+    const { updatedBy: _omitted, ...withoutWriter } = baseNote;
+    await assertFails(setDoc(doc(as(OWNER), 'notes/n-a'), withoutWriter));
+    await assertFails(setDoc(doc(as(OWNER), 'notes/n-b'), { ...baseNote, updatedBy: SHARED }));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-c'), baseNote));
+  });
+
+  it("a shared user cannot leave the owner's name on their change", async () => {
+    // בלי לשלוח updatedBy הערך הקודם (הבעלים) נשאר - ונדחה
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x' }));
+  });
+
+  it('a shared user cannot claim to be the owner', async () => {
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: OWNER }));
+  });
+
+  it('omitting it is accepted only when the previous writer was the same user', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'still mine' }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { title: 'theirs', updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine again' }));
+  });
+
+  it('a legacy note without updatedBy can be edited once the writer sends it', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/legacy-2'), { title: 'ישן', userId: OWNER });
+    });
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x' }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', updatedBy: OWNER }));
   });
 });
 
@@ -286,15 +323,15 @@ describe('known holes (current behavior, expected to change)', () => {
   });
 
   knownHole('C2 (SH-1)', 'a recipient cannot remove themselves from a shared note', async () => {
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED) }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED }));
   });
 
   knownHole('C6 (R-2 / SH-2)', "a shared user can move the owner's note to another category", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category' }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED }));
   });
 
   knownHole('E3 (R-2)', "a shared user can archive the owner's note", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { isArchived: true }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { isArchived: true, updatedBy: SHARED }));
   });
 
   knownHole('E3 (R-2)', "a shared user can rename the owner's category", async () => {
@@ -308,12 +345,12 @@ describe('known holes (current behavior, expected to change)', () => {
   });
 
   knownHole('R-3', 'the owner can hand the note to another user by changing userId', async () => {
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { userId: STRANGER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { userId: STRANGER, updatedBy: OWNER }));
   });
 
   knownHole('R-1', 'there is no size or schema validation on notes', async () => {
     await assertSucceeds(
-      updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'x'.repeat(5000), unexpectedField: true })
+      updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'x'.repeat(5000), unexpectedField: true, updatedBy: OWNER })
     );
   });
 });

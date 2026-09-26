@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.20.6',
+    date: 'ספטמבר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'כל שינוי בפתק נרשם עם מי שביצע אותו, והשרת לא מאפשר לרשום שינוי בשם של משתמש אחר. זו התשתית להיסטוריית הגרסאות',
+      },
+    ],
+  },
+  {
     version: '1.20.5',
     date: 'ספטמבר 2026',
     changes: [

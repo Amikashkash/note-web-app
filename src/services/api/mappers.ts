@@ -60,6 +60,7 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     isPinned: asBoolean(data.isPinned),
     isArchived: asBoolean(data.isArchived),
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
+    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
   };
 };
 

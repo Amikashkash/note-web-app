@@ -28,11 +28,16 @@ export interface Note {
   isPinned: boolean;
   isArchived: boolean;
   archivedAt?: Timestamp;
+  /** מי כתב אחרון. נקבע ע"י שכבת השמירה ונאכף ב-rules; חסר בפתקים ישנים */
+  updatedBy?: string;
 }
 // תזכורות אינן שדה של הפתק. הן שייכות למשימה בודדת ברשימת משימות,
 // ומתוחזקות בקולקציה נפרדת ע"י טריגר בענן - ראה `functions/src/index.ts`.
 
-export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'isArchived' | 'archivedAt'>;
+export type NoteInput = Omit<
+  Note,
+  'id' | 'createdAt' | 'updatedAt' | 'updatedBy' | 'isArchived' | 'archivedAt'
+>;
 
 /**
  * הנתונים שטופס הפתק מחזיר.

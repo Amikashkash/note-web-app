@@ -49,11 +49,17 @@ service cloud.firestore {
     match /notes/{noteId} {
       allow read: if canReadNote(resource.data);
 
+      // `updatedBy` חייב להיות המשתמש המחובר בכל כתיבה. בעדכון, שדה שלא
+      // נשלח נשאר עם הערך הקודם - ולכן מי שלא כתב אחרון חייב לשלוח אותו,
+      // ושותף לא יכול להשאיר את שם הבעלים על שינוי שהוא עשה.
+      // היסטוריית הגרסאות מייחסת שינויים לפי השדה הזה.
       allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.get('updatedBy', null) == request.auth.uid;
 
-      allow update: if isOwner(resource.data.userId)
-        || (isSharedWithMe(resource.data) && ownershipUnchanged());
+      allow update: if request.resource.data.get('updatedBy', null) == request.auth.uid
+        && (isOwner(resource.data.userId)
+          || (isSharedWithMe(resource.data) && ownershipUnchanged()));
 
       allow delete: if isOwner(resource.data.userId);
 
