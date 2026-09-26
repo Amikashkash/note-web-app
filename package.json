@@ -3,6 +3,9 @@
   "version": "1.21.0",
   "description": "אפליקציית פתקים מאורגנים בקטגוריות",
   "type": "module",
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
