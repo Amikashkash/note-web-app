@@ -314,6 +314,14 @@ export const togglePinNote = (noteId: string, isPinned: boolean): Promise<void> 
   updateNote(noteId, { isPinned });
 
 /**
+ * סימון/ביטול סימון פתק כרגיש (מוסתר מ-Claude). רק הבעלים - ה-rules
+ * דוחים את זה משותף. לא יוצר גרסה בהיסטוריה: `isSensitive` אינו שדה
+ * תוכן (ראה `VERSIONED_FIELDS` ב-`functions/src/versions.ts`).
+ */
+export const setNoteSensitive = (noteId: string, isSensitive: boolean): Promise<void> =>
+  updateNote(noteId, { isSensitive });
+
+/**
  * העברת פתק לארכיון (מחיקה רכה)
  */
 export const archiveNote = async (noteId: string): Promise<void> => {

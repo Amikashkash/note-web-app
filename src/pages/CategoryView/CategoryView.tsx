@@ -52,6 +52,7 @@ export const CategoryView: React.FC = () => {
         id: cat.id,
         name: cat.name,
         icon: cat.icon || '📁',
+        isSensitive: cat.isSensitive,
       })),
     [categories]
   );

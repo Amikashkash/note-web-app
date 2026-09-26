@@ -218,6 +218,7 @@ export const Share: React.FC = () => {
           order: 0,
           sharedWith: [],
           isPinned: false,
+          isSensitive: false,
         });
       }
 

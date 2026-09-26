@@ -30,6 +30,12 @@ service cloud.firestore {
         && request.resource.data.get('sharedWith', []) == sharedUsers(resource.data);
     }
 
+    // שדות שרק הבעלים משנה, גם כששאר העדכון מותר לשותף.
+    // `diff` מתייחס גם להוספת שדה שלא היה, כך ששותף לא יכול "ליצור" אותו.
+    function ownerOnlyFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
     // נמען שמסיר את עצמו משיתוף (SH-1). העדכון היחיד המותר: להוריד את
     // עצמו מ-`sharedWith` - לא אחרים, לא להוסיף, ולא לגעת בשום שדה אחר
     // חוץ מחותמת הכותב. בלי זה לנמען לא הייתה דרך להיפטר מפתק ששותף איתו.
@@ -47,8 +53,11 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
 
+      // `isSensitive` (§12 בסקירה): רק הבעלים מסמן או מבטל. אחרת שותף
+      // יכול היה לחשוף ל-Claude של כולם קטגוריה שהבעלים הסתיר.
       allow update: if isOwner(resource.data.userId)
-        || (isSharedWithMe(resource.data) && ownershipUnchanged())
+        || (isSharedWithMe(resource.data) && ownershipUnchanged()
+          && ownerOnlyFieldsUnchanged(['isSensitive']))
         || isLeavingShare();
 
       allow delete: if isOwner(resource.data.userId);
@@ -84,9 +93,13 @@ service cloud.firestore {
         && (!('updatedBy' in request.resource.data)
           || request.resource.data.updatedBy == request.auth.uid);
 
+      // שותף לא משנה `isSensitive` ולא `categoryId` (§12.2): העברה של פתק
+      // מקטגוריה רגישה לקטגוריה שלו הייתה מבטלת את הרגישות בפועל, וגם
+      // "מעלימה" את הפתק מהבעלים (SH-2).
       allow update: if writerStampPhase1()
         && (isOwner(resource.data.userId)
-          || (isSharedWithMe(resource.data) && ownershipUnchanged())
+          || (isSharedWithMe(resource.data) && ownershipUnchanged()
+            && ownerOnlyFieldsUnchanged(['isSensitive', 'categoryId']))
           || isLeavingShare());
 
       allow delete: if isOwner(resource.data.userId);

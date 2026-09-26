@@ -27,6 +27,11 @@ export interface Note {
   updatedAt: Timestamp;
   isPinned: boolean;
   isArchived: boolean;
+  /**
+   * רגיש: מוסתר מ-Claude (שרת ה-MCP). רק הבעלים משנה אותו, רק מהאפליקציה.
+   * הרגישות האפקטיבית כוללת גם את הקטגוריה - ראה `thinking/architecture-review.md` §12.
+   */
+  isSensitive: boolean;
   archivedAt?: Timestamp;
   /** מי כתב אחרון. נקבע ע"י שכבת השמירה ונאכף ב-rules; חסר בפתקים ישנים */
   updatedBy?: string;

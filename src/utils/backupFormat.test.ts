@@ -27,6 +27,7 @@ const makeNote = (overrides: Partial<Note> = {}): Note => ({
   updatedAt: AT,
   isPinned: false,
   isArchived: false,
+  isSensitive: false,
   ...overrides,
 });
 
@@ -38,6 +39,7 @@ const category: Category = {
   order: 0,
   userId: 'u1',
   sharedWith: [],
+  isSensitive: false,
   createdAt: AT,
   updatedAt: AT,
 };

@@ -232,6 +232,13 @@ unrecognized JSON is emitted as a fenced code block rather than dropped.
 There used to be four separate copies of that map and one had already fallen
 out of sync (`aisummary` was missing).
 
+**Sensitive notes** — `isSensitive` on notes and categories hides them from
+Claude (the MCP server, `thinking/mcp-plan.md` §3.4). Only the owner sets or
+clears it; the rules deny it to shared users, and a shared user cannot change
+`categoryId` either (that would move a note out of a sensitive category). It
+is always written, including as `false`, and it is not a content field: it
+creates no version and does not touch reminders.
+
 **Finding users** — sharing by email calls the `findUserByEmail` callable
 (Firebase Auth, verified accounts only, rate-limited). `userLookup` is read
 only by id (`get`) for display names; a `list` query against it is denied.

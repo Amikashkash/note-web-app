@@ -31,7 +31,7 @@ interface CategoryState {
   /** הקמה מחדש של המאזין אחרי שגיאת טעינה */
   retry: () => void;
 
-  createCategory: (userId: string, name: string, color?: string) => Promise<void>;
+  createCategory: (userId: string, name: string, color?: string, isSensitive?: boolean) => Promise<void>;
   updateCategory: (categoryId: string, updates: Partial<CategoryInput>) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
   clearError: () => void;
@@ -137,8 +137,8 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       });
     },
 
-    createCategory: async (userId, name, color) => {
-      await runWrite(() => categoryAPI.createCategory(userId, name, color));
+    createCategory: async (userId, name, color, isSensitive) => {
+      await runWrite(() => categoryAPI.createCategory(userId, name, color, isSensitive));
     },
 
     updateCategory: async (categoryId, updates) => {

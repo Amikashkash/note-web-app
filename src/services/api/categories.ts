@@ -41,12 +41,14 @@ const categoriesRef = () => collection(db, CATEGORIES_COLLECTION);
 export const createCategory = async (
   userId: string,
   name: string,
-  color?: string
+  color?: string,
+  isSensitive = false
 ): Promise<string> => {
   try {
     const docRef = await addDoc(categoriesRef(), {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
+      isSensitive,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

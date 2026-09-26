@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Lock } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
 import { useCategories } from '@/hooks/useCategories';
 import { Modal } from '@/components/common/Modal/Modal';
 import { Input } from '@/components/common/Input/Input';
@@ -19,6 +21,12 @@ interface CategoryFormProps {
 
 export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategory }) => {
   const { addCategory, editCategory: updateCategory } = useCategories();
+  const currentUid = useAuthStore((state) => state.user?.uid);
+
+  // רק הבעלים מסמן קטגוריה כרגישה (ה-rules דוחים את זה משותף). קטגוריה
+  // חדשה - מי שיוצר אותה הוא הבעלים.
+  const canSetSensitive = !editCategory || editCategory.userId === currentUid;
+  const [isSensitive, setIsSensitive] = useState(editCategory?.isSensitive ?? false);
 
   const [name, setName] = useState(editCategory?.name || '');
   const [color, setColor] = useState(editCategory?.color || AVAILABLE_COLORS[0]);
@@ -29,6 +37,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
     if (editCategory) {
       setName(editCategory.name);
       setColor(editCategory.color);
+      setIsSensitive(editCategory.isSensitive);
     }
   }, [editCategory]);
 
@@ -46,10 +55,13 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
     try {
       if (editCategory) {
         // Update existing category
-        await updateCategory(editCategory.id, name, color);
+        // הדגל נשלח רק כשהשתנה - כך שותף שעורך שם או צבע לא נוגע בו
+        const sensitiveChange =
+          canSetSensitive && isSensitive !== editCategory.isSensitive ? isSensitive : undefined;
+        await updateCategory(editCategory.id, name, color, undefined, sensitiveChange);
       } else {
         // Create new category
-        await addCategory(name, color);
+        await addCategory(name, color, isSensitive);
       }
       onClose();
     } catch (err) {
@@ -99,6 +111,29 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ onClose, editCategor
             ))}
           </div>
         </div>
+
+        {/* רגישה (C6) */}
+        {canSetSensitive && (
+          <label className="flex items-start gap-3 p-3 rounded-lg bg-raised-light dark:bg-raised-dark cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSensitive}
+              onChange={(e) => setIsSensitive(e.target.checked)}
+              disabled={isLoading}
+              className="mt-1 h-4 w-4 accent-brand"
+            />
+            <span className="text-body-sm text-ink-light dark:text-ink-dark">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Lock size={14} strokeWidth={2} />
+                רגישה - מוסתרת מ-Claude
+              </span>
+              <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
+                כשהאפליקציה תחובר ל-Claude, הוא לא יראה את הקטגוריה ואת כל הפתקים בה, גם כאלה
+                שיתווספו בהמשך. מה שכבר נקרא בשיחה קודמת לא נמחק ממנה, וזו לא הצפנה.
+              </span>
+            </span>
+          </label>
+        )}
 
         {/* Buttons */}
         <div className="flex gap-2 pt-4">

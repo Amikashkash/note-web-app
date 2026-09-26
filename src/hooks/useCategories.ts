@@ -33,19 +33,27 @@ export const useCategories = () => {
   }, [userId, subscribe, unsubscribe]);
 
   const addCategory = useCallback(
-    async (name: string, color?: string) => {
+    async (name: string, color?: string, isSensitive?: boolean) => {
       if (!userId) throw new Error('משתמש לא מחובר');
-      await createCategory(userId, name, color);
+      await createCategory(userId, name, color, isSensitive);
     },
     [createCategory, userId]
   );
 
   const editCategory = useCallback(
-    async (categoryId: string, name?: string, color?: string, icon?: string) => {
+    async (
+      categoryId: string,
+      name?: string,
+      color?: string,
+      icon?: string,
+      isSensitive?: boolean
+    ) => {
       const updates: Partial<CategoryInput> = {};
       if (name !== undefined) updates.name = name;
       if (color !== undefined) updates.color = color;
       if (icon !== undefined) updates.icon = icon;
+      // רק כשהשתנה, ורק מהבעלים (ה-rules דוחים את זה משותף)
+      if (isSensitive !== undefined) updates.isSensitive = isSensitive;
 
       await updateCategory(categoryId, updates);
     },

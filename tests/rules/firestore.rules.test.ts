@@ -473,6 +473,69 @@ describe('leaving a share (C2 / SH-1)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// פתקים וקטגוריות רגישים (C6, §12.5 בסקירה)
+// ---------------------------------------------------------------------------
+
+describe('sensitive notes and categories (C6)', () => {
+  const seedSensitive = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'notes/secret-1'), { ...baseNote, isSensitive: true });
+      await setDoc(doc(db, 'categories/secret-cat'), { ...baseCategory, isSensitive: true });
+    });
+
+  it("a shared user cannot mark the owner's note sensitive, or clear it", async () => {
+    await seedSensitive();
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { isSensitive: true, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/secret-1'), { isSensitive: false, updatedBy: SHARED }));
+  });
+
+  it("a shared user cannot mark the owner's category sensitive, or clear it", async () => {
+    await seedSensitive();
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/cat-1'), { isSensitive: true }));
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/secret-cat'), { isSensitive: false }));
+  });
+
+  // היה "known hole": שותף העביר פתק לקטגוריה שלו, והפתק נעלם מהבעלים (SH-2)
+  // ויצא מקטגוריה רגישה
+  it("a shared user cannot move the owner's note to another category", async () => {
+    await seedSensitive();
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/secret-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED })
+    );
+  });
+
+  it('a shared user can still edit the content of a sensitive note', async () => {
+    await seedSensitive();
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/secret-1'), { content: '[]', updatedBy: SHARED }));
+  });
+
+  it('the owner can set and clear the flag on notes and categories, and move notes', async () => {
+    await seedSensitive();
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { isSensitive: true, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/secret-1'), { isSensitive: false, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'categories/cat-1'), { isSensitive: true }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'categories/secret-cat'), { isSensitive: false }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { categoryId: 'cat-2', updatedBy: OWNER }));
+  });
+
+  it('a note or category can be created sensitive by its owner', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-secret'), { ...baseNote, isSensitive: true }));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'categories/new-secret'), { ...baseCategory, isSensitive: true }));
+  });
+
+  it('a recipient can still leave a sensitive note', async () => {
+    await seedSensitive();
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/secret-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+  });
+});
+
 describe('rateLimits (findUserByEmail counters)', () => {
   it('are never readable or writable by a client', async () => {
     await assertFails(getDoc(doc(as(OWNER), `rateLimits/findUserByEmail_${OWNER}`)));
@@ -485,10 +548,6 @@ describe('rateLimits (findUserByEmail counters)', () => {
 // ---------------------------------------------------------------------------
 
 describe('known holes (current behavior, expected to change)', () => {
-  knownHole('C6 (R-2 / SH-2)', "a shared user can move the owner's note to another category", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED }));
-  });
-
   knownHole('E3 (R-2)', "a shared user can archive the owner's note", async () => {
     await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { isArchived: true, updatedBy: SHARED }));
   });
