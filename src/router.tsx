@@ -16,13 +16,9 @@ import { About } from '@/pages/About';
 import { Privacy } from '@/pages/Privacy';
 import { Terms } from '@/pages/Terms';
 import { WhatsNew } from '@/pages/WhatsNew';
+import { MCP_CONNECT_ENABLED } from '@/utils/features';
 
-/**
- * מסך ההסכמה לחיבור Claude (`/connect`). רשום רק בפיתוח, או כש-
- * `VITE_MCP_CONNECT=true` בזמן build: עד ששרת ה-OAuth פרוס (שלב 1ג)
- * אין לדף מה לעשות, ובלי הדגל הוא לא נכנס ל-bundle בכלל.
- */
-const MCP_CONNECT_ENABLED = import.meta.env.DEV || import.meta.env.VITE_MCP_CONNECT === 'true';
+/** מסך ההסכמה לחיבור Claude (`/connect`). ראו `MCP_CONNECT_ENABLED` */
 
 const connectRoutes = (): RouteObject[] => {
   if (!MCP_CONNECT_ENABLED) return [];
