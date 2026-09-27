@@ -172,8 +172,45 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-    // מוני הגבלת קצב של `findUserByEmail`. Admin SDK בלבד.
+    // מוני הגבלת קצב של `findUserByEmail` ושל נקודות ה-OAuth. Admin SDK בלבד.
     match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // שרת ה-MCP: ה-Authorization Server (thinking/mcp-plan.md §2.3, §8.1)
+    //
+    // הכל נכתב רק ע"י Admin SDK. הכללים כאן מפורשים לתיעוד: `false` הוא
+    // גם ברירת המחדל. tokens ו-codes נשמרים כ-hash בלבד, אבל גם ה-hash
+    // לא נחשף ללקוח.
+    // ---------------------------------------------------------------------
+
+    match /oauthClients/{clientId} {
+      allow read, write: if false;
+    }
+
+    match /oauthRequests/{reqId} {
+      allow read, write: if false;
+    }
+
+    match /oauthCodes/{codeHash} {
+      allow read, write: if false;
+    }
+
+    match /oauthTokens/{tokenHash} {
+      allow read, write: if false;
+    }
+
+    // "אפליקציות מחוברות" בפרופיל (שלב 1ג): הבעלים רואה את החיבורים שלו.
+    // ביטול רק דרך callable, לא בכתיבה ישירה.
+    match /oauthGrants/{grantId} {
+      allow read: if isOwner(resource.data.uid);
+      allow write: if false;
+    }
+
+    // allowlist המשתמשים של שרת ה-MCP (`config/mcp`). נערך רק מה-console:
+    // לקוח שיכול לקרוא אותו יודע מי מורשה, ולקוח שיכול לכתוב - מורשה.
+    match /config/{configId} {
       allow read, write: if false;
     }
   }

@@ -581,6 +581,58 @@ describe('rateLimits (findUserByEmail counters)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// שרת ה-MCP: Authorization Server (mcp-plan §8.1)
+// ---------------------------------------------------------------------------
+
+describe('MCP OAuth collections', () => {
+  const seedOAuth = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const owned = { uid: OWNER, clientId: 'c1' };
+      await setDoc(doc(db, 'oauthClients/c1'), { clientName: 'Claude', redirectUris: [] });
+      await setDoc(doc(db, 'oauthRequests/r1'), { ...owned, status: 'pending' });
+      await setDoc(doc(db, 'oauthCodes/h1'), { ...owned, used: false });
+      await setDoc(doc(db, 'oauthTokens/h2'), { ...owned, type: 'access' });
+      await setDoc(doc(db, 'oauthGrants/g1'), { ...owned, revoked: false });
+      await setDoc(doc(db, 'config/mcp'), { allowedUids: [OWNER] });
+    });
+
+  it.each(['oauthClients/c1', 'oauthRequests/r1', 'oauthCodes/h1', 'oauthTokens/h2', 'config/mcp'])(
+    '%s is never readable or writable, not even by the user it belongs to',
+    async (path) => {
+      await seedOAuth();
+      for (const uid of [OWNER, STRANGER]) {
+        await assertFails(getDoc(doc(as(uid), path)));
+        await assertFails(setDoc(doc(as(uid), path), { uid, allowedUids: [uid] }));
+        await assertFails(deleteDoc(doc(as(uid), path)));
+      }
+    }
+  );
+
+  it('a user cannot add themselves to the MCP allowlist', async () => {
+    await assertFails(setDoc(doc(as(STRANGER), 'config/mcp'), { allowedUids: [STRANGER], openToAll: true }));
+  });
+
+  it('the owner of a grant can read it and list their own grants', async () => {
+    await seedOAuth();
+    await assertSucceeds(getDoc(doc(as(OWNER), 'oauthGrants/g1')));
+    await assertSucceeds(getDocs(query(collection(as(OWNER), 'oauthGrants'), where('uid', '==', OWNER))));
+  });
+
+  it('nobody else can read a grant or list all grants', async () => {
+    await seedOAuth();
+    await assertFails(getDoc(doc(as(STRANGER), 'oauthGrants/g1')));
+    await assertFails(getDocs(collection(as(OWNER), 'oauthGrants')));
+  });
+
+  it('a grant cannot be written by a client, not even to revoke it', async () => {
+    await seedOAuth();
+    await assertFails(updateDoc(doc(as(OWNER), 'oauthGrants/g1'), { revoked: true }));
+    await assertFails(setDoc(doc(as(OWNER), 'oauthGrants/g2'), { uid: OWNER, revoked: false }));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // חורים ידועים - ההתנהגות הנוכחית, שאמורה להשתנות
 // ---------------------------------------------------------------------------
 
