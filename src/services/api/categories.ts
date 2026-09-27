@@ -41,12 +41,14 @@ const categoriesRef = () => collection(db, CATEGORIES_COLLECTION);
 export const createCategory = async (
   userId: string,
   name: string,
-  color?: string
+  color?: string,
+  isSensitive = false
 ): Promise<string> => {
   try {
     const docRef = await addDoc(categoriesRef(), {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
+      isSensitive,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -111,7 +113,8 @@ export const getUserCategories = async (userId: string): Promise<Category[]> => 
  */
 export const subscribeToCategories = (
   userId: string,
-  callback: (categories: Category[]) => void
+  callback: (categories: Category[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe => {
   let owned: Category[] = [];
   let shared: Category[] = [];
@@ -139,6 +142,7 @@ export const subscribeToCategories = (
       logger.error('Error in owned categories subscription:', error);
       ownedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -153,6 +157,7 @@ export const subscribeToCategories = (
       logger.error('Error in shared categories subscription:', error);
       sharedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -211,6 +216,48 @@ const applySharingToCategoryTree = async (
 };
 
 /**
+ * הנמען מסיר את עצמו מקטגוריה משותפת (SH-1).
+ *
+ * שיתוף קטגוריה מעתיק את `sharedWith` לכל הפתקים שבה, ולכן היציאה
+ * מסירה את הנמען גם מהם - אחרת הפתקים היו נשארים אצלו כיתומים בלי
+ * הקטגוריה. זה כולל גם פתק שבמקרה שותף איתו גם בנפרד: אי אפשר להבחין
+ * בין השניים (SH-3 בסקירה), וזה מה שמצופה ממי שיוצא מקטגוריה.
+ *
+ * הפתקים קודם והקטגוריה אחרונה: אם משהו נכשל באמצע, הקטגוריה עוד
+ * מופיעה ואפשר לנסות שוב.
+ */
+export const leaveSharedCategory = async (categoryId: string): Promise<void> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('משתמש לא מחובר');
+  }
+
+  try {
+    const sharedNotes = await getDocs(
+      query(
+        collection(db, NOTES_COLLECTION),
+        where('categoryId', '==', categoryId),
+        where('sharedWith', 'array-contains', userId)
+      )
+    );
+
+    const stamp = { sharedWith: arrayRemove(userId), updatedBy: userId, updatedAt: serverTimestamp() };
+    const targets = [...sharedNotes.docs.map((noteDoc) => noteDoc.ref), categoryRef(categoryId)];
+
+    for (let i = 0; i < targets.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      for (const ref of targets.slice(i, i + BATCH_LIMIT)) {
+        batch.update(ref, stamp);
+      }
+      await batch.commit();
+    }
+  } catch (error) {
+    logger.error('Error leaving shared category:', error);
+    throw wrapError('שגיאה ביציאה מהקטגוריה המשותפת', error);
+  }
+};
+
+/**
  * שיתוף קטגוריה (וכל הפתקים שבה) עם משתמש אחר לפי אימייל
  */
 export const shareCategoryWithUser = async (
@@ -219,7 +266,7 @@ export const shareCategoryWithUser = async (
 ): Promise<void> => {
   const targetUserId = await findUserIdByEmail(userEmail);
   if (!targetUserId) {
-    throw new Error('משתמש לא נמצא במערכת');
+    throw new Error('לא נמצא משתמש עם האימייל הזה. אם הוא נרשם עם אימייל וסיסמה, ייתכן שעוד לא אימת את הכתובת');
   }
 
   try {

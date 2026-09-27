@@ -14,6 +14,8 @@ import { useOrphanSharedNotes } from '@/hooks/useOrphanSharedNotes';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { NoteCard } from '@/components/note/NoteCard';
 import { NoteView } from '@/components/note/NoteView';
+import { leaveSharedNote } from '@/services/api/notes';
+import { getErrorMessage } from '@/utils/errors';
 import type { Note } from '@/types/note';
 
 export const SharedWithMe: React.FC = () => {
@@ -21,9 +23,26 @@ export const SharedWithMe: React.FC = () => {
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
 
   // הפתקים שייכים לקטגוריה של מישהו אחר, ולכן אין כאן קטגוריה משלנו
-  // להעביר. הפעולות מוגבלות לצפייה ולעריכה - מה שהכללים מתירים למי
-  // ששותפו איתו.
+  // להעביר. הפעולות: צפייה, עריכה, והסרה של עצמי מהשיתוף - מה שהכללים
+  // מתירים למי ששותפו איתו. (קודם היה כאן "מחק" שלא עשה כלום.)
   const { updateNoteFields } = useNoteEditor('');
+
+  const handleLeave = async (note: Note) => {
+    if (
+      !window.confirm(
+        `להסיר אותך מהשיתוף של "${note.title || 'ללא כותרת'}"?
+
+הפתק יפסיק להופיע אצלך. הבעלים יוכל לשתף אותו איתך שוב.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await leaveSharedNote(note.id);
+    } catch (error) {
+      window.alert(getErrorMessage(error));
+    }
+  };
 
   if (sharedNotes.length === 0) return null;
 
@@ -49,9 +68,7 @@ export const SharedWithMe: React.FC = () => {
                 key={note.id}
                 note={note}
                 onView={setViewingNote}
-                // מחיקה לא מוצעת: הפתק אינו בבעלותי, והכללים חוסמים
-                // אותה ממילא. כפתור שנכשל גרוע מכפתור שלא קיים.
-                onDelete={() => undefined}
+                onLeave={handleLeave}
               />
             ))}
           </div>
@@ -62,7 +79,6 @@ export const SharedWithMe: React.FC = () => {
         <NoteView
           note={activeNote}
           onClose={() => setViewingNote(null)}
-          onDelete={() => undefined}
           onUpdate={updateNoteFields}
         />
       )}

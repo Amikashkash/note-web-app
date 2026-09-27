@@ -3,28 +3,21 @@
  *
  * הפרדה בין שתי קולקציות:
  * - `users/{uid}`  - המסמך המלא, כולל הגדרות אישיות. נגיש לבעליו בלבד.
- * - `userLookup/{uid}` - אימייל ושם תצוגה בלבד, נגיש לכל משתמש מחובר
- *   כדי לאפשר שיתוף לפי אימייל בלי לחשוף את שאר נתוני המשתמש.
+ * - `userLookup/{uid}` - אימייל ושם תצוגה בלבד, להצגת שמות לפי מזהה
+ *   (למשל ברשימת "משותף עם"). קריאה רק לפי מזהה (`get`), לעולם לא
+ *   כרשימה - אחרת כל משתמש יכול היה לשלוף את האימיילים של כולם.
+ *
+ * חיפוש לפי אימייל (לשיתוף) לא עובר כאן בכלל: הוא ב-callable
+ * `findUserByEmail`, שבודק מול Firebase Auth ומגביל קצב.
  */
 
-import {
-  collection,
-  doc,
-  documentId,
-  getDocs,
-  limit,
-  query,
-  setDoc,
-  where,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/services/firebase/config';
 import { logger } from '@/utils/logger';
-import { wrapError } from '@/utils/errors';
+import { getFirebaseErrorCode, wrapError } from '@/utils/errors';
 
 const LOOKUP_COLLECTION = 'userLookup';
-
-/** מגבלת הערכים בשאילתת `in` של Firestore */
-const IN_QUERY_LIMIT = 30;
 
 export interface UserLookupEntry {
   uid: string;
@@ -37,6 +30,9 @@ const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 /**
  * יצירה/עדכון של רשומת החיפוש של המשתמש.
  * נקרא בכל התחברות כדי שגם משתמשים ותיקים יקבלו רשומה.
+ *
+ * ה-rules מקבלים רק את האימייל של המשתמש עצמו, ורק אם הוא מאומת. משתמש
+ * שעוד לא אימת את האימייל שלו פשוט לא יקבל רשומה - הכישלון נבלע כאן.
  */
 export const upsertUserLookup = async (
   uid: string,
@@ -49,65 +45,62 @@ export const upsertUserLookup = async (
       displayName,
     });
   } catch (error) {
-    // כישלון כאן אומר שהמשתמש לא יימצא בחיפוש לשיתוף,
+    // כישלון כאן אומר שהשם לא יוצג לאחרים ברשימת השיתוף,
     // אבל אין סיבה לחסום בגללו את ההתחברות.
     logger.error('Error updating user lookup entry:', error);
   }
 };
 
+type FindUserResult = { found: true; uid: string; displayName: string } | { found: false };
+
 /**
  * מציאת מזהה משתמש לפי כתובת אימייל (לצורך שיתוף).
  *
- * מחזיר `null` אם המשתמש לא קיים - מצב תקין ולא שגיאה,
+ * מחזיר `null` אם אין חשבון מאומת עם האימייל הזה - מצב תקין ולא שגיאה,
  * והקורא מחליט איזו הודעה להציג.
  */
 export const findUserIdByEmail = async (email: string): Promise<string | null> => {
   try {
-    const snapshot = await getDocs(
-      query(
-        collection(db, LOOKUP_COLLECTION),
-        where('email', '==', normalizeEmail(email)),
-        limit(1)
-      )
-    );
-
-    return snapshot.empty ? null : snapshot.docs[0].id;
+    const call = httpsCallable<{ email: string }, FindUserResult>(functions, 'findUserByEmail');
+    const { data } = await call({ email: normalizeEmail(email) });
+    return data.found ? data.uid : null;
   } catch (error) {
     logger.error('Error looking up user by email:', error);
+    if (getFirebaseErrorCode(error) === 'functions/resource-exhausted') {
+      throw new Error('יותר מדי חיפושים של משתמשים. נסה שוב בעוד כמה דקות.', { cause: error });
+    }
     throw wrapError('שגיאה בחיפוש המשתמש', error);
   }
 };
 
 /**
  * שליפת פרטי תצוגה של משתמשים לפי מזהים.
- * משמש להצגת רשימת "משותף עם" באימיילים במקום במזהים גולמיים.
+ * משמש להצגת רשימת "משותף עם" והיסטוריית הגרסאות בשמות ולא במזהים.
+ *
+ * `get` נפרד לכל מזהה ולא שאילתת `documentId() in [...]`: שאילתה היא
+ * `list`, וה-rules מאפשרים רק `get`. הרשימות כאן קטנות (אנשים שפתק
+ * משותף איתם), כך שהקריאות המקבילות זולות.
  */
 export const getUserLookupEntries = async (uids: string[]): Promise<UserLookupEntry[]> => {
   if (uids.length === 0) return [];
 
-  try {
-    const entries: UserLookupEntry[] = [];
-
-    // שאילתת `in` מוגבלת במספר הערכים, ולכן מפצלים לקבוצות
-    for (let i = 0; i < uids.length; i += IN_QUERY_LIMIT) {
-      const chunk = uids.slice(i, i + IN_QUERY_LIMIT);
-      const snapshot = await getDocs(
-        query(collection(db, LOOKUP_COLLECTION), where(documentId(), 'in', chunk))
-      );
-
-      for (const docSnapshot of snapshot.docs) {
-        const data = docSnapshot.data();
-        entries.push({
-          uid: docSnapshot.id,
+  const results = await Promise.all(
+    [...new Set(uids)].map(async (uid): Promise<UserLookupEntry | null> => {
+      try {
+        const snapshot = await getDoc(doc(db, LOOKUP_COLLECTION, uid));
+        if (!snapshot.exists()) return null;
+        const data = snapshot.data();
+        return {
+          uid,
           email: typeof data.email === 'string' ? data.email : '',
           displayName: typeof data.displayName === 'string' ? data.displayName : '',
-        });
+        };
+      } catch (error) {
+        logger.error('Error loading user lookup entry:', error);
+        return null;
       }
-    }
+    })
+  );
 
-    return entries;
-  } catch (error) {
-    logger.error('Error loading user lookup entries:', error);
-    return [];
-  }
+  return results.filter((entry): entry is UserLookupEntry => entry !== null);
 };

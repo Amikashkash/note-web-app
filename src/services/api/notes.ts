@@ -205,7 +205,8 @@ export const getNotesByCategory = async (categoryId: string): Promise<Note[]> =>
  */
 export const subscribeToNotes = (
   userId: string,
-  callback: (notes: Note[]) => void
+  callback: (notes: Note[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe => {
   let ownedNotes: Note[] = [];
   let sharedNotes: Note[] = [];
@@ -237,9 +238,11 @@ export const subscribeToNotes = (
     },
     (error) => {
       logger.error('Error in owned notes subscription:', error);
-      // מסמנים כ"נטען" כדי שכישלון של מאזין אחד לא יתקע את השני
+      // מסמנים כ"נטען" כדי שכישלון של מאזין אחד לא יתקע את השני, ומדווחים
+      // לקורא - בלי זה הממשק הציג רשימה ריקה כאילו אין פתקים (ST-1)
       ownedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -254,6 +257,7 @@ export const subscribeToNotes = (
       logger.error('Error in shared notes subscription:', error);
       sharedLoaded = true;
       emit();
+      onError(error);
     }
   );
 
@@ -268,7 +272,8 @@ export const subscribeToNotes = (
  */
 export const subscribeToArchivedNotes = (
   userId: string,
-  callback: (notes: Note[]) => void
+  callback: (notes: Note[]) => void,
+  onError: (error: unknown) => void = () => undefined
 ): Unsubscribe =>
   onSnapshot(
     query(notesRef(), where('userId', '==', userId), where('isArchived', '==', true)),
@@ -278,7 +283,10 @@ export const subscribeToArchivedNotes = (
         .sort((a, b) => (b.archivedAt?.toMillis() ?? 0) - (a.archivedAt?.toMillis() ?? 0));
       callback(notes);
     },
-    (error) => logger.error('Error in archived notes subscription:', error)
+    (error) => {
+      logger.error('Error in archived notes subscription:', error);
+      onError(error);
+    }
   );
 
 /**
@@ -304,6 +312,14 @@ export const reorderNotes = async (orderedIds: string[]): Promise<void> => {
  */
 export const togglePinNote = (noteId: string, isPinned: boolean): Promise<void> =>
   updateNote(noteId, { isPinned });
+
+/**
+ * סימון/ביטול סימון פתק כרגיש (מוסתר מ-Claude). רק הבעלים - ה-rules
+ * דוחים את זה משותף. לא יוצר גרסה בהיסטוריה: `isSensitive` אינו שדה
+ * תוכן (ראה `VERSIONED_FIELDS` ב-`functions/src/versions.ts`).
+ */
+export const setNoteSensitive = (noteId: string, isSensitive: boolean): Promise<void> =>
+  updateNote(noteId, { isSensitive });
 
 /**
  * העברת פתק לארכיון (מחיקה רכה)
@@ -345,7 +361,7 @@ export const restoreNote = async (noteId: string): Promise<void> => {
 export const shareNoteWithUser = async (noteId: string, userEmail: string): Promise<void> => {
   const targetUserId = await findUserIdByEmail(userEmail);
   if (!targetUserId) {
-    throw new Error('משתמש לא נמצא במערכת');
+    throw new Error('לא נמצא משתמש עם האימייל הזה. אם הוא נרשם עם אימייל וסיסמה, ייתכן שעוד לא אימת את הכתובת');
   }
 
   const snapshot = await getDoc(noteRef(noteId));
@@ -365,6 +381,25 @@ export const shareNoteWithUser = async (noteId: string, userEmail: string): Prom
   } catch (error) {
     logger.error('Error sharing note:', error);
     throw wrapError('שגיאה בשיתוף הפתק', error);
+  }
+};
+
+/**
+ * הנמען מסיר את עצמו משיתוף פתק (SH-1).
+ *
+ * הבעלים יכול לשתף שוב בכל רגע. ה-rules מתירים לנמען רק את זה: להוריד
+ * את עצמו מ-`sharedWith`, בלי לגעת בשום שדה אחר.
+ */
+export const leaveSharedNote = async (noteId: string): Promise<void> => {
+  const stamp = writeStamp();
+  try {
+    await updateDoc(noteRef(noteId), {
+      sharedWith: arrayRemove(stamp.updatedBy),
+      ...stamp,
+    });
+  } catch (error) {
+    logger.error('Error leaving shared note:', error);
+    throw wrapError('שגיאה בהסרה מהשיתוף', error);
   }
 };
 

@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { Unsubscribe } from 'firebase/firestore';
 import * as categoryAPI from '@/services/api/categories';
-import { getErrorMessage } from '@/utils/errors';
+import { getErrorMessage, loadErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { Category, CategoryInput } from '@/types';
 
@@ -18,6 +18,8 @@ interface CategoryState {
   isLoading: boolean;
   /** האם התקבלה כבר תשובה ראשונה מהשרת */
   hasLoaded: boolean;
+  /** שגיאת טעינה מהמאזין. נפרד מ-`error`, ששייך לפעולות כתיבה */
+  loadError: string | null;
   error: string | null;
 
   _unsubscribe: Unsubscribe | null;
@@ -26,8 +28,10 @@ interface CategoryState {
 
   subscribe: (userId: string) => void;
   unsubscribe: () => void;
+  /** הקמה מחדש של המאזין אחרי שגיאת טעינה */
+  retry: () => void;
 
-  createCategory: (userId: string, name: string, color?: string) => Promise<void>;
+  createCategory: (userId: string, name: string, color?: string, isSensitive?: boolean) => Promise<void>;
   updateCategory: (categoryId: string, updates: Partial<CategoryInput>) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
   clearError: () => void;
@@ -44,6 +48,23 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
     }
   };
 
+  /** מקים את המאזין; המאזין הקודם, אם יש, נסגר ע"י הקורא */
+  const startListener = (userId: string) => {
+    set({ isLoading: true, hasLoaded: false, loadError: null });
+
+    const unsubscribe = categoryAPI.subscribeToCategories(
+      userId,
+      (categories) => {
+        set({ categories, isLoading: false, hasLoaded: true });
+      },
+      (error) => {
+        set({ isLoading: false, hasLoaded: true, loadError: loadErrorMessage('הקטגוריות', error) });
+      }
+    );
+
+    set({ _unsubscribe: unsubscribe });
+  };
+
   return {
     categories: [],
     isLoading: false,
@@ -51,6 +72,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
     // כ-false לפני שהמנוי בכלל קם: בלעדיו אי אפשר להבחין בין "עוד לא
     // ביקשנו" לבין "ביקשנו ואין קטגוריות", והמסך נתקע על "טוען".
     hasLoaded: false,
+    loadError: null,
     error: null,
 
     _unsubscribe: null,
@@ -74,18 +96,20 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       // קודם בזמן שהרשימה כבר רוקנה, וצרכן שמחכה לטעינה מקבל תשובה
       // שקרית: "נטען, ואין קטגוריות".
       set({
-        isLoading: true,
-        hasLoaded: false,
         categories: [],
         _subscribedUserId: userId,
         _subscriberCount: 1,
       });
 
-      const unsubscribe = categoryAPI.subscribeToCategories(userId, (categories) => {
-        set({ categories, isLoading: false, hasLoaded: true, error: null });
-      });
+      startListener(userId);
+    },
 
-      set({ _unsubscribe: unsubscribe });
+    retry: () => {
+      const { _subscribedUserId, _unsubscribe } = get();
+      if (!_subscribedUserId) return;
+
+      if (_unsubscribe) _unsubscribe();
+      startListener(_subscribedUserId);
     },
 
     unsubscribe: () => {
@@ -106,14 +130,15 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
         categories: [],
         isLoading: false,
         hasLoaded: false,
+        loadError: null,
         _unsubscribe: null,
         _subscribedUserId: null,
         _subscriberCount: 0,
       });
     },
 
-    createCategory: async (userId, name, color) => {
-      await runWrite(() => categoryAPI.createCategory(userId, name, color));
+    createCategory: async (userId, name, color, isSensitive) => {
+      await runWrite(() => categoryAPI.createCategory(userId, name, color, isSensitive));
     },
 
     updateCategory: async (categoryId, updates) => {

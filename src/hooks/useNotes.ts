@@ -17,6 +17,9 @@ export const useNotes = (categoryId?: string) => {
 
   const notes = useNoteStore((state) => state.notes);
   const isLoading = useNoteStore((state) => state.isLoading);
+  const hasLoaded = useNoteStore((state) => state.hasLoaded);
+  const loadError = useNoteStore((state) => state.loadError);
+  const retry = useNoteStore((state) => state.retry);
   const error = useNoteStore((state) => state.error);
   const subscribe = useNoteStore((state) => state.subscribe);
   const unsubscribe = useNoteStore((state) => state.unsubscribe);
@@ -46,6 +49,9 @@ export const useNotes = (categoryId?: string) => {
     notes: filteredNotes,
     allNotes: notes,
     isLoading,
+    hasLoaded,
+    loadError,
+    retry,
     error,
     createNote,
     updateNote,

@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
+import { LoadError } from '@/components/common/LoadError';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { Button } from '@/components/common';
 import { NoteCard } from '@/components/note/NoteCard';
@@ -22,7 +23,7 @@ export const CategoryView: React.FC = () => {
   // קריאה ישירה עבדה רק כשהגיעו לכאן מדף הבית, שכבר טען אותן. כניסה
   // ישירה לכתובת - למשל מלחיצה על התראת תזכורת - השאירה את הרשימה
   // ריקה לנצח ואת המסך תקוע על "טוען".
-  const { categories, hasLoaded: categoriesLoaded } = useCategories();
+  const { categories, hasLoaded: categoriesLoaded, loadError, retry } = useCategories();
 
   const {
     notes,
@@ -51,6 +52,7 @@ export const CategoryView: React.FC = () => {
         id: cat.id,
         name: cat.name,
         icon: cat.icon || '📁',
+        isSensitive: cat.isSensitive,
       })),
     [categories]
   );
@@ -107,10 +109,31 @@ export const CategoryView: React.FC = () => {
     }
   };
 
+  // שלושה מצבים נפרדים (ST-1). קודם כל מקרה של "אין קטגוריה" הציג
+  // "טוען..." לנצח - גם כשהטעינה נכשלה, וגם כשהקטגוריה לא קיימת (נמחקה,
+  // או שהמשתמש יצא ממנה).
   if (!category) {
     return (
-      <div className="min-h-screen bg-app-light dark:bg-app-dark flex items-center justify-center">
-        <p className="text-xl text-ink-2-light dark:text-ink-2-dark">טוען...</p>
+      <div className="min-h-screen bg-app-light dark:bg-app-dark flex items-center justify-center p-4">
+        {!categoriesLoaded ? (
+          <p className="text-xl text-ink-2-light dark:text-ink-2-dark">טוען...</p>
+        ) : (
+          <div className="max-w-md w-full space-y-4 text-center">
+            {loadError ? (
+              <LoadError message={loadError} onRetry={retry} />
+            ) : (
+              <p className="text-lg text-ink-2-light dark:text-ink-2-dark">
+                הקטגוריה לא נמצאה. ייתכן שנמחקה, או שהשיתוף שלה איתך הסתיים.
+              </p>
+            )}
+            <button
+              onClick={() => navigate('/')}
+              className="text-body-sm font-medium text-brand-text dark:text-brand-text-dark hover:underline"
+            >
+              חזרה לדף הבית
+            </button>
+          </div>
+        )}
       </div>
     );
   }

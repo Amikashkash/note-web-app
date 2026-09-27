@@ -12,6 +12,8 @@ export interface Category {
   order: number;
   userId: string;
   sharedWith: string[];
+  /** רגיש: הקטגוריה וכל הפתקים בה מוסתרים מ-Claude. רק הבעלים משנה */
+  isSensitive: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

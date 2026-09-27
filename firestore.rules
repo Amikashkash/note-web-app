@@ -30,14 +30,35 @@ service cloud.firestore {
         && request.resource.data.get('sharedWith', []) == sharedUsers(resource.data);
     }
 
+    // שדות שרק הבעלים משנה, גם כששאר העדכון מותר לשותף.
+    // `diff` מתייחס גם להוספת שדה שלא היה, כך ששותף לא יכול "ליצור" אותו.
+    function ownerOnlyFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // נמען שמסיר את עצמו משיתוף (SH-1). העדכון היחיד המותר: להוריד את
+    // עצמו מ-`sharedWith` - לא אחרים, לא להוסיף, ולא לגעת בשום שדה אחר
+    // חוץ מחותמת הכותב. בלי זה לנמען לא הייתה דרך להיפטר מפתק ששותף איתו.
+    function isLeavingShare() {
+      return isSharedWithMe(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['sharedWith', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('sharedWith', []).toSet()
+          == sharedUsers(resource.data).toSet().difference([request.auth.uid].toSet());
+    }
+
     match /categories/{categoryId} {
       allow read: if isOwner(resource.data.userId) || isSharedWithMe(resource.data);
 
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
 
+      // `isSensitive` (§12 בסקירה): רק הבעלים מסמן או מבטל. אחרת שותף
+      // יכול היה לחשוף ל-Claude של כולם קטגוריה שהבעלים הסתיר.
       allow update: if isOwner(resource.data.userId)
-        || (isSharedWithMe(resource.data) && ownershipUnchanged());
+        || (isSharedWithMe(resource.data) && ownershipUnchanged()
+          && ownerOnlyFieldsUnchanged(['isSensitive']))
+        || isLeavingShare();
 
       allow delete: if isOwner(resource.data.userId);
     }
@@ -72,9 +93,14 @@ service cloud.firestore {
         && (!('updatedBy' in request.resource.data)
           || request.resource.data.updatedBy == request.auth.uid);
 
+      // שותף לא משנה `isSensitive` ולא `categoryId` (§12.2): העברה של פתק
+      // מקטגוריה רגישה לקטגוריה שלו הייתה מבטלת את הרגישות בפועל, וגם
+      // "מעלימה" את הפתק מהבעלים (SH-2).
       allow update: if writerStampPhase1()
         && (isOwner(resource.data.userId)
-          || (isSharedWithMe(resource.data) && ownershipUnchanged()));
+          || (isSharedWithMe(resource.data) && ownershipUnchanged()
+            && ownerOnlyFieldsUnchanged(['isSensitive', 'categoryId']))
+          || isLeavingShare());
 
       allow delete: if isOwner(resource.data.userId);
 
@@ -123,19 +149,32 @@ service cloud.firestore {
       }
     }
 
-    // אינדקס מינימלי לחיפוש משתמש לפי אימייל, לצורך שיתוף.
-    // מכיל רק אימייל ושם תצוגה - בלי הגדרות או מידע אישי אחר.
+    // שם תצוגה ואימייל לפי מזהה משתמש - להצגת "משותף עם" בשמות.
     //
-    // הערה: כל משתמש מחובר יכול לקרוא כאן, וזה מאפשר בדיקה אם אימייל
-    // מסוים רשום למערכת. זה המחיר של חיפוש לפי אימייל ישירות מהלקוח.
-    // כדי לסגור גם את זה צריך להעביר את החיפוש ל-Cloud Function
-    // ולחסום קריאה ישירה לקולקציה.
+    // רק `get` (לפי מזהה ידוע), לעולם לא `list`: קודם כל משתמש מחובר יכול
+    // היה לשלוף את כל הקולקציה, כלומר את האימיילים של כל המשתמשים.
+    // חיפוש לפי אימייל לצורך שיתוף עבר ל-callable `findUserByEmail`,
+    // שבודק מול Firebase Auth ומגביל קצב.
+    //
+    // כתיבה: רק לרשומה של עצמך, ורק עם האימייל שלך, ורק אם הוא מאומת.
+    // קודם אפשר היה לרשום אימייל של מישהו אחר ולקבל את השיתופים שלו.
+    // `lower()` כי האימייל נשמר מנורמל, וב-token הוא עשוי להכיל אותיות גדולות.
     match /userLookup/{userId} {
-      allow read: if isAuthenticated();
+      allow get: if isAuthenticated();
+      allow list: if false;
 
-      allow write: if isOwner(userId)
+      allow create, update: if isOwner(userId)
+        && request.auth.token.email_verified == true
         && request.resource.data.keys().hasOnly(['email', 'displayName'])
-        && request.resource.data.email is string;
+        && request.resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.displayName is string;
+
+      allow delete: if isOwner(userId);
+    }
+
+    // מוני הגבלת קצב של `findUserByEmail`. Admin SDK בלבד.
+    match /rateLimits/{key} {
+      allow read, write: if false;
     }
   }
 }

@@ -140,6 +140,26 @@ describe('when a version is created', () => {
     expect(await versionsOf(noteId)).toHaveLength(0);
   });
 
+  // C6: סימון רגיש אינו שינוי תוכן. גרסה כאן הייתה מופיעה בהיסטוריה כ"שינוי"
+  // שאין בו שום הבדל בתוכן - ובשחזור שלה לא היה משתנה כלום
+  it('creates nothing when the owner marks the note sensitive, or clears it', async () => {
+    const noteId = newNoteId();
+    await write(noteId, note(), note({ isSensitive: true }), T0);
+    await write(noteId, note({ isSensitive: true }), note({ isSensitive: false }), T0 + MINUTE);
+    expect(await versionsOf(noteId)).toHaveLength(0);
+  });
+
+  it('creates nothing for the flag even when the previous writer was someone else', async () => {
+    const noteId = newNoteId();
+    await write(
+      noteId,
+      note({ updatedBy: 'shared-user' }),
+      note({ isSensitive: true, updatedBy: 'owner' }),
+      T0
+    );
+    expect(await versionsOf(noteId)).toHaveLength(0);
+  });
+
   it('treats a change to tags as a content change', async () => {
     const noteId = newNoteId();
     await write(noteId, note(), note({ tags: ['עבודה'] }), T0);

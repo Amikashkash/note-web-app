@@ -60,6 +60,8 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     updatedAt: asTimestamp(data.updatedAt, createdAt),
     isPinned: asBoolean(data.isPinned),
     isArchived: asBoolean(data.isArchived),
+    // מסמך ישן בלי השדה - לא רגיש
+    isSensitive: asBoolean(data.isSensitive),
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
   };
@@ -81,6 +83,7 @@ export const toCategory = (snapshot: AnySnapshot): Category => {
     order: asNumber(data.order),
     userId: asString(data.userId),
     sharedWith: asStringArray(data.sharedWith),
+    isSensitive: asBoolean(data.isSensitive),
     createdAt,
     updatedAt: asTimestamp(data.updatedAt, createdAt),
   };

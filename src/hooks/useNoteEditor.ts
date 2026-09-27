@@ -63,6 +63,7 @@ export const useNoteEditor = (categoryId: string) => {
         order: notes.length,
         sharedWith: [],
         isPinned: false,
+        isSensitive: false,
       };
 
       return run(() => createNote(newNote));

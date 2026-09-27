@@ -42,7 +42,16 @@ let env: RulesTestEnvironment;
 
 // ה-context מחזיר את הטיפוס של ה-compat SDK. בזמן ריצה הוא עובד עם
 // הפונקציות המודולריות, ורק הטיפוסים לא תואמים - לכן ההמרה.
-const as = (uid: string) => env.authenticatedContext(uid).firestore() as unknown as Firestore;
+const as = (uid: string) =>
+  env
+    .authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: true })
+    .firestore() as unknown as Firestore;
+
+/** משתמש שנכנס עם אימייל וסיסמה ולא אימת את האימייל */
+const asUnverified = (uid: string) =>
+  env
+    .authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: false })
+    .firestore() as unknown as Firestore;
 const anonymous = () => env.unauthenticatedContext().firestore() as unknown as Firestore;
 
 const baseNote = {
@@ -322,21 +331,215 @@ describe('users and their subcollections', () => {
   });
 });
 
-describe('userLookup', () => {
-  it('a signed-in user can look up an entry by id; an anonymous user cannot', async () => {
+describe('userLookup (C1 / S-1)', () => {
+  it('a signed-in user can get an entry by id; an anonymous user cannot', async () => {
     await assertSucceeds(getDoc(doc(as(STRANGER), `userLookup/${OWNER}`)));
     await assertFails(getDoc(doc(anonymous(), `userLookup/${OWNER}`)));
   });
 
-  it('a user writes only their own entry, with only email and displayName', async () => {
-    const db = as(STRANGER);
-    await assertSucceeds(
-      setDoc(doc(db, `userLookup/${STRANGER}`), { email: 'stranger@example.com', displayName: 'S' })
-    );
-    await assertFails(setDoc(doc(db, `userLookup/${OWNER}`), { email: 'x@example.com', displayName: 'x' }));
+  // היה "known hole": כל משתמש מחובר יכול היה לשלוף את כל האימיילים
+  it('no one can list the collection, not even with a filter', async () => {
+    await assertFails(getDocs(collection(as(STRANGER), 'userLookup')));
     await assertFails(
-      setDoc(doc(db, `userLookup/${STRANGER}`), { email: 's@example.com', displayName: 'S', admin: true })
+      getDocs(query(collection(as(STRANGER), 'userLookup'), where('email', '==', 'owner@example.com')))
     );
+  });
+
+  it('a user writes their own entry with their own verified email', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(STRANGER), `userLookup/${STRANGER}`), {
+        email: `${STRANGER}@example.com`,
+        displayName: 'S',
+      })
+    );
+  });
+
+  // היה "known hole": אפשר היה לרשום אימייל של מישהו אחר ולקבל את השיתופים שלו
+  it("a user cannot register someone else's email", async () => {
+    await assertFails(
+      setDoc(doc(as(STRANGER), `userLookup/${STRANGER}`), {
+        email: 'owner@example.com',
+        displayName: 'Not the owner',
+      })
+    );
+  });
+
+  it('an unverified email cannot be registered, even your own', async () => {
+    await assertFails(
+      setDoc(doc(asUnverified(STRANGER), `userLookup/${STRANGER}`), {
+        email: `${STRANGER}@example.com`,
+        displayName: 'S',
+      })
+    );
+  });
+
+  it('the email is compared case-insensitively to the token', async () => {
+    const upper = env
+      .authenticatedContext(STRANGER, { email: 'Stranger-UID@Example.com', email_verified: true })
+      .firestore() as unknown as Firestore;
+    await assertSucceeds(
+      setDoc(doc(upper, `userLookup/${STRANGER}`), { email: 'stranger-uid@example.com', displayName: 'S' })
+    );
+  });
+
+  it("no one can write someone else's entry, or add fields", async () => {
+    await assertFails(
+      setDoc(doc(as(STRANGER), `userLookup/${OWNER}`), { email: `${STRANGER}@example.com`, displayName: 'x' })
+    );
+    await assertFails(
+      setDoc(doc(as(STRANGER), `userLookup/${STRANGER}`), {
+        email: `${STRANGER}@example.com`,
+        displayName: 'S',
+        admin: true,
+      })
+    );
+  });
+
+  it('a user can delete their own entry only', async () => {
+    await assertFails(deleteDoc(doc(as(STRANGER), `userLookup/${OWNER}`)));
+    await assertSucceeds(deleteDoc(doc(as(OWNER), `userLookup/${OWNER}`)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// נמען מסיר את עצמו משיתוף (C2 / SH-1)
+// ---------------------------------------------------------------------------
+
+describe('leaving a share (C2 / SH-1)', () => {
+  const seedGroupShare = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'notes/group-1'), { ...baseNote, sharedWith: [SHARED, STRANGER] });
+      await setDoc(doc(db, 'categories/group-cat'), { ...baseCategory, sharedWith: [SHARED, STRANGER] });
+    });
+
+  // היה "known hole": לנמען לא הייתה דרך להיפטר מפתק ששותף איתו
+  it('a recipient can remove themselves from a shared note', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+    await assertFails(getDoc(doc(as(SHARED), 'notes/note-1')));
+  });
+
+  it('a recipient can remove themselves from a shared category', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'categories/cat-1'), { sharedWith: arrayRemove(SHARED) }));
+    await assertFails(getDoc(doc(as(SHARED), 'categories/cat-1')));
+  });
+
+  it('removing yourself leaves the other recipients in place', async () => {
+    await seedGroupShare();
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+    await assertSucceeds(getDoc(doc(as(STRANGER), 'notes/group-1')));
+  });
+
+  it('a recipient cannot remove someone else', async () => {
+    await seedGroupShare();
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: SHARED })
+    );
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/group-cat'), { sharedWith: arrayRemove(STRANGER) }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/group-1'), { sharedWith: [], updatedBy: SHARED }));
+  });
+
+  it('leaving cannot be combined with any other change', async () => {
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), {
+        sharedWith: arrayRemove(SHARED),
+        content: 'last edit on the way out',
+        updatedBy: SHARED,
+      })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'categories/cat-1'), { sharedWith: arrayRemove(SHARED), name: 'renamed' })
+    );
+  });
+
+  it('someone the note is not shared with cannot use it to join or change anything', async () => {
+    await assertFails(
+      updateDoc(doc(as(STRANGER), 'notes/note-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: STRANGER })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayUnion(SHARED, STRANGER), updatedBy: SHARED })
+    );
+  });
+
+  it('the owner can still remove anyone', async () => {
+    await seedGroupShare();
+    await assertSucceeds(
+      updateDoc(doc(as(OWNER), 'notes/group-1'), { sharedWith: arrayRemove(STRANGER), updatedBy: OWNER })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// פתקים וקטגוריות רגישים (C6, §12.5 בסקירה)
+// ---------------------------------------------------------------------------
+
+describe('sensitive notes and categories (C6)', () => {
+  const seedSensitive = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'notes/secret-1'), { ...baseNote, isSensitive: true });
+      await setDoc(doc(db, 'categories/secret-cat'), { ...baseCategory, isSensitive: true });
+    });
+
+  it("a shared user cannot mark the owner's note sensitive, or clear it", async () => {
+    await seedSensitive();
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { isSensitive: true, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/secret-1'), { isSensitive: false, updatedBy: SHARED }));
+  });
+
+  it("a shared user cannot mark the owner's category sensitive, or clear it", async () => {
+    await seedSensitive();
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/cat-1'), { isSensitive: true }));
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/secret-cat'), { isSensitive: false }));
+  });
+
+  // היה "known hole": שותף העביר פתק לקטגוריה שלו, והפתק נעלם מהבעלים (SH-2)
+  // ויצא מקטגוריה רגישה
+  it("a shared user cannot move the owner's note to another category", async () => {
+    await seedSensitive();
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED })
+    );
+    await assertFails(
+      updateDoc(doc(as(SHARED), 'notes/secret-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED })
+    );
+  });
+
+  it('a shared user can still edit the content of a sensitive note', async () => {
+    await seedSensitive();
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/secret-1'), { content: '[]', updatedBy: SHARED }));
+  });
+
+  it('the owner can set and clear the flag on notes and categories, and move notes', async () => {
+    await seedSensitive();
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { isSensitive: true, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/secret-1'), { isSensitive: false, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'categories/cat-1'), { isSensitive: true }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'categories/secret-cat'), { isSensitive: false }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { categoryId: 'cat-2', updatedBy: OWNER }));
+  });
+
+  it('a note or category can be created sensitive by its owner', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-secret'), { ...baseNote, isSensitive: true }));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'categories/new-secret'), { ...baseCategory, isSensitive: true }));
+  });
+
+  it('a recipient can still leave a sensitive note', async () => {
+    await seedSensitive();
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), 'notes/secret-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
+    );
+  });
+});
+
+describe('rateLimits (findUserByEmail counters)', () => {
+  it('are never readable or writable by a client', async () => {
+    await assertFails(getDoc(doc(as(OWNER), `rateLimits/findUserByEmail_${OWNER}`)));
+    await assertFails(setDoc(doc(as(OWNER), `rateLimits/findUserByEmail_${OWNER}`), { minute: { count: 0 } }));
   });
 });
 
@@ -345,27 +548,6 @@ describe('userLookup', () => {
 // ---------------------------------------------------------------------------
 
 describe('known holes (current behavior, expected to change)', () => {
-  knownHole('C1 (S-1)', 'any signed-in user can list every entry in userLookup', async () => {
-    await assertSucceeds(getDocs(collection(as(STRANGER), 'userLookup')));
-  });
-
-  knownHole('C1 (S-1)', "a user can register someone else's email in their own lookup entry", async () => {
-    await assertSucceeds(
-      setDoc(doc(as(STRANGER), `userLookup/${STRANGER}`), {
-        email: 'owner@example.com',
-        displayName: 'Not the owner',
-      })
-    );
-  });
-
-  knownHole('C2 (SH-1)', 'a recipient cannot remove themselves from a shared note', async () => {
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED }));
-  });
-
-  knownHole('C6 (R-2 / SH-2)', "a shared user can move the owner's note to another category", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { categoryId: 'shared-users-own-category', updatedBy: SHARED }));
-  });
-
   knownHole('E3 (R-2)', "a shared user can archive the owner's note", async () => {
     await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { isArchived: true, updatedBy: SHARED }));
   });

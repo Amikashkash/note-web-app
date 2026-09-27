@@ -33,6 +33,7 @@ describe('remindersNeedSync (early exit, F-4)', () => {
     ['order', 5],
     ['categoryId', 'c2'],
     ['updatedBy', 'u2'],
+    ['isSensitive', true],
   ])('skips a change to %s only', (field, value) => {
     expect(remindersNeedSync(checklist, { ...checklist, [field]: value })).toBe(false);
   });

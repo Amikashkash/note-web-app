@@ -4,7 +4,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Pin, Plus, Share2, Users } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Lock, LogOut, Pin, Plus, Share2, Users } from 'lucide-react';
 import type { Category } from '@/types';
 import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
@@ -15,6 +15,7 @@ import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { filterNotesByQuery } from '@/utils/search';
+import { getErrorMessage } from '@/utils/errors';
 import * as categoryAPI from '@/services/api/categories';
 
 interface CategoryItemProps {
@@ -59,6 +60,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
         id: cat.id,
         name: cat.name,
         icon: cat.icon || '📁',
+        isSensitive: cat.isSensitive,
       })),
     [categories]
   );
@@ -78,6 +80,27 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
 
   const isOwner = user !== null && category.userId === user.uid;
   const isShared = category.sharedWith.length > 0;
+
+  /**
+   * נמען שיוצא מקטגוריה משותפת. יוצא גם מהפתקים שבה, כי שיתוף קטגוריה
+   * משותף בפועל פתק-פתק (ראה `leaveSharedCategory`).
+   */
+  const handleLeaveCategory = async () => {
+    if (
+      !window.confirm(
+        `לצאת מהקטגוריה המשותפת "${category.name}"?
+
+הקטגוריה והפתקים שבה יפסיקו להופיע אצלך. הבעלים יוכל לשתף אותם איתך שוב.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await categoryAPI.leaveSharedCategory(category.id);
+    } catch (error) {
+      window.alert(getErrorMessage(error));
+    }
+  };
 
   const handleDrop = async (targetNote: Note) => {
     if (draggingNote) {
@@ -137,6 +160,14 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
             title="פתח בתצוגה מלאה"
           >
             <h3 className="text-h2 text-ink-light dark:text-ink-dark truncate">
+              {category.isSensitive && (
+                <Lock
+                  size={16}
+                  strokeWidth={2}
+                  className="inline-block me-1.5 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
+                  aria-label="רגישה - הקטגוריה והפתקים שבה מוסתרים מ-Claude"
+                />
+              )}
               {category.name}
             </h3>
             <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">
@@ -161,10 +192,20 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
             </button>
           )}
           {!isOwner && isShared && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded-lg font-medium">
-              <Users size={16} strokeWidth={1.75} />
-              משותף
-            </span>
+            <>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded-lg font-medium">
+                <Users size={16} strokeWidth={1.75} />
+                משותף
+              </span>
+              <button
+                onClick={handleLeaveCategory}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm rounded-lg font-medium bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-danger-soft dark:hover:bg-danger-soft-dark hover:text-danger dark:hover:text-danger-dark transition-smooth"
+                title="הסר אותי מהקטגוריה המשותפת"
+              >
+                <LogOut size={16} strokeWidth={1.75} />
+                הסר אותי
+              </button>
+            </>
           )}
           <button
             onClick={() => {

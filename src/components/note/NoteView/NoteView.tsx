@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, Pencil, X } from 'lucide-react';
+import { Eye, Lock, Pencil, X } from 'lucide-react';
 import { Note, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -29,6 +29,7 @@ import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
+import { getErrorMessage } from '@/utils/errors';
 
 export interface NoteUpdates {
   title?: string;
@@ -40,11 +41,12 @@ export interface NoteUpdates {
 interface NoteViewProps {
   note: Note;
   onClose: () => void;
-  onDelete: (noteId: string) => void;
+  /** ארכוב - רק לבעלים. מי שאינו בעלים מקבל "הסר אותי" במקומו */
+  onDelete?: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onUpdate?: (noteId: string, updates: NoteUpdates) => void;
   onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
-  categories?: Array<{ id: string; name: string; icon: string }>;
+  categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean }>;
 }
 
 /** תבניות שהתוכן שלהן נערך כטקסט ולכן יש להן מתג צפייה/עריכה */
@@ -144,8 +146,32 @@ export const NoteView: React.FC<NoteViewProps> = ({
       )
     ) {
       saveUpdates.cancel();
-      onDelete(note.id);
+      onDelete?.(note.id);
       onClose();
+    }
+  };
+
+  /**
+   * נמען שמסיר את עצמו מהשיתוף. מחליף את "מחק" אצל מי שאינו בעלים:
+   * מחיקה (ארכוב) של פתק של מישהו אחר היא לא ההחלטה שלו.
+   */
+  const handleLeave = async () => {
+    if (
+      !window.confirm(
+        `להסיר אותך מהשיתוף של "${note.title || 'ללא כותרת'}"?
+
+הפתק יפסיק להופיע אצלך. הבעלים יוכל לשתף אותו איתך שוב.`
+      )
+    ) {
+      return;
+    }
+
+    saveUpdates.cancel();
+    try {
+      await noteAPI.leaveSharedNote(note.id);
+      onClose();
+    } catch (error) {
+      window.alert(getErrorMessage(error));
     }
   };
 
@@ -163,8 +189,39 @@ export const NoteView: React.FC<NoteViewProps> = ({
     }
   };
 
+  /** הקטגוריה של הפתק רגישה - ואז הפתק מוסתר מ-Claude גם בלי דגל משלו */
+  const categoryIsSensitive =
+    categories.find((category) => category.id === note.categoryId)?.isSensitive === true;
+
+  /**
+   * סימון רגיש (C6). רק לבעלים - ה-rules דוחים את זה משותף. לא יוצר
+   * גרסה בהיסטוריה, כי זה לא שינוי תוכן.
+   */
+  const handleToggleSensitive = async () => {
+    saveUpdates.flush();
+    try {
+      await noteAPI.setNoteSensitive(note.id, !note.isSensitive);
+    } catch (error) {
+      window.alert(getErrorMessage(error));
+    }
+  };
+
   const handleMoveToCategory = (newCategoryId: string) => {
     if (!onMoveToCategory || newCategoryId === note.categoryId) return;
+
+    // הרגישות נגזרת מהקטגוריה: העברה לקטגוריה רגילה חושפת את הפתק
+    // ל-Claude, אלא אם יש לו דגל משלו (§12.1 בסקירה)
+    const target = categories.find((category) => category.id === newCategoryId);
+    if (
+      categoryIsSensitive &&
+      !note.isSensitive &&
+      !target?.isSensitive &&
+      !window.confirm(
+        'הפתק עובר מקטגוריה רגישה לקטגוריה רגילה, ויהיה גלוי ל-Claude.\n\nכדי שיישאר מוסתר, סמנו אותו כרגיש לפני ההעברה. להמשיך בכל זאת?'
+      )
+    ) {
+      return;
+    }
 
     saveUpdates.flush();
     onMoveToCategory(note.id, newCategoryId);
@@ -266,6 +323,15 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 <TemplateIcon size={16} strokeWidth={1.75} />
                 {getTemplateLabel(note.templateType)}
               </span>
+              {(note.isSensitive || categoryIsSensitive) && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1" title="מוסתר מ-Claude">
+                    <Lock size={14} strokeWidth={2} />
+                    רגיש
+                  </span>
+                </>
+              )}
               <span>•</span>
               <span>
                 {note.updatedAt.toDate().toLocaleDateString('he-IL', {
@@ -330,6 +396,33 @@ export const NoteView: React.FC<NoteViewProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {/* רגיש - רק הבעלים מסמן (C6) */}
+        {isOwner && (
+          <label className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-raised-light dark:bg-raised-dark cursor-pointer">
+            <input
+              type="checkbox"
+              checked={note.isSensitive}
+              onChange={handleToggleSensitive}
+              className="mt-1 h-4 w-4 accent-brand"
+            />
+            <span className="text-body-sm text-ink-light dark:text-ink-dark">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Lock size={14} strokeWidth={2} />
+                רגיש - מוסתר מ-Claude
+              </span>
+              <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
+                כשהאפליקציה תחובר ל-Claude, הוא לא יראה את הפתק הזה בכלל. מה שכבר נקרא בשיחה קודמת
+                לא נמחק ממנה, וזו לא הצפנה - הפתק נשמר כרגיל.
+              </span>
+              {!note.isSensitive && categoryIsSensitive && (
+                <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
+                  הפתק כבר מוסתר, כי הקטגוריה שלו מסומנת כרגישה.
+                </span>
+              )}
+            </span>
+          </label>
         )}
 
         {/* תפריט שיתוף חיצוני */}
@@ -416,7 +509,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 👥 משותף
               </span>
             )}
-            {onMoveToCategory && categories.length > 1 && (
+            {/* העברה - רק לבעלים. ה-rules דוחים העברה משותף (C6 / SH-2) */}
+            {isOwner && onMoveToCategory && categories.length > 1 && (
               <Button
                 onClick={() => setShowMoveMenu((previous) => !previous)}
                 variant="outline"
@@ -425,9 +519,15 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 📁 העבר
               </Button>
             )}
-            <Button variant="danger" onClick={handleDelete} className="flex-1">
-              🗑 מחק
-            </Button>
+            {isOwner ? (
+              <Button variant="danger" onClick={handleDelete} className="flex-1">
+                🗑 מחק
+              </Button>
+            ) : (
+              <Button variant="danger" onClick={handleLeave} className="flex-1">
+                🚪 הסר אותי
+              </Button>
+            )}
           </div>
           <Button variant="outline" onClick={handleOpenHistory} className="w-full">
             🕘 היסטוריה

@@ -13,6 +13,7 @@ import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFunctions, Functions } from 'firebase/functions';
 
 // בדיקת משתני סביבה
 const requiredEnvVars = {
@@ -47,6 +48,7 @@ let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 let storageInstance: FirebaseStorage | null = null;
+let functionsInstance: Functions | null = null;
 
 if (isFirebaseConfigured) {
   app = initializeApp({
@@ -61,6 +63,8 @@ if (isFirebaseConfigured) {
   authInstance = getAuth(app);
   dbInstance = getFirestore(app);
   storageInstance = getStorage(app);
+  // אותו region שבו הפונקציות נפרסות (`setGlobalOptions` ב-`functions/src/index.ts`)
+  functionsInstance = getFunctions(app, 'europe-west1');
 } else {
   console.error(
     [
@@ -89,5 +93,6 @@ export const auth: Auth = authInstance ?? uninitialized<Auth>('Auth');
 export const db: Firestore = dbInstance ?? uninitialized<Firestore>('Firestore');
 export const storage: FirebaseStorage =
   storageInstance ?? uninitialized<FirebaseStorage>('Storage');
+export const functions: Functions = functionsInstance ?? uninitialized<Functions>('Functions');
 
 export default app;
