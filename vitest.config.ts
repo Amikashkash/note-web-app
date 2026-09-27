@@ -19,6 +19,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     // `tests/mirrors`: המראות של functions/ מול המקור, ראה הקובץ שם
-    include: ['src/**/*.test.ts', 'tests/mirrors/**/*.test.ts'],
+    // `tests/hosting`: בדיקות של `firebase.json`
+    include: ['src/**/*.test.ts', 'tests/mirrors/**/*.test.ts', 'tests/hosting/**/*.test.ts'],
   },
 });

@@ -154,7 +154,8 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 - `client_id` בפורמט URL נדחה ב-`/oauth/authorize` עם `invalid_client`. השרת לא מוריד אותו.
 - **DCR (RFC 7591):** `POST /oauth/register`.
   - רק `token_endpoint_auth_method: "none"` (public client) ורק `grant_types` של authorization_code ו-refresh_token.
-  - **ה-`redirect_uris` מוגבלים ל-allowlist:** `https://claude.ai/api/mcp/auth_callback` ו-loopback (`http://localhost/*`, `http://127.0.0.1/*`).
+  - **ה-`redirect_uris` מוגבלים ל-allowlist:** בדיוק `https://claude.ai/api/mcp/auth_callback`, בהתאמה מדויקת תו אחר תו (בלי prefix, בלי wildcard, בלי התעלמות מ-port).
+  - **החלטה (שלב 1ב): בלי loopback.** Claude Code משתמש ב-`http://localhost:<port>/callback` עם port שמשתנה בכל session, ומחייב התאמה שמתעלמת מה-port (RFC 8252 §7.3). התאמה מדויקת לא מאפשרת את זה, ולכן Claude Code לא יכול להתחבר כרגע. הוספה בעתיד: host מדויק (`localhost` או `127.0.0.1`), path מדויק (`/callback`), בלי query, fragment או userinfo, ורק ה-port משתנה. ואז גם האזהרה של loopback במסך ההסכמה.
   - מחזיר `client_id` אקראי.
   - rate limit לכל IP.
   - לקוח שלא הונפק לו token תוך 24 שעות נמחק (Firestore TTL).
@@ -582,12 +583,23 @@ match /config/{id}         { allow read, write: if false; }
 5. בדיקות emulator: משתמש A, משתמש B, פתק משותף, קטגוריה משותפת, פתק זר, פתק רגיש, פתק בקטגוריה רגישה, פתק שהקטגוריה שלו נמחקה, פתק מאורכב. הבדיקה הגנרית של 3.2.8 כבר רצה ברמת `UserScope`: כל מתודה ציבורית מול כל סוג של מסמך מוסתר, ובדיקה שנכשלת אם נוספה מתודה שלא נכנסה לטבלה. בשלב 1ג היא תורחב לכל tool רשום.
    - בנוסף, בדיקות ה-rules (`tests/rules`) מריצות כל שדה מ-`NOTE_PATCH_FIELDS` מול `firestore.rules` - ההוכחה ש-3.2.5 הוא תת-קבוצה.
 
-**שלב 1ב: OAuth**
+**שלב 1ב: OAuth** - מומש ב-branch `claude/mcp-oauth`
 6. `oauth/tokens.ts`, `oauth/store.ts`, metadata endpoints.
 7. `register` (DCR עם allowlist של redirect URIs של Claude). בלי CIMD (2.1). `config/mcp` עם allowlist של משתמשים (החשבון של הבעלים בלבד).
 8. `authorize`, `decision`, route `/connect` ב-SPA (מסך הסכמה בסגנון העיצוב הקיים).
 9. `token` (code + refresh rotation + reuse detection), `revoke`, `verify.ts`.
-10. Firestore rules (8.1) ו-TTL policies.
+10. Firestore rules (8.1) ו-TTL policies (8.3.1).
+   - **מה שהשתנה מהתכנון בזמן המימוש:**
+     - ההחלטה במסך ההסכמה קשורה לבקשה ולמשתמש: `GET /oauth/decision` קושר את הבקשה ל-`uid` של ה-ID token ומחזיר nonce חד-פעמי (נשמר כ-hash). `POST` דורש את אותו `uid` ואת ה-nonce, וצורך את הבקשה. בקשה שנקשרה למשתמש אחד לא נפתחת לאחר.
+     - code נצרך בהצגה הראשונה שלו, גם אם היא נכשלה (verifier שגוי, לקוח אחר): לגונב code יש ניסיון אחד. ה-grant נוצר רק בהחלפה המוצלחת.
+     - allowlist המשתמשים נבדק גם ב-`/oauth/token` (החלפת code ו-refresh), לא רק ב-decision וב-`verify.ts`.
+     - scopes: רק `notes.read` ו-`offline_access`. `notes.write` ייכנס בשלב 2, עם ה-tools שלו.
+     - הגבלות קצב לכל IP (hash, לא הכתובת עצמה) ותקרה כללית, על register, authorize, token ו-revoke. המספרים ב-`oauth/config.ts`.
+     - `/connect` רשום ב-SPA רק בפיתוח או עם `VITE_MCP_CONNECT=true` בזמן build. ה-headers נגד clickjacking כבר ב-`firebase.json`.
+   - **פתוח לשלב 1ג:**
+     - לבדוק מאחורי ה-rewrite של Hosting איזה header מחזיק את כתובת הלקוח האמיתית, ולעדכן את `ipKey` ב-`oauth/app.ts` (היום: הערך הראשון ב-`X-Forwarded-For`, שאפשר לזייף. התקרה הכללית מגינה בינתיים).
+     - ה-Service Worker מטפל בכל ניווט (`NavigationRoute` ב-`src/sw.ts`, network-first). להוסיף `denylist` ל-`/oauth/` ול-`/.well-known/`, כדי שניווט ל-`/oauth/authorize` לא יעבור דרכו.
+     - להגדיר `VITE_MCP_CONNECT=true` ב-build של ה-CI.
 
 **שלב 1ג: MCP קריאה**
 11. `mcp/http.ts`, `server.ts`, `defineTool.ts`, ו-4 tools הקריאה.
@@ -601,6 +613,27 @@ match /config/{id}         { allow read, write: if false; }
 17. `add_checklist_item` → בדיקה שהתזכורת נוצרת ונשלחת.
 18. `create_note`, `update_note`, `move_note_to_category`, `archive_note`.
 19. rate limiting לכתיבות.
+
+### 8.3.1 הגדרות ידניות (לא בקוד)
+
+**TTL policies** (פעם אחת, לפני הפריסה של שלב 1ג). Firestore מוחק מסמך כשהזמן ב-`expiresAt` עבר, בדרך כלל תוך 24 שעות:
+```
+gcloud firestore fields ttls update expiresAt --collection-group=oauthRequests --enable-ttl --project=notes-4-me
+gcloud firestore fields ttls update expiresAt --collection-group=oauthCodes    --enable-ttl --project=notes-4-me
+gcloud firestore fields ttls update expiresAt --collection-group=oauthTokens   --enable-ttl --project=notes-4-me
+gcloud firestore fields ttls update expiresAt --collection-group=oauthClients  --enable-ttl --project=notes-4-me
+gcloud firestore fields ttls update expiresAt --collection-group=rateLimits    --enable-ttl --project=notes-4-me
+```
+- התוקף נבדק בקוד בכל שימוש. ה-TTL רק מנקה, ואיחור שלו לא מאריך אף token.
+- `oauthClients`: השדה נמחק כשהונפק ללקוח token ראשון, ולכן רק לקוחות שלא השתמשו בהם נמחקים.
+- `oauthGrants` בלי TTL: הם הרשימה של "אפליקציות מחוברות". התקרה של 90 יום נבדקת בקוד (`absoluteExpiresAt`).
+- בדיקה: `gcloud firestore fields ttls list --project=notes-4-me`.
+
+**`config/mcp`** (allowlist המשתמשים, §2.3.5). נוצר ידנית ב-console, לא מהקוד ולא מהריפו:
+- Firestore Database → Start collection → Collection ID: `config` → Document ID: `mcp`.
+- שדות: `allowedUids` (array) עם ה-uid של הבעלים כמחרוזת, ו-`openToAll` (boolean) `false`.
+- ה-uid: Authentication → Users → השורה של האימייל שלך → עמודת User UID.
+- מסמך חסר, `allowedUids` ריק, או `openToAll` שאינו בדיוק `true` - אף אחד לא מורשה.
 
 ### 8.4 תכנית בדיקות
 
