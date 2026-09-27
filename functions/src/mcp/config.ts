@@ -17,6 +17,16 @@ export const MCP_USER_LIMITS = [
 ] as const;
 
 /**
+ * כתיבות (`create_note`) לכל משתמש, בנוסף ל-`MCP_USER_LIMITS`. בקשה של
+ * המשתמש יכולה להוליד כמה פתקים ברצף ("פצל לשלוש רשימות"), לא מאות.
+ * תקרה שמגבילה נזק של לולאה או של prompt injection מתוך פתק משותף.
+ */
+export const MCP_WRITE_LIMITS = [
+  { name: 'minute', windowMs: MINUTE, max: 10 },
+  { name: 'day', windowMs: DAY, max: 100 },
+] as const;
+
+/**
  * גודל הפלט של tool. הפלט נכנס להקשר של Claude: פלט ענק דוחק החוצה את
  * השיחה עצמה. כשהפלט נחתך, הטקסט אומר זאת במפורש ואיך להמשיך.
  */

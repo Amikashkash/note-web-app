@@ -29,6 +29,8 @@ const note = (overrides: Partial<Note> = {}): Note => ({
   updatedAt: '2026-09-20T10:00:00.000Z',
   archivedAt: null,
   updatedBy: null,
+  isReadOnly: false,
+  createdVia: null,
   access: 'owner',
   ...overrides,
 });

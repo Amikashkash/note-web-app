@@ -32,6 +32,8 @@ import { ACCESS_TOKEN_PREFIX, isSecretShaped, sha256Hex } from './tokens';
 export interface AuthContext {
   identity: VerifiedIdentity;
   clientId: string;
+  /** שם הלקוח מההרשמה, לרישום ב-audit */
+  clientName: string;
   grantId: string;
   scopes: string[];
 }
@@ -114,6 +116,7 @@ export const verifyAccessToken = async ({
   return {
     identity: mintVerifiedIdentity(record.uid),
     clientId: record.clientId,
+    clientName: grant.clientName,
     grantId: record.grantId,
     scopes: record.scope.split(' ').filter(Boolean),
   };

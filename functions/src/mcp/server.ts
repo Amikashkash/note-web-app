@@ -8,6 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { VerifiedIdentity } from '../notesCore/identity';
 import { UserScope } from '../notesCore/store';
+import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
 import { SERVER_INFO } from './config';
 import { registerTools } from './tools';
@@ -18,11 +19,21 @@ export type ScopeFactory = (identity: VerifiedIdentity) => UserScope;
 export const defaultScopeFactory: ScopeFactory = (identity) => UserScope.for(identity);
 
 const INSTRUCTIONS =
-  "Read-only access to the user's personal notes in the Notes 4 Me app. Notes and categories are mostly in Hebrew. " +
-  'Start with list_categories or search_notes, then read a note with get_note. Notes the user marked as sensitive are not available at all.';
+  "Access to the user's personal notes in the Notes 4 Me app. Notes and categories are mostly in Hebrew. " +
+  'Start with list_categories or search_notes, then read a note with get_note. Notes the user marked as sensitive are ' +
+  'not available at all. With write access, create_note adds a new note - only when the user asked for it; existing ' +
+  'notes cannot be changed.';
 
-export const createMcpServer = (context: AuthContext, scopeFor: ScopeFactory = defaultScopeFactory): McpServer => {
+export interface ServerDeps {
+  scopeFor?: ScopeFactory;
+  consumeWriteQuota: () => Promise<RateLimitResult>;
+}
+
+export const createMcpServer = (
+  context: AuthContext,
+  { scopeFor = defaultScopeFactory, consumeWriteQuota }: ServerDeps
+): McpServer => {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
-  registerTools(server, { scope: scopeFor(context.identity), context });
+  registerTools(server, { scope: scopeFor(context.identity), context, consumeWriteQuota });
   return server;
 };

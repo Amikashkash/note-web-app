@@ -284,7 +284,7 @@ describe('the /mcp endpoint', () => {
     });
     expect(response.status).toBe(401);
     expect(response.headers.get('www-authenticate')).toBe(
-      'Bearer resource_metadata="https://notes-4-me.web.app/.well-known/oauth-protected-resource/mcp", scope="notes.read"'
+      'Bearer resource_metadata="https://notes-4-me.web.app/.well-known/oauth-protected-resource/mcp", scope="notes.read notes.write"'
     );
   });
 
@@ -329,11 +329,17 @@ describe('the /mcp endpoint', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'notes-4-me' } } });
   });
 
-  it('lists exactly the four read-only tools, each with a description', async () => {
+  it('lists the four read tools and create_note, each with a description', async () => {
     const { tools } = await clientA.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_note', 'list_categories', 'list_notes', 'search_notes']);
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'create_note',
+      'get_note',
+      'list_categories',
+      'list_notes',
+      'search_notes',
+    ]);
     for (const tool of tools) {
-      expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+      expect(tool.annotations).toMatchObject({ readOnlyHint: tool.name !== 'create_note', destructiveHint: false });
       expect(tool.description?.length).toBeGreaterThan(150);
     }
   });
