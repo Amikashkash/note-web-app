@@ -262,6 +262,11 @@ export class OAuthStore {
     return readAccessConfig((await this.#db.doc(CONFIG_DOC).get()).data());
   }
 
+  /** "שימוש אחרון" לרשימת האפליקציות המחוברות. מחוץ ל-transaction: לא קריטי */
+  async touchGrant(grantId: string, now: number): Promise<void> {
+    await this.#db.collection(COLLECTIONS.grants).doc(grantId).update({ lastUsedAt: Timestamp.fromMillis(now) });
+  }
+
   /**
    * ביטול כל ה-tokens של grant. ה-grant המבוטל הוא הבדיקה הקובעת (כל
    * שימוש ב-token בודק אותו), ולכן זה ניקוי משלים, מחוץ ל-transaction.

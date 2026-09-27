@@ -53,6 +53,8 @@ export class McpAuthError extends Error {
 
 const DEFAULT_CHALLENGE_SCOPE = RESOURCE_SCOPES.join(' ');
 
+const LAST_USED_RESOLUTION = 10 * 60 * 1000;
+
 const invalidToken = () => new McpAuthError(401, 'invalid_token', DEFAULT_CHALLENGE_SCOPE);
 
 /** `tokensValidAfterTime` של Firebase הוא מחרוזת תאריך UTC, או חסר */
@@ -102,6 +104,12 @@ export const verifyAccessToken = async ({
     throw invalidToken();
   }
   if (user.disabled || validAfterMs(user.tokensValidAfterTime) > grant.createdAt) throw invalidToken();
+
+  // "שימוש אחרון" ברשימת האפליקציות המחוברות, לכל היותר פעם ב-10 דקות:
+  // כתיבה בכל בקשה הייתה מכפילה את העלות בשביל דיוק שאף אחד לא צריך
+  if (now - grant.lastUsedAt > LAST_USED_RESOLUTION) {
+    await store.touchGrant(grant.grantId, now).catch(() => undefined);
+  }
 
   return {
     identity: mintVerifiedIdentity(record.uid),

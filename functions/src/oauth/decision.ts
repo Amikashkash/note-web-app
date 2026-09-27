@@ -44,19 +44,21 @@ export const bearerToken = (authorization: unknown): string | null => {
 
 /**
  * המשתמש המחובר, מתוך Firebase ID token. `checkRevoked`: token של משתמש
- * מושבת או אחרי "התנתק מכל המכשירים" נדחה. התחברות ישנה מיממה מחייבת
- * התחברות מחדש (`login_required`) לפני הסכמה.
+ * מושבת או אחרי "התנתק מכל המכשירים" נדחה.
  */
-const signedInUser = async (auth: Auth, authorization: unknown, now: number): Promise<string> => {
+export const firebaseUser = async (auth: Auth, authorization: unknown) => {
   const idToken = bearerToken(authorization);
   if (!idToken) throw new OAuthError('invalid_token', 'Sign-in required', 401);
-
-  let decoded;
   try {
-    decoded = await auth.verifyIdToken(idToken, true);
+    return await auth.verifyIdToken(idToken, true);
   } catch {
     throw new OAuthError('invalid_token', 'Sign-in required', 401);
   }
+};
+
+/** כמו `firebaseUser`, ובנוסף: התחברות ישנה מיממה מחייבת התחברות מחדש (`login_required`) לפני הסכמה */
+const signedInUser = async (auth: Auth, authorization: unknown, now: number): Promise<string> => {
+  const decoded = await firebaseUser(auth, authorization);
   const authTime = typeof decoded.auth_time === 'number' ? decoded.auth_time * 1000 : 0;
   if (now - authTime > LIFETIMES.authTime) {
     throw new OAuthError('login_required', 'Please sign in again to connect', 401);
