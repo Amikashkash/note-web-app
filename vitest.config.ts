@@ -18,6 +18,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // `tests/mirrors`: המראות של functions/ מול המקור, ראה הקובץ שם
+    include: ['src/**/*.test.ts', 'tests/mirrors/**/*.test.ts'],
   },
 });
