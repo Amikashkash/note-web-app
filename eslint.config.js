@@ -11,7 +11,8 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'node_modules'] },
+  // `functions/lib` הוא פלט ה-build של הפונקציות (לא בגיט). בלי זה, lint אחרי build נכשל על קוד מתורגם
+  { ignores: ['dist', 'dev-dist', 'node_modules', 'functions/lib'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
