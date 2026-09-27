@@ -28,11 +28,14 @@ export type ConnectProblem =
 
 export const SCOPE_LABELS: Record<string, string> = {
   'notes.read': 'קריאת הפתקים והקטגוריות שלך',
-  'notes.write': 'יצירה ועריכה של פתקים',
+  'notes.write': 'יצירת פתקים חדשים (בלי עריכה או מחיקה של פתקים קיימים)',
   offline_access: 'שמירת החיבור לאורך זמן, בלי להתחבר מחדש בכל פעם',
 };
 
 export const scopeLabel = (scope: string): string => SCOPE_LABELS[scope] ?? scope;
+
+/** האם הבקשה כוללת כתיבה - ואז מסך ההסכמה מדגיש את זה */
+export const requestsWrite = (scopes: readonly string[]): boolean => scopes.includes('notes.write');
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 

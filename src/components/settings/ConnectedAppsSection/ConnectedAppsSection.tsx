@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { listMcpConnections, revokeMcpConnection, type McpConnection } from '@/services/api/mcpGrants';
 import { getErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
+import { ClaudeActivity } from './ClaudeActivity';
 
 const MCP_URL = 'https://notes-4-me.web.app/mcp';
 
@@ -55,7 +56,7 @@ export const ConnectedAppsSection: React.FC = () => {
     <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-md p-6 transition-colors">
       <h2 className="text-xl font-bold text-ink-light dark:text-ink-dark mb-2">🔌 אפליקציות מחוברות</h2>
       <p className="text-sm text-ink-2-light dark:text-ink-2-dark mb-4">
-        אפליקציות שקיבלו ממך גישת קריאה לפתקים, כמו Claude. פתקים וקטגוריות שסימנת כרגישים לא נגישים להן.
+        אפליקציות שקיבלו ממך גישה לפתקים, כמו Claude. פתקים וקטגוריות שסימנת כרגישים לא נגישים להן.
       </p>
 
       {load.kind === 'loading' && <p className="text-sm text-ink-2-light dark:text-ink-2-dark">טוען...</p>}
@@ -100,6 +101,8 @@ export const ConnectedAppsSection: React.FC = () => {
       )}
 
       {revokeError && <p className="text-sm text-danger dark:text-danger-dark mt-3">{revokeError}</p>}
+
+      {uid && <ClaudeActivity uid={uid} />}
     </div>
   );
 };
