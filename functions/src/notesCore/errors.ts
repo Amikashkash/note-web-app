@@ -30,6 +30,18 @@ export class ForbiddenError extends Error {
   }
 }
 
+/**
+ * המשתמש סימן את הפתק או את הקטגוריה "קריאה בלבד ל-Claude". בניגוד ל-
+ * `NotFound`, מותר לומר את זה: המסמך גלוי ל-Claude ממילא.
+ */
+export class ReadOnlyError extends Error {
+  readonly code = 'read-only';
+  constructor(message = 'Read-only for Claude') {
+    super(message);
+    this.name = 'ReadOnlyError';
+  }
+}
+
 /** קלט שלא עבר ולידציה (שדה לא מותר, טיפוס שגוי, אורך חורג) */
 export class InvalidError extends Error {
   readonly code = 'invalid';

@@ -54,6 +54,9 @@ export const toNoteRecord = (id: string, data: Data): NoteRecord => {
     // ⚠️ כאן, ורק כאן, ערך שאינו בוליאני נחשב רגיש: `isSensitive: 'true'`
     // שנכתב בטעות לא יחשוף פתק. האפליקציה כותבת רק בוליאני.
     isSensitive: data.isSensitive === undefined ? false : data.isSensitive !== false,
+    // אותו fail-closed: ערך שאינו בוליאני נחשב קריאה בלבד
+    isReadOnly: data.isReadOnly === undefined ? false : data.isReadOnly !== false,
+    createdVia: data.createdVia === 'mcp' ? 'mcp' : null,
     createdAt,
     updatedAt: asIsoDate(data.updatedAt) ?? createdAt,
     archivedAt: asIsoDate(data.archivedAt),
@@ -73,6 +76,7 @@ export const toCategoryRecord = (id: string, data: Data): CategoryRecord => {
     sharedWith: asStringArray(data.sharedWith),
     // אותו fail-closed כמו בפתק
     isSensitive: data.isSensitive === undefined ? false : data.isSensitive !== false,
+    isReadOnly: data.isReadOnly === undefined ? false : data.isReadOnly !== false,
     createdAt,
     updatedAt: asIsoDate(data.updatedAt) ?? createdAt,
   };

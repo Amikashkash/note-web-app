@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFramed, parseConnectRequest, problemFrom, safeRedirect, scopeLabel } from './mcpConnect';
+import { isFramed, parseConnectRequest, problemFrom, requestsWrite, safeRedirect, scopeLabel } from './mcpConnect';
 
 describe('safeRedirect', () => {
   const CALLBACK = 'https://claude.ai/api/mcp/auth_callback?code=abc&state=s&iss=x';
@@ -78,4 +78,16 @@ describe('isFramed', () => {
 it('labels scopes in Hebrew, and shows an unknown scope as is', () => {
   expect(scopeLabel('notes.read')).toContain('קריאת');
   expect(scopeLabel('something')).toBe('something');
+});
+
+describe('write access on the consent screen', () => {
+  it('is flagged only when notes.write is requested', () => {
+    expect(requestsWrite(['notes.read', 'notes.write', 'offline_access'])).toBe(true);
+    expect(requestsWrite(['notes.read', 'offline_access'])).toBe(false);
+  });
+
+  it('says it creates notes and does not edit or delete them', () => {
+    expect(scopeLabel('notes.write')).toContain('יצירת פתקים חדשים');
+    expect(scopeLabel('notes.write')).toContain('בלי עריכה או מחיקה');
+  });
 });

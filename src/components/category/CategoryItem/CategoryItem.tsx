@@ -4,7 +4,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Lock, LogOut, Pin, Plus, Share2, Users } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Lock, LogOut, PenOff, Pin, Plus, Share2, Users } from 'lucide-react';
 import type { Category } from '@/types';
 import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
@@ -61,6 +61,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
         name: cat.name,
         icon: cat.icon || '📁',
         isSensitive: cat.isSensitive,
+        isReadOnly: cat.isReadOnly,
       })),
     [categories]
   );
@@ -166,6 +167,14 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
                   strokeWidth={2}
                   className="inline-block me-1.5 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
                   aria-label="רגישה - הקטגוריה והפתקים שבה מוסתרים מ-Claude"
+                />
+              )}
+              {category.isReadOnly && (
+                <PenOff
+                  size={16}
+                  strokeWidth={2}
+                  className="inline-block me-1.5 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
+                  aria-label="קריאה בלבד ל-Claude - הוא לא יוצר בה פתקים"
                 />
               )}
               {category.name}

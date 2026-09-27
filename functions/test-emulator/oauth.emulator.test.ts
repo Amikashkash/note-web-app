@@ -690,7 +690,7 @@ describe('access token verification', () => {
     const error = await expectRejected(verify(undefined));
     expect(error.status).toBe(401);
     expect(error.wwwAuthenticate).toBe(
-      `Bearer resource_metadata="${ISSUER}/.well-known/oauth-protected-resource/mcp", scope="notes.read"`
+      `Bearer resource_metadata="${ISSUER}/.well-known/oauth-protected-resource/mcp", scope="notes.read notes.write"`
     );
   });
 

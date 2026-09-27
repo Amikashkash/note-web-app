@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
 import { signOut } from '@/services/firebase/auth';
 import { loadConnectRequest, sendConnectDecision } from '@/services/api/mcpConnect';
-import { isFramed, scopeLabel, type ConnectProblem, type ConnectRequest } from '@/utils/mcpConnect';
+import { isFramed, requestsWrite, scopeLabel, type ConnectProblem, type ConnectRequest } from '@/utils/mcpConnect';
 import { loginRedirectState } from '@/utils/returnTo';
 
 type State =
@@ -147,6 +147,20 @@ export const Connect: React.FC = () => {
           {request.redirectHost}
         </p>
       </div>
+
+      {requestsWrite(request.scopes) && (
+        <div
+          role="note"
+          className="rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 p-4 space-y-1 text-amber-950 dark:text-amber-100"
+        >
+          <p className="font-bold">✏️ הבקשה כוללת גישת כתיבה</p>
+          <p className="text-sm">
+            <bdi>{request.clientName}</bdi> יוכל ליצור פתקים חדשים בקטגוריות שלך, כולל משימות עם תזכורות. הוא לא יכול לערוך
+            או למחוק פתקים קיימים, ולא ליצור פתקים בקטגוריות שסימנת &quot;קריאה בלבד ל-Claude&quot;. כל פתק שהוא יוצר מסומן
+            באפליקציה ומופיע ב&quot;פעילות Claude&quot; בהגדרות.
+          </p>
+        </div>
+      )}
 
       <div>
         <p className="font-medium mb-2">הגישה כוללת:</p>

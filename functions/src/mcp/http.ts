@@ -28,13 +28,15 @@ import { createOAuthApp, securityHeaders, type OAuthAppDeps } from '../oauth/app
 import type { RateLimitWindow } from '../oauth/config';
 import { OAuthStore } from '../oauth/store';
 import { requireMcpAuth, type AuthContext } from '../oauth/verify';
-import { MAX_REQUEST_BODY, MCP_USER_LIMITS } from './config';
+import { MAX_REQUEST_BODY, MCP_USER_LIMITS, MCP_WRITE_LIMITS } from './config';
 import { createMcpServer, defaultScopeFactory, type ScopeFactory } from './server';
 
 export interface McpAppDeps extends OAuthAppDeps {
   scopeFor?: ScopeFactory;
   /** לבדיקות בלבד. ברירת המחדל היא `MCP_USER_LIMITS` */
   mcpLimits?: readonly RateLimitWindow[];
+  /** לבדיקות בלבד. ברירת המחדל היא `MCP_WRITE_LIMITS` */
+  mcpWriteLimits?: readonly RateLimitWindow[];
 }
 
 /** ה-`AuthContext` עובר דרך ה-SDK כ-`authInfo.extra` (pass-through, לא מועתק) */
@@ -68,8 +70,20 @@ const sendWebResponse = async (res: ExpressResponse, response: globalThis.Respon
 };
 
 export const createMcpApp = (deps: McpAppDeps) => {
-  const { store, auth, clock = Date.now, scopeFor = defaultScopeFactory, mcpLimits = MCP_USER_LIMITS } = deps;
-  const buildServer = (context: AuthContext) => createMcpServer(context, scopeFor);
+  const {
+    store,
+    auth,
+    clock = Date.now,
+    scopeFor = defaultScopeFactory,
+    mcpLimits = MCP_USER_LIMITS,
+    mcpWriteLimits = MCP_WRITE_LIMITS,
+  } = deps;
+  const buildServer = (context: AuthContext) =>
+    createMcpServer(context, {
+      scopeFor,
+      consumeWriteQuota: () =>
+        store.consumeRateLimit(`mcp_write_${context.identity.uid}`, mcpWriteLimits, clock()),
+    });
 
   const modern = createMcpHandler(({ authInfo }) => buildServer(contextFrom(authInfo)), {
     legacy: 'reject',

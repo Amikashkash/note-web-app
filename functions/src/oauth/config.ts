@@ -25,11 +25,16 @@ export const CONNECT_URL = `${ISSUER}/connect`;
 export const REDIRECT_URI_ALLOWLIST: readonly string[] = ['https://claude.ai/api/mcp/auth_callback'];
 
 /**
- * ה-scopes שה-AS מנפיק היום. `notes.write` ייכנס בשלב 2, עם ה-tools
- * שדורשים אותו - לא מנפיקים הרשאה שאין לה עדיין שימוש.
+ * ה-scopes שה-AS מנפיק.
+ * - `notes.read`: ארבעת כלי הקריאה.
+ * - `notes.write`: מ-שלב 2א, `create_note` בלבד (יצירה, בלי עריכה).
  * `offline_access` מפורסם כדי ש-Claude יבקש refresh token (§2.3.11).
+ *
+ * `RESOURCE_SCOPES` מופיע ב-`WWW-Authenticate` וב-metadata, ולכן חיבור
+ * חדש מבקש את שניהם. חיבור קיים שמחזיק רק `notes.read` לא מתרחב ב-refresh
+ * (RFC 6749 §6): צריך לנתק ולחבר מחדש כדי לקבל כתיבה.
  */
-export const RESOURCE_SCOPES = ['notes.read'] as const;
+export const RESOURCE_SCOPES = ['notes.read', 'notes.write'] as const;
 export const SUPPORTED_SCOPES: readonly string[] = [...RESOURCE_SCOPES, 'offline_access'];
 export const DEFAULT_SCOPE = 'notes.read';
 

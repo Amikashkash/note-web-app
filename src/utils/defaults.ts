@@ -24,4 +24,5 @@ export const getDefaultCategory = (userId: string, name: string) => ({
   sharedWith: [],
   // נכתב תמיד, גם כ-false (§12.1 בסקירה)
   isSensitive: false,
+  isReadOnly: false,
 });

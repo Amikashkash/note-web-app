@@ -32,6 +32,13 @@ export interface Note {
    * הרגישות האפקטיבית כוללת גם את הקטגוריה - ראה `thinking/architecture-review.md` §12.
    */
   isSensitive: boolean;
+  /**
+   * קריאה בלבד ל-Claude: הוא רואה את הפתק אבל לא משנה אותו. רק הבעלים
+   * משנה את הדגל, רק מהאפליקציה. האפליקציה עצמה עורכת כרגיל.
+   */
+  isReadOnly: boolean;
+  /** `'mcp'` - הפתק נוצר ע"י Claude. נקבע רק בשרת; ה-rules חוסמים כתיבה שלו מהאפליקציה */
+  createdVia?: 'mcp';
   archivedAt?: Timestamp;
   /** מי כתב אחרון. נקבע ע"י שכבת השמירה ונאכף ב-rules; חסר בפתקים ישנים */
   updatedBy?: string;

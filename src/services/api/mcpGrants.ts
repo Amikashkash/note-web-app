@@ -7,7 +7,7 @@
  *   עם Firebase ID token. הפונקציה מבטלת את החיבור ואת כל ה-tokens שלו.
  */
 
-import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase/config';
 import { logger } from '@/utils/logger';
 
@@ -64,4 +64,45 @@ export const revokeMcpConnection = async (grantId: string): Promise<void> => {
     logger.error('Revoking MCP connection failed with status', response.status);
     throw new Error('הניתוק נכשל. רעננו את הדף ונסו שוב.');
   }
+};
+
+/** פעולה אחת של Claude, מתוך `auditLog` (נכתב רק בשרת, קריא רק לבעלים) */
+export interface ClaudeActivity {
+  id: string;
+  at: Date | null;
+  clientName: string;
+  noteId: string;
+  title: string;
+  templateType: string;
+  categoryId: string;
+  categoryName: string;
+  itemCount: number;
+  reminderCount: number;
+}
+
+const ACTIVITY_LIMIT = 20;
+
+/** הפעולות האחרונות של Claude בשם המשתמש, מהחדשה לישנה */
+export const listClaudeActivity = async (uid: string): Promise<ClaudeActivity[]> => {
+  const snapshot = await getDocs(
+    query(collection(db, 'auditLog'), where('uid', '==', uid), orderBy('at', 'desc'), limit(ACTIVITY_LIMIT))
+  );
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    const summary = (data.summary ?? {}) as Record<string, unknown>;
+    const text = (value: unknown) => (typeof value === 'string' ? value : '');
+    const count = (value: unknown) => (typeof value === 'number' ? value : 0);
+    return {
+      id: doc.id,
+      at: asDate(data.at),
+      clientName: text(data.clientName) || 'MCP client',
+      noteId: text((data.target as { id?: unknown } | undefined)?.id),
+      title: text(summary.title),
+      templateType: text(summary.templateType),
+      categoryId: text(summary.categoryId),
+      categoryName: text(summary.categoryName),
+      itemCount: count(summary.itemCount),
+      reminderCount: count(summary.reminderCount),
+    };
+  });
 };

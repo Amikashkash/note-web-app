@@ -104,6 +104,8 @@ function functionsImportBoundaries() {
   // כי הם לא פועלים בשם משתמש (טריגרים, מתזמן, callable עם בדיקות משלו).
   const legacyFirestoreFiles = [
     'functions/src/index.ts',
+    // המתזמן של התזכורות, שהוצא מ-index.ts (E5)
+    'functions/src/dueReminders.ts',
     'functions/src/noteWritten.ts',
     'functions/src/reminders.ts',
     'functions/src/userLookup.ts',

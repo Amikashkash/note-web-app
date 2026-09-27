@@ -25,6 +25,10 @@ export interface NoteRecord {
   isPinned: boolean;
   isArchived: boolean;
   isSensitive: boolean;
+  /** הדגל של הפתק עצמו. האפקטיבי (כולל הקטגוריה) ב-`Note.isReadOnly` */
+  isReadOnly: boolean;
+  /** `'mcp'` כשהפתק נוצר ע"י Claude */
+  createdVia: 'mcp' | null;
   createdAt: string | null;
   updatedAt: string | null;
   archivedAt: string | null;
@@ -41,10 +45,16 @@ export interface CategoryRecord {
   userId: string;
   sharedWith: string[];
   isSensitive: boolean;
+  /** קריאה בלבד ל-Claude: אין יצירה בקטגוריה, והפתקים בה לקריאה בלבד */
+  isReadOnly: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 }
 
+/**
+ * פתק גלוי. `isReadOnly` כאן הוא **האפקטיבי**: הדגל של הפתק או של
+ * הקטגוריה שלו. כלי עריכה (שלב 2ב) מסרבים לפיו.
+ */
 export type Note = Omit<NoteRecord, 'isSensitive'> & { access: Access };
 
 export type Category = Omit<CategoryRecord, 'isSensitive'> & { access: Access };

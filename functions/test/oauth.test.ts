@@ -106,8 +106,8 @@ describe('scopes', () => {
     expect(parseScope('notes.read offline_access')).toEqual(['notes.read', 'offline_access']);
   });
 
-  it('rejects scopes that are not issued yet, or unknown', () => {
-    expect(parseScope('notes.write')).toBeNull();
+  it('accepts notes.write (phase 2a), and rejects unknown scopes', () => {
+    expect(parseScope('notes.read notes.write offline_access')).toEqual(['notes.read', 'notes.write', 'offline_access']);
     expect(parseScope('notes.read admin')).toBeNull();
     expect(parseScope(['notes.read'])).toBeNull();
   });
@@ -135,7 +135,7 @@ describe('metadata', () => {
     expect(metadata.code_challenge_methods_supported).toEqual(['S256']);
     expect(metadata.token_endpoint_auth_methods_supported).toEqual(['none']);
     expect(metadata).not.toHaveProperty('client_id_metadata_document_supported');
-    expect(metadata.scopes_supported).toEqual(['notes.read', 'offline_access']);
+    expect(metadata.scopes_supported).toEqual(['notes.read', 'notes.write', 'offline_access']);
   });
 
   it('names the resource exactly as the user enters it', () => {

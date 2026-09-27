@@ -61,6 +61,8 @@ const describeNote = ({ note, matchedIn }: NoteListEntry, position: number, cate
     note.isPinned ? 'pinned' : null,
     note.isArchived ? 'archived' : null,
     note.access === 'shared' ? 'shared with you by another user' : null,
+    note.isReadOnly ? 'read-only for Claude' : null,
+    note.createdVia === 'mcp' ? 'created by Claude' : null,
     note.tags.length > 0 ? `tags: ${note.tags.join(', ')}` : null,
     matchedIn ? `matched in: ${matchedIn.join(', ')}` : null,
   ].filter(Boolean);
@@ -121,11 +123,15 @@ export const formatCategories = (
 ): string => {
   if (categories.length === 0 && sharedWithoutCategory === 0) return 'The user has no categories yet.';
 
-  const lines = categories.map(
-    (category) =>
-      `- ${oneLine(category.name) || '(unnamed)'} [id: ${category.id}] · ${noteCounts.get(category.id) ?? 0} notes · ${
-        category.access === 'owner' ? "user's own" : 'shared with the user'
-      }`
+  const lines = categories.map((category) =>
+    [
+      `- ${oneLine(category.name) || '(unnamed)'} [id: ${category.id}]`,
+      `${noteCounts.get(category.id) ?? 0} notes`,
+      category.access === 'owner' ? "user's own" : 'shared with the user (Claude cannot create notes here)',
+      category.isReadOnly ? 'read-only for Claude (no new notes)' : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
   );
   if (sharedWithoutCategory > 0) {
     lines.push(
@@ -150,6 +156,8 @@ export const formatNote = (note: Note, categoryName: string): string => {
     `Created: ${day(note.createdAt)} · Updated: ${day(note.updatedAt)}`,
     note.isPinned ? 'Pinned: yes' : null,
     note.isArchived ? 'Archived: yes' : null,
+    note.isReadOnly ? 'Read-only for Claude: yes - the user does not want Claude to change this note' : null,
+    note.createdVia === 'mcp' ? 'Created by: Claude' : null,
     note.access === 'shared' ? 'Access: shared with the user by another user' : "Access: the user's own note",
   ].filter(Boolean);
 

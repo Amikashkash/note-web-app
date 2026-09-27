@@ -446,13 +446,25 @@ defineTool({
 
 ### שלב 2: כתיבה (`notes.write`)
 
+**החלטה: שלב 2 מתפצל לשניים.**
+- **2א - יצירה בלבד (`create_note`), מומש ב-branch `claude/mcp-create`.** פתק חדש לא פתוח בשום מכשיר, ולכן אין לו סיכון של C-1 (דריסה בין עורך פתוח לכתיבה מהשרת). אפשר לעשות את זה עכשיו, בלי קבוצות D ו-E.
+- **2ב - עריכה (`add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note`), אחרי קבוצות D ו-E ב-review.** כל עריכה של פתק קיים עלולה להידרס ע"י עורך פתוח (C-1) עד שמודל ה-`items` (D4, E1) וה-autosave בלי דריסה (E2, E2b) בפרודקשן. 2ב גם חייב לסרב לכל פתק שהוא **קריאה בלבד ל-Claude** (ראו למטה).
+
+**קריאה בלבד ל-Claude (`isReadOnly`, נוסף ב-2א):** דגל על פתק ועל קטגוריה, באותו דפוס כמו `isSensitive`: רק הבעלים משנה (rules), מתג וסמל נפרד (`PenOff`) באפליקציה. אפקטיבי = הדגל של הפתק **או** של הקטגוריה.
+- פתק לקריאה בלבד **גלוי** ל-MCP. `list_notes`, `get_note` ו-`list_categories` מציינים שהוא לקריאה בלבד.
+- קטגוריה לקריאה בלבד לא מקבלת פתקים מ-`create_note`: תשובה מפורשת "Read-only", לא `NotFound` (הקטגוריה גלויה ממילא).
+- כלי העריכה של 2ב מסרבים לפתק לקריאה בלבד (`ReadOnlyError`), דרך `Note.isReadOnly` האפקטיבי ש-`UserScope` מחזיר.
+
 | Tool | קלט | התנהגות |
 |---|---|---|
-| `create_note` | `categoryId`, `title`, `templateType` (ברירת מחדל `plain`), `text?` או `items?` | בונה את התוכן דרך ה-codec (תבנית רשימה נכתבת ישר כ-`items` עם `contentFormat: 2`). `userId=uid`, `sharedWith: []`, `isPinned:false`, `isArchived:false`, `isSensitive:false`, `isEmpty` מחושב, `revision: 1`, `updatedBy: 'mcp:<clientId>'`, `pos`/`order` בסוף הקטגוריה, `tags: []`, `color: null`, ו-`createdAt`/`updatedAt` מהשרת. **קטגוריית היעד חייבת להיות בבעלות המשתמש** (החלטה). קטגוריה משותפת של מישהו אחר אסורה בינתיים. |
+| `create_note` (**2א, מומש**) | `categoryId`, `title`, `type` (`text`/`checklist`/`shopping`), `text?` או `items?` (`text`, `dueDate?`, `dueTime?`, `repeat?`, `quantity?`) | **כפי שמומש:** התוכן בפורמט הנוכחי של האפליקציה (טקסט, או JSON של פריטים), לא `items`/`contentFormat: 2` - המיגרציה (D4, E1) עוד לא קרתה. שעות בשעון ישראל; `onNoteWritten` יוצר את התזכורות בלי שינוי. קטגוריית היעד: **בבעלות המשתמש**, לא רגישה ולא לקריאה בלבד. `createdVia: 'mcp'` (סמל ✨ באפליקציה; ה-rules לא מאפשרים לאפליקציה לכתוב אותו). מניעת כפילויות לפי fingerprint של הבקשה, 10 דקות, לכל משתמש (`mcpIdempotency`). רשומת audit באותו transaction. הגבלת קצב לכתיבות לכל משתמש (10 בדקה, 100 ביום). ולידציה עם הודעות ש-Claude יכול לפעול לפיהן. |
+| `create_note` (התכנון המקורי, לפני 2א) | `categoryId`, `title`, `templateType` (ברירת מחדל `plain`), `text?` או `items?` | בונה את התוכן דרך ה-codec (תבנית רשימה נכתבת ישר כ-`items` עם `contentFormat: 2`). `userId=uid`, `sharedWith: []`, `isPinned:false`, `isArchived:false`, `isSensitive:false`, `isEmpty` מחושב, `revision: 1`, `updatedBy: 'mcp:<clientId>'`, `pos`/`order` בסוף הקטגוריה, `tags: []`, `color: null`, ו-`createdAt`/`updatedAt` מהשרת. **קטגוריית היעד חייבת להיות בבעלות המשתמש** (החלטה). קטגוריה משותפת של מישהו אחר אסורה בינתיים. |
 | `add_checklist_item` | `noteId`, `text`, `dueDate?` (`YYYY-MM-DD`), `dueTime?` (`HH:MM`), `repeat?` (`daily\|weekly\|monthly\|yearly`) | רק ל-`templateType == 'checklist'` (או תוכן שזוהה כ-checklist). `id = Date.now().toString()`, כמו בלקוח, עם הגנה מהתנגשות. ולידציה: `repeat` דורש `dueDate` ו-`dueTime` (כך בממשק). התאריך נבדק עם `localDateTimeToDate`. **כתיבת שדה אחת:** `items.<newId> = {...}` + `revision: increment(1)` + `updatedBy`, בתוך ה-transaction של ה-tool (בשביל `loadNoteForUser` וה-audit). אין קריאה-שינוי-כתיבה של רשימה, ואין `expectedRevision`. פתק בפורמט הישן מומר ל-`items` באותה transaction (מיגרציה עצלה, review E1). הטריגר הקיים `onNoteWritten` (סנכרון התזכורות שבו) רואה את הכתיבה ויוצר תזכורת, **בלי שום שינוי בו**. פלט: `{noteId,itemId,revision,reminderScheduled: boolean, remindAt?}`. |
 | `update_note` | `noteId`, `expectedRevision?`, ואחד או יותר מ: `title`, `text` (plain), `itemPatches` (`[{itemId, text?, completed?, dueDate?, dueTime?, repeat?\|null, deleted?}]`), `isPinned` | **`itemPatches`**: כתיבות field-path ל-`items.<id>.<field>`, ומחיקה כ-tombstone. לא דורש `expectedRevision`, ולא נוגע בפריטים אחרים או בשדות לא מוכרים. **`text`** (plain): דורש `expectedRevision`, שנבדק ב-transaction בצד השרת, כי Admin SDK עוקף את ה-rule (7.2). אי-התאמה מחזירה `Conflict`. **`title`**: last-write-wins. אין "החלפת כל הרשימה". |
 | `move_note_to_category` | `noteId`, `categoryId` | **בעלים בלבד** (החלטה). היעד חייב להיות קטגוריה **בבעלות המשתמש** ולא רגישה (אותו כלל כמו ב-`create_note`). מעדכן `categoryId` ו-`pos` (סוף הקטגוריה). **לא** משנה `sharedWith`, עד להחלטת SH-3 ב-review. |
 | `archive_note` | `noteId` | `isArchived:true`, `archivedAt: serverTimestamp()`, כמו `archiveNote` בלקוח. הטריגר מוחק את התזכורות. בעלים בלבד. אפשר לשחזר מהאפליקציה. |
+
+שאר ה-tools בטבלה (`add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note`) הם **2ב**, אחרי D ו-E, וכולם מסרבים לפתק לקריאה בלבד.
 
 **אין `delete_note` ואין שום נתיב קוד שקורא ל-`.delete()` על notes או categories.** בדיקה סטטית ב-CI: grep על `notesCore/` שנכשל אם יש `delete(`.
 
@@ -486,7 +498,8 @@ defineTool({
 - **הרשאה:**
   - `read` לבעלים (`resource.data.uid == request.auth.uid` או `noteOwnerId == request.auth.uid`). הבעלים יכולים לראות מה Claude של שותף עשה בפתק שלהם.
   - `write: if false`.
-- אופציונלי: מסך "פעילות Claude" באפליקציה. לא חלק מהתכנית הזו.
+- מסך "פעילות Claude" באפליקציה: **נוסף ב-2א**, תחת "אפליקציות מחוברות" בהגדרות (20 הפעולות האחרונות, עם קישור לפתק).
+- **ב-2א** הרשומה היא של יצירה בלבד (`action: 'note.create'`): `summary` עם כותרת, סוג, קטגוריה, מספר פריטים ותזכורות, בלי `changes.before/after` (אין "לפני" ליצירה). השדות האלה ייכנסו עם העריכות של 2ב.
 
 ---
 
@@ -616,12 +629,16 @@ match /config/{id}         { allow read, write: if false; }
      - **cold start (מדידה מקומית):** הקוד שלנו מוסיף כ-390ms (מודולי בסיס 220, SDK ו-zod 160, בניית האפליקציה 10). ב-Cloud Run, עם CPU איטי יותר, הפעלת container וחיבור Firestore ראשון, ההערכה היא 2 עד 4 שניות לבקשה ראשונה. בטווח של 10 השניות של Claude. מדידה אמיתית אחרי הפריסה (תיאור ה-PR), ורק אז החלטה על `minInstances`.
      - **ה-emulator של Hosting לא מחיל `headers` בכלל** (נבדק גם עם `**` על קובץ סטטי). ה-headers של `/connect` נבדקים ב-`tests/hosting` וב-`curl` אחרי הפריסה.
 
-**שלב 2: כתיבה**
-15. **תנאי מקדים:** review D4, E1, E2 ו-E2b ב-production (7.3). לא חלק מה-branch של MCP.
-16. `audit.ts` + rules ל-`auditLog`.
-17. `add_checklist_item` → בדיקה שהתזכורת נוצרת ונשלחת.
-18. `create_note`, `update_note`, `move_note_to_category`, `archive_note`.
-19. rate limiting לכתיבות.
+**שלב 2א: יצירה בלבד** - מומש ב-branch `claude/mcp-create`
+15. `isReadOnly` על פתקים וקטגוריות (אפליקציה, rules, `UserScope`), ו-`createdVia` שרק השרת כותב.
+16. `audit.ts` + rules ל-`auditLog` ו"פעילות Claude" בהגדרות.
+17. `create_note` (scope `notes.write`), כולל תזכורות ובדיקה שהתזכורת נוצרת ונשלחת, מניעת כפילויות ו-rate limit לכתיבות.
+18. E5 מ-review (claim-then-send ב-`sendDueReminders`) - התנאי ש-Claude ייצור משימות עם שעות בלי כפילויות התראות.
+
+**שלב 2ב: עריכה**
+19. **תנאי מקדים:** review D4, E1, E2 ו-E2b ב-production (7.3). לא חלק מה-branch של MCP.
+20. `add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note` - כולם מסרבים לפתק לקריאה בלבד.
+21. audit עם `changes.before/after`.
 
 ### 8.3.1 הגדרות ידניות (לא בקוד)
 
@@ -632,6 +649,9 @@ gcloud firestore fields ttls update expiresAt --collection-group=oauthCodes    -
 gcloud firestore fields ttls update expiresAt --collection-group=oauthTokens   --enable-ttl --project=notes-4-me
 gcloud firestore fields ttls update expiresAt --collection-group=oauthClients  --enable-ttl --project=notes-4-me
 gcloud firestore fields ttls update expiresAt --collection-group=rateLimits    --enable-ttl --project=notes-4-me
+# נוספו ב-2א
+gcloud firestore fields ttls update expiresAt --collection-group=auditLog       --enable-ttl --project=notes-4-me
+gcloud firestore fields ttls update expiresAt --collection-group=mcpIdempotency --enable-ttl --project=notes-4-me
 ```
 - התוקף נבדק בקוד בכל שימוש. ה-TTL רק מנקה, ואיחור שלו לא מאריך אף token.
 - `oauthClients`: השדה נמחק כשהונפק ללקוח token ראשון, ולכן רק לקוחות שלא השתמשו בהם נמחקים.

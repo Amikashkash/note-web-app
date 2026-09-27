@@ -43,6 +43,8 @@ const notesRef = () => collection(db, NOTES_COLLECTION);
  */
 const IMMUTABLE_FIELDS: readonly string[] = [
   'id',
+  // נקבע רק בשרת, כשהפתק נוצר ע"י Claude (ה-rules חוסמים שינוי)
+  'createdVia',
   'userId',
   'sharedWith',
   'createdAt',
@@ -320,6 +322,13 @@ export const togglePinNote = (noteId: string, isPinned: boolean): Promise<void> 
  */
 export const setNoteSensitive = (noteId: string, isSensitive: boolean): Promise<void> =>
   updateNote(noteId, { isSensitive });
+
+/**
+ * קריאה בלבד ל-Claude: הוא רואה את הפתק, אבל כלי עריכה עתידיים יסרבו
+ * לשנות אותו. רק הבעלים (rules). לא יוצר גרסה - אינו שדה תוכן.
+ */
+export const setNoteReadOnly = (noteId: string, isReadOnly: boolean): Promise<void> =>
+  updateNote(noteId, { isReadOnly });
 
 /**
  * העברת פתק לארכיון (מחיקה רכה)
