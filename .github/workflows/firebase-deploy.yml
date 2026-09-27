@@ -57,6 +57,9 @@ jobs:
       # `npm run build` מריץ `tsc` (כולל קבצי הבדיקות) ואז `vite build`
       - name: Typecheck and build client
         run: npm run build
+        env:
+          # כמו בפריסה, כדי שה-bundle שנבדק כולל את `/connect`
+          VITE_MCP_CONNECT: 'true'
 
       - name: Client unit tests
         run: npm test
@@ -140,6 +143,8 @@ jobs:
           # בלי המפתח הזה ה-build מצליח אבל ההתראות מתות בשקט:
           # `isPushConfigured` יוצא false ואף מכשיר לא נרשם ל-push.
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          # מסך ההסכמה לחיבור Claude (`/connect`). בלעדיו ה-route לא נכנס ל-bundle
+          VITE_MCP_CONNECT: 'true'
 
       # אין מפתח JSON: Google מאמת את ה-token של GitHub מול ה-provider,
       # שמקבל רק את ה-repo הזה וה-branch `main`, ומנפיק הרשאות זמניות של
