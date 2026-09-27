@@ -17,11 +17,14 @@
     "test:emulator": "vitest run -c vitest.emulator.config.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.1.0",
     "express": "^5.2.1",
     "firebase-admin": "^13.0.2",
-    "firebase-functions": "^7.4.0"
+    "firebase-functions": "^7.4.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.1.0",
     "@types/express": "^5.0.6",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",
