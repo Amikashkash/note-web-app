@@ -26,10 +26,10 @@ import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
-import { isRepeatRule, nextOccurrence } from './recurrence';
 import { handleNoteWritten } from './noteWritten';
+import { processDueReminders, type TokenRef } from './dueReminders';
 import { lookupUserByEmail } from './userLookup';
 import type { ReminderPushData } from './reminderPayload';
 
@@ -98,12 +98,6 @@ export const findUserByEmail = onCall({ memory: '256MiB', timeoutSeconds: 10 }, 
 
 // ==================== מסירה ====================
 
-interface TokenRef {
-  token: string;
-  /** נתיב המסמך, לצורך מחיקה כשה-token מת */
-  path: string;
-}
-
 const getUserTokens = async (userId: string): Promise<TokenRef[]> => {
   const snapshot = await db.collection('users').doc(userId).collection('fcmTokens').get();
 
@@ -151,6 +145,11 @@ const sendToUser = async (tokens: TokenRef[], data: ReminderPushData): Promise<T
   return dead;
 };
 
+/**
+ * claim-then-send (E5 בסקירה): כל תזכורת מסומנת ב-transaction משלה לפני
+ * שליחה, ולכן כישלון באמצע ההרצה או הרצה חופפת לא שולחים פעמיים.
+ * הלוגיקה ב-`dueReminders.ts`; כאן רק FCM וה-tokens.
+ */
 export const sendDueReminders = onSchedule(
   {
     schedule: 'every 1 minutes',
@@ -159,102 +158,14 @@ export const sendDueReminders = onSchedule(
     timeoutSeconds: 120,
   },
   async () => {
-    const now = Timestamp.now();
-
-    const due = await db
-      .collection('reminders')
-      .where('sent', '==', false)
-      .where('remindAt', '<=', now)
-      .limit(MAX_REMINDERS_PER_RUN)
-      .get();
-
-    if (due.empty) return;
-
-    logger.info(`Processing ${due.size} due reminders`);
-
-    // ה-tokens נשלפים פעם אחת למשתמש, גם אם יש לו כמה תזכורות באותה דקה
-    const tokensByUser = new Map<string, TokenRef[]>();
-    const deadTokens = new Set<string>();
-    const batch = db.batch();
-
-    for (const doc of due.docs) {
-      const userId = doc.get('userId') as string | undefined;
-
-      // התזכורת מסומנת כמטופלת בכל מקרה, גם כשאין למי לשלוח. אחרת היא
-      // הייתה נשלפת מחדש בכל הרצה, כל דקה, לנצח.
-      //
-      // בתזכורת חוזרת "מטופלת" פירושה מתגלגלת למועד הבא ולא נסגרת.
-      // החישוב מתאריך הבסיס ולא מהמועד שנורה - אחרת קיצוץ לסוף חודש
-      // מצטבר ו"כל 31 בחודש" מתדרדר ל-28.
-      const repeat = doc.get('repeat') as string | null;
-      const baseDate = doc.get('baseDate') as string | undefined;
-      const baseTime = doc.get('baseTime') as string | undefined;
-
-      const rollForward =
-        isRepeatRule(repeat) && baseDate && baseTime
-          ? nextOccurrence(baseDate, baseTime, repeat, now.toDate())
-          : null;
-
-      if (rollForward) {
-        batch.update(doc.ref, {
-          remindAt: Timestamp.fromDate(rollForward),
-          sent: false,
-          sentAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        batch.update(doc.ref, { sent: true, sentAt: FieldValue.serverTimestamp() });
-      }
-
-      if (!userId) {
-        logger.warn('Reminder has no userId', { reminderId: doc.id });
-        continue;
-      }
-
-      let tokens = tokensByUser.get(userId);
-      if (!tokens) {
-        tokens = await getUserTokens(userId);
-        tokensByUser.set(userId, tokens);
-      }
-
-      if (tokens.length === 0) {
-        logger.info('No registered devices for user', { userId, reminderId: doc.id });
-        continue;
-      }
-
-      const payload = {
-        noteId: (doc.get('noteId') as string) || '',
-        itemId: (doc.get('itemId') as string) || '',
-        title: (doc.get('itemText') as string) || 'תזכורת',
-        body: (doc.get('noteTitle') as string) || '',
-        categoryId: (doc.get('categoryId') as string) || '',
-      };
-
-      // מזהי היעד נרשמים כדי שאפשר יהיה לאמת לאן ההתראה אמורה לנווט.
-      // בלי זה, "ההתראה לא פותחת את הפתק" הוא דיווח שאי אפשר לאבחן
-      // בלי ניפוי מרחוק על המכשיר עצמו.
-      logger.info('Sending reminder', {
-        reminderId: doc.id,
-        noteId: payload.noteId,
-        categoryId: payload.categoryId,
-        deviceCount: tokens.length,
-      });
-
-      const dead = await sendToUser(tokens, payload);
-
-      for (const entry of dead) {
-        deadTokens.add(entry.path);
-      }
-    }
-
-    for (const path of deadTokens) {
-      batch.delete(db.doc(path));
-    }
-
-    await batch.commit();
-
-    if (deadTokens.size > 0) {
-      logger.info(`Pruned ${deadTokens.size} dead FCM tokens`);
-    }
+    await processDueReminders({
+      db,
+      now: new Date(),
+      getTokens: getUserTokens,
+      send: sendToUser,
+      limit: MAX_REMINDERS_PER_RUN,
+      log: (message, fields) => logger.info(message, fields ?? {}),
+    });
   }
 );
 
