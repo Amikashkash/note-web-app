@@ -280,6 +280,20 @@ const BY_CATEGORY_ID: Record<string, Read> = {
   'loadCategoryForUser(read)': (scope, categoryId) => scope.loadCategoryForUser(categoryId, 'read'),
   'loadCategoryForUser(write)': (scope, categoryId) => scope.loadCategoryForUser(categoryId, 'write'),
   'loadCategoryForUser(owner)': (scope, categoryId) => scope.loadCategoryForUser(categoryId, 'owner'),
+  // כתיבה: יצירת פתק בקטגוריה מוסתרת נדחית באותו NotFound
+  createNote: (scope, categoryId) =>
+    scope.createNote(
+      {
+        categoryId,
+        title: 'x',
+        templateType: 'plain',
+        content: 'x',
+        fingerprint: `generic-${categoryId}-${Math.random()}`,
+        summary: { title: 'x', templateType: 'plain', categoryId, itemCount: 0, reminderCount: 0 },
+      },
+      { grantId: 'g', clientId: 'c', clientName: 'test', tool: 'test' },
+      Date.now()
+    ),
 };
 
 /** פונקציות שמחזירות רשימה - המסמך המוסתר פשוט לא מופיע */

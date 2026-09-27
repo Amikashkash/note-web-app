@@ -18,18 +18,25 @@
  * ולא רץ בפרודקשן. הקורא הראשון יהיה שרת ה-MCP (שלב 1ג).
  */
 
-import { getFirestore, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
-import { ForbiddenError, NotFoundError } from './errors';
+import { createHash } from 'node:crypto';
+import { FieldValue, getFirestore, Timestamp, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
+import { AUDIT_RETENTION_MS, noteCreatedEntry, type NoteCreatedSummary, type WriteActor } from './audit';
+import { ForbiddenError, NotFoundError, ReadOnlyError } from './errors';
 import { isVerifiedIdentity, type VerifiedIdentity } from './identity';
 import { toCategoryRecord, toNoteRecord, toNoteVersion } from './mappers';
 import type { Access, Category, CategoryRecord, Note, NoteRecord, NoteVersion } from './model';
 import { LIMITS, accessOf, satisfies, type Need } from './permissions';
 import { searchNotes, type SearchHit } from './search';
-import { isVisibleToMcp } from './visibility';
+import { isReadOnlyForMcp, isVisibleToMcp } from './visibility';
 
 const NOTES = 'notes';
 const CATEGORIES = 'categories';
 const VERSIONS = 'versions';
+const AUDIT = 'auditLog';
+const IDEMPOTENCY = 'mcpIdempotency';
+
+/** חלון מניעת הכפילויות של `createNote` */
+export const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
 
 /** מספר הגרסאות המרבי שמוחזר - אותו סדר גודל כמו מה שהאפליקציה שומרת */
 const MAX_VERSIONS = 50;
@@ -43,7 +50,12 @@ const isDocId = (id: unknown): id is string =>
 
 const withoutSensitive = <T extends { isSensitive: boolean }>({ isSensitive: _, ...rest }: T) => rest;
 
-const toNote = (record: NoteRecord, access: Access): Note => ({ ...withoutSensitive(record), access });
+/** `isReadOnly` מוחלף בערך האפקטיבי (פתק או קטגוריה) */
+const toNote = (record: NoteRecord, access: Access, isReadOnly: boolean): Note => ({
+  ...withoutSensitive(record),
+  isReadOnly,
+  access,
+});
 
 const toCategory = (record: CategoryRecord, access: Access): Category => ({
   ...withoutSensitive(record),
@@ -65,6 +77,25 @@ export interface ListNotesOptions {
 export interface SearchOptions {
   /** לכלול גם פתקים מאורכבים בבעלות המשתמש */
   includeArchived?: boolean;
+}
+
+/** פתק מוכן ליצירה. נבנה ומאומת ב-`mcp/createNote.ts` */
+export interface NoteDraft {
+  categoryId: string;
+  title: string;
+  templateType: 'plain' | 'checklist' | 'shopping';
+  /** התוכן בפורמט של האפליקציה (טקסט, או JSON של הפריטים) */
+  content: string;
+  /** זהה לשני פתקים זהים - בלי מזהים שנוצרו ובלי זמנים. למניעת כפילויות */
+  fingerprint: string;
+  summary: Omit<NoteCreatedSummary, 'categoryName'>;
+}
+
+export interface CreateNoteResult {
+  note: Note;
+  categoryName: string;
+  /** `true` כשפתק זהה נוצר בחלון של 10 הדקות, והוחזר הוא במקום ליצור חדש */
+  duplicate: boolean;
 }
 
 export class UserScope {
@@ -190,6 +221,88 @@ export class UserScope {
   }
 
   // -------------------------------------------------------------------------
+  // כתיבה (mcp-plan שלב 2א: יצירה בלבד)
+  // -------------------------------------------------------------------------
+
+  /**
+   * פתק חדש בקטגוריה של המשתמש.
+   *
+   * הכל ב-transaction אחד:
+   * - **הקטגוריה:** בבעלות המשתמש, גלויה (לא רגישה) ולא לקריאה בלבד.
+   *   קטגוריה שלא קיימת, של משתמש אחר (גם משותפת) או רגישה - `NotFound`,
+   *   כמו כל קריאה. קטגוריה לקריאה בלבד - `ReadOnlyError`: היא גלויה ממילא.
+   * - **כפילויות:** אותו פתק (`draft.fingerprint`) מאותו משתמש בתוך 10
+   *   דקות מחזיר את הקיים במקום ליצור שני. ראו `mcp/createNote.ts`.
+   * - **audit:** רשומה ב-`auditLog`. נכשלה - הפתק לא נוצר.
+   */
+  async createNote(draft: NoteDraft, actor: Omit<WriteActor, 'uid'>, now: number): Promise<CreateNoteResult> {
+    if (!isDocId(draft.categoryId)) throw new NotFoundError();
+    const categoryRef = this.#db.collection(CATEGORIES).doc(draft.categoryId);
+    const keyRef = this.#db
+      .collection(IDEMPOTENCY)
+      .doc(createHash('sha256').update(`${this.uid}\n${draft.fingerprint}`).digest('hex'));
+
+    return this.#db.runTransaction(async (tx) => {
+      // כל הקריאות לפני כל הכתיבות
+      const [categorySnapshot, keySnapshot] = await Promise.all([tx.get(categoryRef), tx.get(keyRef)]);
+      const siblings = await tx.get(
+        this.#db.collection(NOTES).where('userId', '==', this.uid).where('categoryId', '==', draft.categoryId)
+      );
+
+      if (!categorySnapshot.exists) throw new NotFoundError();
+      const category = toCategoryRecord(categorySnapshot.id, categorySnapshot.data() ?? {});
+      if (category.userId !== this.uid || category.isSensitive) throw new NotFoundError();
+      if (category.isReadOnly) throw new ReadOnlyError('The category is read-only for Claude');
+
+      const key = keySnapshot.data();
+      const existingId = typeof key?.noteId === 'string' ? key.noteId : null;
+      const keyExpiresAt = (key?.expiresAt as Timestamp | undefined)?.toMillis() ?? 0;
+      if (existingId && keyExpiresAt > now) {
+        // הפתק הקיים חייב עדיין להיות שם, פעיל: אם נמחק או אורכב, יוצרים חדש
+        const existing = siblings.docs.find((doc) => doc.id === existingId && doc.get('isArchived') !== true);
+        if (existing) {
+          const record = toNoteRecord(existing.id, existing.data());
+          return { note: toNote(record, 'owner', record.isReadOnly), categoryName: category.name, duplicate: true };
+        }
+      }
+
+      const noteRef = this.#db.collection(NOTES).doc();
+      const order = siblings.docs.reduce((max, doc) => Math.max(max, Number(doc.get('order')) || 0), -1) + 1;
+      const stamp = Timestamp.fromMillis(now);
+      const data = {
+        title: draft.title,
+        content: draft.content,
+        categoryId: draft.categoryId,
+        templateType: draft.templateType,
+        tags: [],
+        color: null,
+        order,
+        userId: this.uid,
+        sharedWith: [],
+        isPinned: false,
+        isArchived: false,
+        isSensitive: false,
+        isReadOnly: false,
+        createdVia: 'mcp',
+        createdAt: stamp,
+        updatedAt: stamp,
+        updatedBy: this.uid,
+      };
+
+      tx.create(noteRef, data);
+      tx.set(keyRef, { uid: this.uid, noteId: noteRef.id, expiresAt: Timestamp.fromMillis(now + DUPLICATE_WINDOW_MS) });
+      tx.create(this.#db.collection(AUDIT).doc(), {
+        ...noteCreatedEntry({ ...actor, uid: this.uid }, noteRef.id, { ...draft.summary, categoryName: category.name }),
+        at: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(now + AUDIT_RETENTION_MS),
+      });
+
+      const record = toNoteRecord(noteRef.id, data);
+      return { note: toNote(record, 'owner', false), categoryName: category.name, duplicate: false };
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // פנימי
   // -------------------------------------------------------------------------
 
@@ -203,7 +316,9 @@ export class UserScope {
     return records
       .flatMap((record) => {
         const access = accessOf(record, this.uid);
-        return access && isVisibleToMcp(record, categoriesById) ? [toNote(record, access)] : [];
+        return access && isVisibleToMcp(record, categoriesById)
+          ? [toNote(record, access, isReadOnlyForMcp(record, categoriesById))]
+          : [];
       })
       .sort(byPinnedThenOrder);
   }

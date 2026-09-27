@@ -26,3 +26,13 @@ export const isVisibleToMcp = (
   const category = categoriesById.get(note.categoryId);
   return category !== undefined && !category.isSensitive;
 };
+
+/**
+ * קריאה בלבד ל-Claude, אפקטיבית: הדגל של הפתק או של הקטגוריה שלו.
+ * נקרא רק על פתק שכבר עבר את `isVisibleToMcp`. קטגוריה שלא נמצאה (פתק
+ * כזה ממילא מוסתר) - קריאה בלבד, fail-closed.
+ */
+export const isReadOnlyForMcp = (
+  note: { isReadOnly: boolean; categoryId: string },
+  categoriesById: ReadonlyMap<string, { isReadOnly: boolean }>
+): boolean => note.isReadOnly || (categoriesById.get(note.categoryId)?.isReadOnly ?? true);
