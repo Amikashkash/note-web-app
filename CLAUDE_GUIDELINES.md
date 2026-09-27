@@ -134,6 +134,19 @@ version has made deploys time out.
 - Avoid `any` — the lint config warns on it. For caught errors use `unknown`
   plus the helpers in `src/utils/errors.ts`.
 
+### Real User Data ⚠️
+- **Never export, dump, list or read real user data without the owner's
+  explicit approval in advance** — Firebase Auth accounts
+  (`firebase auth:export`, `getUsers`, ...), production Firestore documents,
+  backups. This applies **even for counts or statistics**, even read-only, and
+  even when the data would be deleted right after.
+- Ask first, say exactly what would be read and why, and wait for a yes.
+- Tests and experiments use the emulators and `demo-*` projects, never the
+  real project.
+- (Added after an Auth export was made to count unverified accounts during
+  group C without asking first. It was written outside the repo, counted, and
+  deleted, but it should not have been made without approval.)
+
 ### Logging
 - **Never call `console.*` directly** in app code — use `logger` from
   `src/utils/logger.ts`. It silences debug/info/warn in production so user

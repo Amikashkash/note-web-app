@@ -18,8 +18,9 @@
 
 ### 1.1 הפונקציה
 
-- ב-`functions/src/index.ts` נוסף רק שורת export אחת לפונקציה חדשה, `mcp`. כל הקוד שלה יושב בתיקיות חדשות (ראו סעיף 4). **את `syncNoteReminders` ואת `sendDueReminders` לא נוגעים.**
-- `onRequest` מ-`firebase-functions/v2/https`, עם אפליקציית Express קטנה. Express כבר מגיעה כתלות של `firebase-functions`, אבל נוסיף אותה במפורש ל-`package.json`.
+- ב-`functions/src/index.ts` נוסף רק שורת export אחת לפונקציה חדשה, `mcp`. כל הקוד שלה יושב בתיקיות חדשות (ראו סעיף 4). **את `onNoteWritten`, `sendDueReminders` ו-`findUserByEmail` לא נוגעים.**
+- **Baseline:** `firebase-functions` v7 (7.4.0 היום) ו-`firebase-admin` 13, Node 22 (`.nvmrc`, `engines`), region `europe-west1`. כל מה שכאן מניח את הגרסאות האלה.
+- `onRequest` מ-`firebase-functions/v2/https`, עם אפליקציית Express קטנה. `firebase-functions` 7 תלויה ב-**Express 5** (`^5.2.1`), ולכן גם האפליקציה שלנו Express 5: תחביר נתיבים של path-to-regexp 8 (wildcard עם שם, בלי `?` אופציונלי), ו-`async` handlers מעבירים שגיאות ל-error middleware בעצמם. נוסיף את `express@^5` במפורש ל-`package.json`, באותה גרסה ראשית, כדי שלא יותקנו שתי גרסאות.
 - אפשרויות לפונקציה:
   - `region`: **לא מצוין בנפרד** - `functions/src/index.ts` קורא ל-`setGlobalOptions({ region: 'europe-west1' })` (branch `claude/housekeeping`, אחרי בדיקה מול `firebase firestore:databases:get`), וכל פונקציה חדשה יורשת אותו אוטומטית. זה גם מיקום מסד הנתונים, כך שהפונקציה קוראת Firestore מקומית ולא חוצה יבשת. Hosting rewrite עדיין דורש לציין את ה-region המפורש (`europe-west1`) בקובץ ה-rewrite עצמו - `setGlobalOptions` לא משפיע עליו.
   - `memory: '256MiB'`, `timeoutSeconds: 30`.
@@ -265,7 +266,10 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 ### 3.2 הערובה: `UserScope` במקום אחד
 
 1. **רק מודול אחד מחזיק את `db`:** `functions/src/notesCore/store.ts`. ממנו נחשפת רק מחלקה `UserScope`.
-2. **`UserScope` נבנה רק מתוך `AuthContext` מאומת.** ה-constructor פרטי. יש factory אחד, `scopeFromAuth(auth)`, וה-middleware של סעיף 2.3.9 הוא היחיד שקורא לו. `uid` לא מגיע אף פעם מקלט של tool.
+2. **`UserScope` נבנה רק מתוך זהות מאומתת.** ה-constructor פרטי. יש factory אחד, `UserScope.for(identity)`, והוא מקבל רק `VerifiedIdentity` (`notesCore/identity.ts`, מומש בשלב 1א):
+   - טיפוס ממותג, ובנוסף בדיקה בזמן ריצה (WeakSet) שהאובייקט יצא מ-`mintVerifiedIdentity`. גם `{ uid } as VerifiedIdentity` נדחה.
+   - `mintVerifiedIdentity(uid)` נקרא רק ב-`oauth/verify.ts` (ה-middleware של 2.3.9), אחרי אימות ה-token. ESLint חוסם את הייבוא שלו בכל מקום אחר ב-`functions/src`.
+   - `uid` לא מגיע אף פעם מקלט של tool.
 3. **כל השאילתות נבנות בתוך `UserScope`:**
    - `listAccessibleNotes()` מריץ תמיד שתי שאילתות, `where('userId','==',uid)` ו-`where('sharedWith','array-contains',uid)`, וממזג אותן. זה אותו דפוס כמו `subscribeToNotes` בלקוח.
    - `listAccessibleCategories()` באותו אופן.
@@ -273,7 +277,9 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 4. **גישה לפי id עוברת בפונקציה אחת:** `loadNoteForUser(noteId, need: 'read' | 'write' | 'owner')`.
    - היא קוראת את המסמך ובודקת `userId == uid || sharedWith.includes(uid)`.
    - עבור `'owner'` היא דורשת `userId == uid`.
-   - היא **מחזירה `NotFound` זהה** גם כשהפתק לא קיים וגם כשאין הרשאה, כדי לא לאפשר enumeration.
+   - היא **מחזירה `NotFound` זהה** גם כשהפתק לא קיים, גם כשהוא של משתמש אחר וגם כשהוא רגיש, כדי לא לאפשר enumeration.
+   - `Forbidden` רק כשהפתק **גלוי** למשתמש והפעולה דורשת יותר (שותף מול `'owner'`, למשל ארכוב). זה לא חושף כלום, כי המשתמש כבר רואה את הפתק. הבדיקה של רגישות קודמת לבדיקת ההרשאה, כך שפתק רגיש תמיד `NotFound`.
+   - פתק מאורכב של הבעלים לא מופיע ברשימות של שותף (כמו באפליקציה), אבל נטען לפי מזהה, כי ה-rules מתירים לו לקרוא אותו.
    - כל פעולת כתיבה משתמשת בה בתוך transaction.
 5. **הרשאות ה-MCP הן תת-קבוצה של `firestore.rules`, אף פעם לא יותר.** המיפוי מוגדר בטבלה אחת (`permissions.ts`):
    - `read`: בעלים או שיתוף.
@@ -286,7 +292,7 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 6. **קטגוריית יעד** (ב-`create_note` או ב-`move_note_to_category`) נבדקת ב-`loadCategoryForUser(categoryId, 'owner')`, באותו דפוס. קטגוריה רגישה מחזירה `NotFound` (3.4).
 7. **אכיפה סטטית:**
    - כלל ESLint `no-restricted-imports` ב-`functions/` אוסר `firebase-admin/firestore` מחוץ ל-`notesCore/store.ts` ו-`oauth/store.ts`. גם הקבצים הקיימים (`index.ts`) מוחרגים במפורש.
-   - ל-`functions/` אין כרגע ESLint. הוספה של config מינימלי היא חלק מהמשימה.
+   - ה-config של השורש (`eslint.config.js`) כבר מכסה את `functions/**/*.ts`. הכלל נוסף שם בשלב 0, יחד עם שני גבולות נוספים: `mintVerifiedIdentity` רק מ-`oauth/verify.ts`, ו-notesCore לא מייבא מ-`mcp/` או מ-`oauth/`.
 8. **בדיקת רגרסיה גנרית:** test שעובר על **כל tool רשום** (מתוך `listTools`), מריץ אותו עם `noteId` ו-`categoryId` של משתמש זר (על ה-emulator), ומצפה ל-`NotFound`. tool חדש שנוסף מכוסה אוטומטית. **אותה בדיקה רצה גם מול פתק רגיש ומול קטגוריה רגישה** (3.4).
 
 ### 3.3 אבטחה נוספת
@@ -332,7 +338,7 @@ Claude                MCP fn (RS+AS)                  SPA /connect            Fi
 - **אין שום tool שמשנה `isSensitive`.** השדה לא ב-allowlist של `sanitizeNotePatch`. הוא נקבע רק באפליקציה, על ידי הבעלים, ונאכף ב-`firestore.rules` (review §12.2).
 - **היסטוריית גרסאות (`notes/{noteId}/versions`, צעד B6):** הגרסאות של פתק רגיש רגישות גם הן.
   - הרגישות נקבעת לפי **הפתק הנוכחי** ולא לפי הגרסה. גרסה לא שומרת `isSensitive` משלה, ופתק שסומן רגיש מסתיר גם גרסאות שנשמרו לפני הסימון.
-  - `UserScope` לא מספק גישה ישירה לגרסאות. כל tool עתידי שיחשוף היסטוריה או undo ניגש אליה רק דרך `loadNoteForUser(noteId)`, ולכן פתק רגיש מחזיר `NotFound` עוד לפני שהגרסאות נקראות.
+  - הגישה היחידה לגרסאות היא `UserScope.listVersionsForNote(noteId)`. היא קוראת קודם ל-`loadNoteForUser(noteId)`, ולכן פתק זר או רגיש מחזיר `NotFound` עוד לפני שהגרסאות נקראות. כל tool עתידי של היסטוריה או undo עובר דרכה.
   - אסור ליצור שאילתת collection group על `versions` מתוך MCP. היא עוקפת את הבדיקה לפי פתק.
   - הבדיקה הגנרית (3.2.8) תכלול כל tool כזה ביום שיתווסף.
 - **Audit log:** אין רשומות על פתקים רגישים, כי אין גישה אליהם. אם פתק הפך לרגיש אחרי שנכתב, רשומות ה-audit הקודמות נשארות (הן של הבעלים, לא נחשפות ל-MCP).
@@ -355,14 +361,17 @@ functions/src/
   recurrence.ts, timezone.ts  ← קיימים, נקראים גם משכבת הנתונים (לולידציה בלבד)
   notesCore/               ← שכבת נתונים. לא יודעת מה זה MCP
     store.ts               ← UserScope: הקובץ היחיד שמחזיק את db של notes/categories
-    permissions.ts         ← טבלת ההרשאות (סעיף 3.2.5)
-    model.ts               ← Note / Category / NoteSummary (בלי תלות ב-Firestore Timestamp; ISO strings)
-    mappers.ts             ← נרמול מסמכים (מראה של src/services/api/mappers.ts)
+    identity.ts            ← VerifiedIdentity + mintVerifiedIdentity (3.2.2)
+    visibility.ts          ← isVisibleToMcp (3.4)
+    permissions.ts         ← טבלת ההרשאות + sanitizeNotePatch (סעיף 3.2.5). טהור: גם בדיקות ה-rules מייבאות אותו
+    model.ts               ← Note / Category / NoteVersion (בלי תלות ב-Firestore Timestamp; ISO strings)
+    mappers.ts             ← נרמול מסמכים (מראה מותאמת של src/services/api/mappers.ts)
     content/               ← codecs לתוכן התבניות
-      index.ts             ← parseContent(note) / serializeContent(type, value): dispatch לפי templateType + shape detection
-      checklist.ts shopping.ts workplan.ts accounting.ts recipe.ts plain.ts
-      render.ts            ← תוכן לטקסט קריא ל-LLM (מראה של utils/backupFormat.ts)
-    search.ts              ← חיפוש בזיכרון (מראה של src/utils/search.ts)
+      templateContent.ts   ← מראה מילה במילה של src/utils/templateContent.ts (פענוח כל התבניות, המרה, הוספה)
+      render.ts            ← מראה של החלק המציג ב-src/utils/backupFormat.ts (renderNoteContent)
+      types.ts             ← מראה של src/types/template.ts
+      index.ts             ← parseContent(type, content) / serializeContent(parsed): שמירת שדות לא מוכרים (extra)
+    search.ts              ← חיפוש בזיכרון על טקסט מרונדר (מבוסס src/utils/search.ts)
     audit.ts               ← writeAudit(tx, entry)
     errors.ts              ← NotFound / Forbidden / Conflict / Invalid: שגיאות דומיין
   oauth/                   ← Authorization Server
@@ -439,7 +448,7 @@ defineTool({
 | Tool | קלט | התנהגות |
 |---|---|---|
 | `create_note` | `categoryId`, `title`, `templateType` (ברירת מחדל `plain`), `text?` או `items?` | בונה את התוכן דרך ה-codec (תבנית רשימה נכתבת ישר כ-`items` עם `contentFormat: 2`). `userId=uid`, `sharedWith: []`, `isPinned:false`, `isArchived:false`, `isSensitive:false`, `isEmpty` מחושב, `revision: 1`, `updatedBy: 'mcp:<clientId>'`, `pos`/`order` בסוף הקטגוריה, `tags: []`, `color: null`, ו-`createdAt`/`updatedAt` מהשרת. **קטגוריית היעד חייבת להיות בבעלות המשתמש** (החלטה). קטגוריה משותפת של מישהו אחר אסורה בינתיים. |
-| `add_checklist_item` | `noteId`, `text`, `dueDate?` (`YYYY-MM-DD`), `dueTime?` (`HH:MM`), `repeat?` (`daily\|weekly\|monthly\|yearly`) | רק ל-`templateType == 'checklist'` (או תוכן שזוהה כ-checklist). `id = Date.now().toString()`, כמו בלקוח, עם הגנה מהתנגשות. ולידציה: `repeat` דורש `dueDate` ו-`dueTime` (כך בממשק). התאריך נבדק עם `localDateTimeToDate`. **כתיבת שדה אחת:** `items.<newId> = {...}` + `revision: increment(1)` + `updatedBy`, בתוך ה-transaction של ה-tool (בשביל `loadNoteForUser` וה-audit). אין קריאה-שינוי-כתיבה של רשימה, ואין `expectedRevision`. פתק בפורמט הישן מומר ל-`items` באותה transaction (מיגרציה עצלה, review E1). הטריגר הקיים `syncNoteReminders` רואה את הכתיבה ויוצר תזכורת, **בלי שום שינוי בו**. פלט: `{noteId,itemId,revision,reminderScheduled: boolean, remindAt?}`. |
+| `add_checklist_item` | `noteId`, `text`, `dueDate?` (`YYYY-MM-DD`), `dueTime?` (`HH:MM`), `repeat?` (`daily\|weekly\|monthly\|yearly`) | רק ל-`templateType == 'checklist'` (או תוכן שזוהה כ-checklist). `id = Date.now().toString()`, כמו בלקוח, עם הגנה מהתנגשות. ולידציה: `repeat` דורש `dueDate` ו-`dueTime` (כך בממשק). התאריך נבדק עם `localDateTimeToDate`. **כתיבת שדה אחת:** `items.<newId> = {...}` + `revision: increment(1)` + `updatedBy`, בתוך ה-transaction של ה-tool (בשביל `loadNoteForUser` וה-audit). אין קריאה-שינוי-כתיבה של רשימה, ואין `expectedRevision`. פתק בפורמט הישן מומר ל-`items` באותה transaction (מיגרציה עצלה, review E1). הטריגר הקיים `onNoteWritten` (סנכרון התזכורות שבו) רואה את הכתיבה ויוצר תזכורת, **בלי שום שינוי בו**. פלט: `{noteId,itemId,revision,reminderScheduled: boolean, remindAt?}`. |
 | `update_note` | `noteId`, `expectedRevision?`, ואחד או יותר מ: `title`, `text` (plain), `itemPatches` (`[{itemId, text?, completed?, dueDate?, dueTime?, repeat?\|null, deleted?}]`), `isPinned` | **`itemPatches`**: כתיבות field-path ל-`items.<id>.<field>`, ומחיקה כ-tombstone. לא דורש `expectedRevision`, ולא נוגע בפריטים אחרים או בשדות לא מוכרים. **`text`** (plain): דורש `expectedRevision`, שנבדק ב-transaction בצד השרת, כי Admin SDK עוקף את ה-rule (7.2). אי-התאמה מחזירה `Conflict`. **`title`**: last-write-wins. אין "החלפת כל הרשימה". |
 | `move_note_to_category` | `noteId`, `categoryId` | **בעלים בלבד** (החלטה). היעד חייב להיות קטגוריה **בבעלות המשתמש** ולא רגישה (אותו כלל כמו ב-`create_note`). מעדכן `categoryId` ו-`pos` (סוף הקטגוריה). **לא** משנה `sharedWith`, עד להחלטת SH-3 ב-review. |
 | `archive_note` | `noteId` | `isArchived:true`, `archivedAt: serverTimestamp()`, כמו `archiveNote` בלקוח. הטריגר מוחק את התזכורות. בעלים בלבד. אפשר לשחזר מהאפליקציה. |
@@ -561,16 +570,17 @@ match /config/{id}         { allow read, write: if false; }
 
 ### 8.3 סדר מימוש
 
-כל שלב נכנס ב-commit נפרד עם העלאת גרסה ורשומה ב-WhatsNew, לפי `CLAUDE_GUIDELINES.md`. **החלטה (שאלה 12): branch ו-PR לכל שלב (0, 1א, 1ב, 1ג, 2). הבעלים עושה review לפני merge.** אין דחיפה ישירה ל-`main`.
+כל שלב נכנס ב-commits נפרדים. העלאת גרסה ורשומה ב-WhatsNew רק כשהאפליקציה משתנה (לפי `CLAUDE_GUIDELINES.md`) - שלבים 0 ו-1א לא משנים אותה ולא רצים בפרודקשן. **החלטה (שאלה 12): branch ו-PR לכל שלב (0, 1א, 1ב, 1ג, 2). הבעלים עושה review לפני merge.** אין דחיפה ישירה ל-`main`.
 
-**שלב 0: תשתית (בלי השפעה על משתמשים)**
-1. ESLint מינימלי ל-`functions/` + כלל `no-restricted-imports` (3.2.7).
-2. תשתית בדיקות ל-`functions/`: `vitest` + Firebase Emulator Suite (Firestore ו-Auth). `npm run test` ב-`functions/`.
-3. `notesCore/content/*` + `render.ts` + בדיקות יחידה על דוגמאות מכל תבנית, כולל תוכן "לא תואם לסוג" ושדות לא מוכרים שנשמרים.
+**שלב 0: תשתית (בלי השפעה על משתמשים)** - מומש ב-branch `claude/mcp-core`
+1. כלל `no-restricted-imports` ל-`functions/` ב-config של השורש (3.2.7).
+2. תשתית בדיקות ל-`functions/`: כבר קיימת (`npm test` ו-`test:emulator` ב-`functions/`, `npm run test:functions:emulator` בשורש).
+3. `notesCore/content/*` + `render.ts` + בדיקות יחידה על דוגמאות מכל תבנית, כולל תוכן "לא תואם לסוג" ושדות לא מוכרים שנשמרים. בדיקת המראות (`tests/mirrors/notesCore.mirror.test.ts`, רצה עם `npm test` בשורש) משווה גם את קוד המראה למקור וגם את הפלט על אותן דוגמאות.
 
-**שלב 1א: שכבת נתונים לקריאה**
+**שלב 1א: שכבת נתונים לקריאה** - מומש ב-branch `claude/mcp-core`
 4. `notesCore/store.ts` (`UserScope`, `loadNoteForUser`, `listAccessible*`, `isVisibleToMcp`), `permissions.ts`, `search.ts`. **תלוי ב-C6 ב-review** (השדה `isSensitive` קיים והבעלים יכול לסמן לפני שהשרת עולה).
-5. בדיקות emulator: משתמש A, משתמש B, פתק משותף, קטגוריה משותפת, פתק זר.
+5. בדיקות emulator: משתמש A, משתמש B, פתק משותף, קטגוריה משותפת, פתק זר, פתק רגיש, פתק בקטגוריה רגישה, פתק שהקטגוריה שלו נמחקה, פתק מאורכב. הבדיקה הגנרית של 3.2.8 כבר רצה ברמת `UserScope`: כל מתודה ציבורית מול כל סוג של מסמך מוסתר, ובדיקה שנכשלת אם נוספה מתודה שלא נכנסה לטבלה. בשלב 1ג היא תורחב לכל tool רשום.
+   - בנוסף, בדיקות ה-rules (`tests/rules`) מריצות כל שדה מ-`NOTE_PATCH_FIELDS` מול `firestore.rules` - ההוכחה ש-3.2.5 הוא תת-קבוצה.
 
 **שלב 1ב: OAuth**
 6. `oauth/tokens.ts`, `oauth/store.ts`, metadata endpoints.

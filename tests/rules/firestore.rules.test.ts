@@ -33,6 +33,11 @@ import {
   where,
   type Firestore,
 } from 'firebase/firestore';
+import {
+  NOTE_PATCH_FIELDS,
+  sanitizeNotePatch,
+  type NotePatchField,
+} from '../../functions/src/notesCore/permissions';
 
 const OWNER = 'owner-uid';
 const SHARED = 'shared-uid';
@@ -533,6 +538,38 @@ describe('sensitive notes and categories (C6)', () => {
     await assertSucceeds(
       updateDoc(doc(as(SHARED), 'notes/secret-1'), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// הרשאות notesCore (שרת ה-MCP) - תת-קבוצה של ה-rules (mcp-plan §3.2.5)
+//
+// ה-Admin SDK עוקף את ה-rules, ולכן כל שדה ש-`sanitizeNotePatch` מתיר
+// למשתמש חייב להיות מותר לו גם כאן. שדה חדש ב-`NOTE_PATCH_FIELDS` בלי
+// ערך לדוגמה כאן מכשיל את הבדיקה.
+// ---------------------------------------------------------------------------
+
+describe('notesCore permissions are a subset of the rules', () => {
+  const SAMPLE: Record<NotePatchField, unknown> = {
+    title: 'כותרת מ-MCP',
+    content: '[{"id":"1","text":"x","completed":false}]',
+    isPinned: true,
+    isArchived: true,
+    categoryId: 'cat-2',
+  };
+
+  const users = { owner: OWNER, shared: SHARED } as const;
+  const cases = (Object.entries(NOTE_PATCH_FIELDS) as [NotePatchField, 'read' | 'write' | 'owner'][]).flatMap(
+    ([field, need]) =>
+      (['owner', 'shared'] as const)
+        .filter((access) => access === 'owner' || need !== 'owner')
+        .map((access) => [field, access] as const)
+  );
+
+  it.each(cases)('%s by the %s is allowed by the rules too', async (field, access) => {
+    const uid = users[access];
+    const patch = sanitizeNotePatch({ [field]: SAMPLE[field] }, access);
+    await assertSucceeds(updateDoc(doc(as(uid), 'notes/note-1'), { ...patch, updatedBy: uid }));
   });
 });
 
