@@ -219,6 +219,7 @@ export const Share: React.FC = () => {
           sharedWith: [],
           isPinned: false,
           isSensitive: false,
+          isReadOnly: false,
         });
       }
 

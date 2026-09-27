@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase/config';
 import { getDefaultCategory } from '@/utils/defaults';
-import type { Category, CategoryInput } from '@/types';
+import type { Category, CategoryFlags, CategoryInput } from '@/types';
 import { toCategory } from './mappers';
 import { findUserIdByEmail } from './users';
 import { logger } from '@/utils/logger';
@@ -42,13 +42,14 @@ export const createCategory = async (
   userId: string,
   name: string,
   color?: string,
-  isSensitive = false
+  flags: CategoryFlags = {}
 ): Promise<string> => {
   try {
     const docRef = await addDoc(categoriesRef(), {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
-      isSensitive,
+      isSensitive: flags.isSensitive ?? false,
+      isReadOnly: flags.isReadOnly ?? false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

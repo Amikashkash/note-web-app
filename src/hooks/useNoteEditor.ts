@@ -64,6 +64,7 @@ export const useNoteEditor = (categoryId: string) => {
         sharedWith: [],
         isPinned: false,
         isSensitive: false,
+        isReadOnly: false,
       };
 
       return run(() => createNote(newNote));

@@ -573,6 +573,94 @@ describe('notesCore permissions are a subset of the rules', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// קריאה בלבד ל-Claude (`isReadOnly`) ו"נוצר ע"י Claude" (`createdVia`)
+// ---------------------------------------------------------------------------
+
+describe('read-only for Claude (isReadOnly)', () => {
+  it("a shared user cannot set or clear the flag on the owner's note or category", async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/readonly-1'), { ...baseNote, isReadOnly: true });
+    });
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { isReadOnly: true, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/readonly-1'), { isReadOnly: false, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(SHARED), 'categories/cat-1'), { isReadOnly: true }));
+  });
+
+  it('the owner sets and clears it on notes and categories, and can create with it', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { isReadOnly: true, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { isReadOnly: false, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'categories/cat-1'), { isReadOnly: true }));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'categories/new-ro'), { ...baseCategory, isReadOnly: true }));
+  });
+
+  it('a shared user can still edit the content of a read-only note in the app', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/readonly-2'), { ...baseNote, isReadOnly: true });
+    });
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/readonly-2'), { content: '[]', updatedBy: SHARED }));
+  });
+});
+
+describe('created by Claude (createdVia)', () => {
+  const seedMcpNote = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/mcp-1'), { ...baseNote, createdVia: 'mcp' });
+    });
+
+  it('the app cannot create a note that claims to be created by Claude', async () => {
+    await assertFails(setDoc(doc(as(OWNER), 'notes/fake-mcp'), { ...baseNote, sharedWith: [], createdVia: 'mcp' }));
+  });
+
+  it('nobody can add, change or remove the marker from the app, not even the owner', async () => {
+    await seedMcpNote();
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { createdVia: 'mcp', updatedBy: OWNER }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/mcp-1'), { createdVia: 'app', updatedBy: OWNER }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/mcp-1'), { createdVia: 'app', updatedBy: SHARED }));
+  });
+
+  it('a note Claude created is edited normally in the app', async () => {
+    await seedMcpNote();
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/mcp-1'), { title: 'ערוך', updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/mcp-1'), { content: '[]', updatedBy: SHARED }));
+  });
+});
+
+describe("Claude's audit log and idempotency keys", () => {
+  const seedAudit = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'auditLog/a1'), { uid: OWNER, action: 'note.create', target: { id: 'n1' } });
+      await setDoc(doc(db, 'mcpIdempotency/k1'), { uid: OWNER, noteId: 'n1' });
+    });
+
+  it('the owner reads and lists their own entries', async () => {
+    await seedAudit();
+    await assertSucceeds(getDoc(doc(as(OWNER), 'auditLog/a1')));
+    await assertSucceeds(getDocs(query(collection(as(OWNER), 'auditLog'), where('uid', '==', OWNER))));
+  });
+
+  it('nobody else reads them, and nobody lists all entries', async () => {
+    await seedAudit();
+    await assertFails(getDoc(doc(as(STRANGER), 'auditLog/a1')));
+    await assertFails(getDoc(doc(as(SHARED), 'auditLog/a1')));
+    await assertFails(getDocs(collection(as(OWNER), 'auditLog')));
+  });
+
+  it('no client writes or deletes the log, not even the owner', async () => {
+    await seedAudit();
+    await assertFails(setDoc(doc(as(OWNER), 'auditLog/a2'), { uid: OWNER, action: 'note.create' }));
+    await assertFails(updateDoc(doc(as(OWNER), 'auditLog/a1'), { action: 'nothing' }));
+    await assertFails(deleteDoc(doc(as(OWNER), 'auditLog/a1')));
+  });
+
+  it('idempotency keys are closed to clients', async () => {
+    await seedAudit();
+    await assertFails(getDoc(doc(as(OWNER), 'mcpIdempotency/k1')));
+    await assertFails(setDoc(doc(as(OWNER), 'mcpIdempotency/k2'), { uid: OWNER }));
+  });
+});
+
 describe('rateLimits (findUserByEmail counters)', () => {
   it('are never readable or writable by a client', async () => {
     await assertFails(getDoc(doc(as(OWNER), `rateLimits/findUserByEmail_${OWNER}`)));

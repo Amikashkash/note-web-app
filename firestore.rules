@@ -55,9 +55,10 @@ service cloud.firestore {
 
       // `isSensitive` (§12 בסקירה): רק הבעלים מסמן או מבטל. אחרת שותף
       // יכול היה לחשוף ל-Claude של כולם קטגוריה שהבעלים הסתיר.
+      // `isReadOnly` (קריאה בלבד ל-Claude) - אותו כלל.
       allow update: if isOwner(resource.data.userId)
         || (isSharedWithMe(resource.data) && ownershipUnchanged()
-          && ownerOnlyFieldsUnchanged(['isSensitive']))
+          && ownerOnlyFieldsUnchanged(['isSensitive', 'isReadOnly']))
         || isLeavingShare();
 
       allow delete: if isOwner(resource.data.userId);
@@ -88,18 +89,27 @@ service cloud.firestore {
           || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']);
       }
 
+      // `createdVia` ("נוצר ע"י Claude") נכתב רק ע"י השרת (Admin SDK).
+      // האפליקציה לא יוצרת אותו, לא משנה ולא מוחקת - כך הסימון אמין.
+      function createdViaUnchanged() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdVia']);
+      }
+
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
+        && !('createdVia' in request.resource.data)
         && (!('updatedBy' in request.resource.data)
           || request.resource.data.updatedBy == request.auth.uid);
 
       // שותף לא משנה `isSensitive` ולא `categoryId` (§12.2): העברה של פתק
       // מקטגוריה רגישה לקטגוריה שלו הייתה מבטלת את הרגישות בפועל, וגם
       // "מעלימה" את הפתק מהבעלים (SH-2).
+      // `isReadOnly` (קריאה בלבד ל-Claude) - רק הבעלים, כמו `isSensitive`.
       allow update: if writerStampPhase1()
+        && createdViaUnchanged()
         && (isOwner(resource.data.userId)
           || (isSharedWithMe(resource.data) && ownershipUnchanged()
-            && ownerOnlyFieldsUnchanged(['isSensitive', 'categoryId']))
+            && ownerOnlyFieldsUnchanged(['isSensitive', 'categoryId', 'isReadOnly']))
           || isLeavingShare());
 
       allow delete: if isOwner(resource.data.userId);
@@ -206,6 +216,19 @@ service cloud.firestore {
     match /oauthGrants/{grantId} {
       allow read: if isOwner(resource.data.uid);
       allow write: if false;
+    }
+
+    // יומן הפעולות של Claude (mcp-plan §6). נכתב רק בשרת, באותו transaction
+    // של הכתיבה עצמה. הבעלים רואה את מה ש-Claude עשה בשמו - "פעילות Claude"
+    // בהגדרות. אין כתיבה מהאפליקציה, גם לא מחיקה.
+    match /auditLog/{entryId} {
+      allow read: if isOwner(resource.data.uid);
+      allow write: if false;
+    }
+
+    // מניעת כפילויות ב-`create_note` (retry אחרי timeout). שרת בלבד.
+    match /mcpIdempotency/{key} {
+      allow read, write: if false;
     }
 
     // allowlist המשתמשים של שרת ה-MCP (`config/mcp`). נערך רק מה-console:

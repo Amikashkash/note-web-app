@@ -11,7 +11,7 @@ import { Unsubscribe } from 'firebase/firestore';
 import * as categoryAPI from '@/services/api/categories';
 import { getErrorMessage, loadErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import type { Category, CategoryInput } from '@/types';
+import type { Category, CategoryFlags, CategoryInput } from '@/types';
 
 interface CategoryState {
   categories: Category[];
@@ -31,7 +31,7 @@ interface CategoryState {
   /** הקמה מחדש של המאזין אחרי שגיאת טעינה */
   retry: () => void;
 
-  createCategory: (userId: string, name: string, color?: string, isSensitive?: boolean) => Promise<void>;
+  createCategory: (userId: string, name: string, color?: string, flags?: CategoryFlags) => Promise<void>;
   updateCategory: (categoryId: string, updates: Partial<CategoryInput>) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
   clearError: () => void;
@@ -137,8 +137,8 @@ export const useCategoryStore = create<CategoryState>((set, get) => {
       });
     },
 
-    createCategory: async (userId, name, color, isSensitive) => {
-      await runWrite(() => categoryAPI.createCategory(userId, name, color, isSensitive));
+    createCategory: async (userId, name, color, flags) => {
+      await runWrite(() => categoryAPI.createCategory(userId, name, color, flags));
     },
 
     updateCategory: async (categoryId, updates) => {

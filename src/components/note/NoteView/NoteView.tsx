@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, Lock, Pencil, X } from 'lucide-react';
+import { Eye, Lock, PenOff, Pencil, Sparkles, X } from 'lucide-react';
 import { Note, TemplateType } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -46,7 +46,7 @@ interface NoteViewProps {
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
   onUpdate?: (noteId: string, updates: NoteUpdates) => void;
   onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
-  categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean }>;
+  categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean; isReadOnly?: boolean }>;
 }
 
 /** תבניות שהתוכן שלהן נערך כטקסט ולכן יש להן מתג צפייה/עריכה */
@@ -193,6 +193,10 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const categoryIsSensitive =
     categories.find((category) => category.id === note.categoryId)?.isSensitive === true;
 
+  /** הקטגוריה של הפתק לקריאה בלבד ל-Claude - ואז גם הפתק, בלי דגל משלו */
+  const categoryIsReadOnly =
+    categories.find((category) => category.id === note.categoryId)?.isReadOnly === true;
+
   /**
    * סימון רגיש (C6). רק לבעלים - ה-rules דוחים את זה משותף. לא יוצר
    * גרסה בהיסטוריה, כי זה לא שינוי תוכן.
@@ -201,6 +205,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
     saveUpdates.flush();
     try {
       await noteAPI.setNoteSensitive(note.id, !note.isSensitive);
+    } catch (error) {
+      window.alert(getErrorMessage(error));
+    }
+  };
+
+  /** קריאה בלבד ל-Claude. רק לבעלים (rules), ולא יוצר גרסה */
+  const handleToggleReadOnly = async () => {
+    saveUpdates.flush();
+    try {
+      await noteAPI.setNoteReadOnly(note.id, !note.isReadOnly);
     } catch (error) {
       window.alert(getErrorMessage(error));
     }
@@ -332,6 +346,24 @@ export const NoteView: React.FC<NoteViewProps> = ({
                   </span>
                 </>
               )}
+              {(note.isReadOnly || categoryIsReadOnly) && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1" title="Claude יכול לקרוא, לא לשנות">
+                    <PenOff size={14} strokeWidth={2} />
+                    קריאה בלבד ל-Claude
+                  </span>
+                </>
+              )}
+              {note.createdVia === 'mcp' && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 text-brand dark:text-brand-dark">
+                    <Sparkles size={14} strokeWidth={2} />
+                    נוצר ע״י Claude
+                  </span>
+                </>
+              )}
               <span>•</span>
               <span>
                 {note.updatedAt.toDate().toLocaleDateString('he-IL', {
@@ -413,12 +445,38 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 רגיש - מוסתר מ-Claude
               </span>
               <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
-                כשהאפליקציה תחובר ל-Claude, הוא לא יראה את הפתק הזה בכלל. מה שכבר נקרא בשיחה קודמת
-                לא נמחק ממנה, וזו לא הצפנה - הפתק נשמר כרגיל.
+                Claude לא יראה את הפתק הזה בכלל. מה שכבר נקרא בשיחה קודמת לא נמחק ממנה, וזו לא
+                הצפנה - הפתק נשמר כרגיל.
               </span>
               {!note.isSensitive && categoryIsSensitive && (
                 <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
                   הפתק כבר מוסתר, כי הקטגוריה שלו מסומנת כרגישה.
+                </span>
+              )}
+            </span>
+          </label>
+        )}
+
+        {/* קריאה בלבד ל-Claude - רק הבעלים מסמן */}
+        {isOwner && (
+          <label className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-raised-light dark:bg-raised-dark cursor-pointer">
+            <input
+              type="checkbox"
+              checked={note.isReadOnly}
+              onChange={handleToggleReadOnly}
+              className="mt-1 h-4 w-4 accent-brand"
+            />
+            <span className="text-body-sm text-ink-light dark:text-ink-dark">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <PenOff size={14} strokeWidth={2} />
+                קריאה בלבד ל-Claude
+              </span>
+              <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
+                Claude יכול לקרוא את הפתק אבל לא לשנות אותו. באפליקציה הוא נשאר ניתן לעריכה.
+              </span>
+              {!note.isReadOnly && categoryIsReadOnly && (
+                <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
+                  הפתק כבר לקריאה בלבד, כי הקטגוריה שלו מסומנת כך.
                 </span>
               )}
             </span>

@@ -8,7 +8,7 @@
 import { useCallback, useEffect } from 'react';
 import { useCategoryStore } from '@/store/categoryStore';
 import { useAuthStore } from '@/store/authStore';
-import type { CategoryInput } from '@/types';
+import type { CategoryFlags, CategoryInput } from '@/types';
 
 export const useCategories = () => {
   const userId = useAuthStore((state) => state.user?.uid);
@@ -33,9 +33,9 @@ export const useCategories = () => {
   }, [userId, subscribe, unsubscribe]);
 
   const addCategory = useCallback(
-    async (name: string, color?: string, isSensitive?: boolean) => {
+    async (name: string, color?: string, flags?: CategoryFlags) => {
       if (!userId) throw new Error('משתמש לא מחובר');
-      await createCategory(userId, name, color, isSensitive);
+      await createCategory(userId, name, color, flags);
     },
     [createCategory, userId]
   );
@@ -46,14 +46,15 @@ export const useCategories = () => {
       name?: string,
       color?: string,
       icon?: string,
-      isSensitive?: boolean
+      flags: CategoryFlags = {}
     ) => {
       const updates: Partial<CategoryInput> = {};
       if (name !== undefined) updates.name = name;
       if (color !== undefined) updates.color = color;
       if (icon !== undefined) updates.icon = icon;
-      // רק כשהשתנה, ורק מהבעלים (ה-rules דוחים את זה משותף)
-      if (isSensitive !== undefined) updates.isSensitive = isSensitive;
+      // רק כשהשתנו, ורק מהבעלים (ה-rules דוחים אותם משותף)
+      if (flags.isSensitive !== undefined) updates.isSensitive = flags.isSensitive;
+      if (flags.isReadOnly !== undefined) updates.isReadOnly = flags.isReadOnly;
 
       await updateCategory(categoryId, updates);
     },

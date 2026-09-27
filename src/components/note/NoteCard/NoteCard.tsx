@@ -2,7 +2,7 @@
  * קומפוננטה המציגה כרטיס פתק בודד
  */
 
-import { Eye, GripVertical, Lock, LogOut, Pin, Trash2 } from 'lucide-react';
+import { Eye, GripVertical, Lock, LogOut, PenOff, Pin, Sparkles, Trash2 } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Button } from '@/components/common/Button';
 import { getNotePreview } from '@/utils/notePreview';
@@ -131,6 +131,22 @@ export const NoteCard: React.FC<NoteCardProps> = ({
                 strokeWidth={2}
                 className="inline-block me-1 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
                 aria-label="רגיש - מוסתר מ-Claude"
+              />
+            )}
+            {note.isReadOnly && (
+              <PenOff
+                size={14}
+                strokeWidth={2}
+                className="inline-block me-1 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
+                aria-label="קריאה בלבד ל-Claude"
+              />
+            )}
+            {note.createdVia === 'mcp' && (
+              <Sparkles
+                size={14}
+                strokeWidth={2}
+                className="inline-block me-1 -mt-0.5 text-brand dark:text-brand-dark"
+                aria-label="נוצר ע״י Claude"
               />
             )}
             {note.title}
