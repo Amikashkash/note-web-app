@@ -63,7 +63,7 @@ done
 | `datastore.indexAdmin` | פריסת `firestore.indexes.json` |
 | `serviceusage.serviceUsageConsumer` | ה-Firebase CLI בודק שה-APIs פעילים |
 
-**כשתתווסף פריסה של שרת ה-MCP** (Hosting rewrite לפונקציה), הפריסה צריכה גם `roles/run.viewer`. פריסת Functions מה-CI, אם תוחלט, צריכה עוד תפקידים. לא מוסיפים אותם מראש.
+**שרת ה-MCP** (Hosting rewrite לפונקציה `mcp`, מ-`claude/mcp-read`): פריסת Hosting צריכה גם `roles/run.viewer`, כדי שה-CLI יוכל למצוא את הפונקציה שה-rewrite מפנה אליה. נוסף לפני ה-merge של שלב 1ג (ראו תיאור ה-PR). פריסת Functions מה-CI, אם תוחלט, צריכה עוד תפקידים. לא מוסיפים אותם מראש.
 
 ## שלב 3: Workload Identity Pool ו-Provider של GitHub
 

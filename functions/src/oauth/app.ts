@@ -17,9 +17,11 @@ import express, { type NextFunction, type Request, type RequestHandler, type Res
 import type { Auth } from 'firebase-admin/auth';
 import { logger } from 'firebase-functions';
 import { authorize } from './authorize';
+import { clientIp } from './clientIp';
 import { RATE_LIMITS, type RateLimitedEndpoint, type RateLimitWindow } from './config';
 import { decide, describeRequest } from './decision';
 import { OAuthError, tooManyRequests } from './errors';
+import { revokeMcpGrant } from './grants';
 import { authorizationServerMetadata, protectedResourceMetadata } from './metadata';
 import { registerClient } from './register';
 import { revokeToken } from './revoke';
@@ -46,20 +48,10 @@ const ERROR_PAGE = `<!doctype html>
 <p lang="en" dir="ltr">The authorization request is invalid. Return to the application and try again.</p>
 </body></html>`;
 
-/**
- * מפתח להגבלת קצב לפי IP: hash, כדי שכתובות IP לא יישמרו במסד.
- *
- * ה-IP נלקח מהערך הראשון ב-`X-Forwarded-For`, שלקוח יכול לזייף. זיוף
- * עוקף רק את המגבלה לכל IP - התקרה הכללית נשארת. ⚠️ לבדוק בשלב 1ג, מאחורי
- * rewrite של Hosting, איזה header מחזיק את כתובת הלקוח האמיתית.
- */
-const ipKey = (req: Request): string => {
-  const forwarded = req.headers['x-forwarded-for'];
-  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
-  return sha256Hex(first || req.socket.remoteAddress || 'unknown').slice(0, 32);
-};
+/** מפתח להגבלת קצב לפי IP: hash, כדי שכתובות IP לא יישמרו במסד. ראו `clientIp.ts` */
+const ipKey = (req: Request): string => sha256Hex(clientIp(req.headers, req.socket.remoteAddress).ip).slice(0, 32);
 
-const securityHeaders: RequestHandler = (_req, res, next) => {
+export const securityHeaders: RequestHandler = (_req, res, next) => {
   res.set({
     'Cache-Control': 'no-store',
     Pragma: 'no-cache',
@@ -115,7 +107,10 @@ export const createOAuthApp = ({ store, auth, clock = Date.now, rateLimits = RAT
 
   app.post('/oauth/register', json, rateLimited('register'), async (req, res) => {
     const client = await registerClient({ store, body: req.body, now: clock() });
-    logger.info('oauth.client_registered', { clientId: client.client_id });
+    logger.info('oauth.client_registered', {
+      clientId: client.client_id,
+      ipSource: clientIp(req.headers, req.socket.remoteAddress).source,
+    });
     res.status(201).json(client);
   });
 
@@ -146,10 +141,20 @@ export const createOAuthApp = ({ store, auth, clock = Date.now, rateLimits = RAT
     res.json(result);
   });
 
+  // "אפליקציות מחוברות" בהגדרות: ניתוק חיבור ע"י המשתמש
+  app.post('/oauth/grants/revoke', json, async (req, res) => {
+    const { grantId } = await revokeMcpGrant({ store, auth, authorization: req.headers.authorization, body: req.body });
+    logger.info('oauth.grant_revoked_by_user', { grantId });
+    res.json({ revoked: true });
+  });
+
   app.post('/oauth/token', form, rateLimited('token'), async (req, res) => {
     const params = asParams(req.body);
     const tokens = await exchangeToken({ store, params, now: clock() });
-    logger.info('oauth.token_issued', { grantType: params.grant_type === 'refresh_token' ? 'refresh_token' : 'authorization_code' });
+    logger.info('oauth.token_issued', {
+      grantType: params.grant_type === 'refresh_token' ? 'refresh_token' : 'authorization_code',
+      ipSource: clientIp(req.headers, req.socket.remoteAddress).source,
+    });
     res.json(tokens);
   });
 

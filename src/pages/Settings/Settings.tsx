@@ -6,6 +6,8 @@ import React from 'react';
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { BackupSection } from '@/components/settings/BackupSection';
+import { ConnectedAppsSection } from '@/components/settings/ConnectedAppsSection';
+import { MCP_CONNECT_ENABLED } from '@/utils/features';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -29,6 +31,7 @@ export const Settings: React.FC = () => {
       {/* Content */}
       <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
         <BackupSection />
+        {MCP_CONNECT_ENABLED && <ConnectedAppsSection />}
       </main>
     </div>
   );

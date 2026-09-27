@@ -601,11 +601,20 @@ match /config/{id}         { allow read, write: if false; }
      - ה-Service Worker מטפל בכל ניווט (`NavigationRoute` ב-`src/sw.ts`, network-first). להוסיף `denylist` ל-`/oauth/` ול-`/.well-known/`, כדי שניווט ל-`/oauth/authorize` לא יעבור דרכו.
      - להגדיר `VITE_MCP_CONNECT=true` ב-build של ה-CI.
 
-**שלב 1ג: MCP קריאה**
+**שלב 1ג: MCP קריאה** - מומש ב-branch `claude/mcp-read`
 11. `mcp/http.ts`, `server.ts`, `defineTool.ts`, ו-4 tools הקריאה.
-12. rewrites ב-`firebase.json`. פריסה: `firebase deploy --only functions:mcp,hosting,firestore:rules`, **לא** `--only functions` כולו, כדי לא לגעת בפונקציות הקיימות מעבר לנדרש.
-13. חיבור אמיתי מ-claude.ai (Settings → Connectors → Add custom connector), ובנוסף מ-Claude Code (`claude mcp add --transport http notes https://.../mcp`) לבדיקת loopback.
-14. "אפליקציות מחוברות" בפרופיל + `revokeMcpGrant` callable.
+12. rewrites ב-`firebase.json`. פריסה: `functions:mcp` בלבד מהמחשב, **לא** `--only functions` כולו. Hosting ו-rules נפרסים מה-CI אחרי ה-merge.
+13. חיבור אמיתי מ-claude.ai (Settings → Connectors → Add custom connector). **בלי Claude Code**: loopback לא נתמך (§2.3.3).
+14. "אפליקציות מחוברות" בהגדרות + `revokeMcpGrant`.
+   - **מה שהשתנה מהתכנון בזמן המימוש:**
+     - **SDK:** `@modelcontextprotocol/server` 2.1.0 (v2 יציב מ-2.0.0, יולי 2026), נעול לגרסה מדויקת, בלי `@modelcontextprotocol/node` (שמושך את Hono). הפרוטוקול המודרני (2026-07-28) דרך `createMcpHandler` עם `responseMode: 'json'`; ה-handshake של 2025 דרך transport עם `enableJsonResponse`. בלי SSE בשום מסלול.
+     - `functions/tsconfig.json` עבר ל-`module`/`moduleResolution: node16`, כדי לקרוא את ה-`exports` של ה-SDK. הפלט עדיין CommonJS. בדיקות: `bundler`.
+     - **`revokeMcpGrant` הוא route בתוך `mcp`** (`POST /oauth/grants/revoke`, עם Firebase ID token) ולא callable נפרד. כך הפריסה נשארת `functions:mcp` בלבד. `lastUsedAt` מתעדכן ב-`verify.ts`, לכל היותר פעם ב-10 דקות.
+     - **הקוד של `mcp` נטען lazy** (`import()` בתוך ה-handler), כדי שה-SDK לא ייטען ב-cold start של שאר הפונקציות.
+     - **פלט:** טקסט בלבד, בלי `structuredContent`/`outputSchema` ובלי `parsed`/`revision` ב-`get_note`: הם נדרשים לכתיבה (שלב 2). תקרה של 20,000 תווים לתשובה, רשימות עם cursor, והודעה מפורשת בכל חיתוך.
+     - **כתובת הלקוח (שאלת PR #9):** מאחורי Hosting, `X-Forwarded-For` מסתיים בשרת ה-CDN ו-`Fastly-Client-IP` מחזיק את הלקוח. ה-URL של Cloud Run ציבורי, ולכן אף header לא אמין לגמרי. `clientIp.ts` לוקח `Fastly-Client-IP`, ואחריו את הערך **האחרון** ב-`X-Forwarded-For`; `ipSource` נרשם בלוג לאימות בפרודקשן. ההגנה האמיתית: התקרה הכללית, והגבלה לכל משתמש על `/mcp` (לפי ה-uid מה-token).
+     - **cold start (מדידה מקומית):** הקוד שלנו מוסיף כ-390ms (מודולי בסיס 220, SDK ו-zod 160, בניית האפליקציה 10). ב-Cloud Run, עם CPU איטי יותר, הפעלת container וחיבור Firestore ראשון, ההערכה היא 2 עד 4 שניות לבקשה ראשונה. בטווח של 10 השניות של Claude. מדידה אמיתית אחרי הפריסה (תיאור ה-PR), ורק אז החלטה על `minInstances`.
+     - **ה-emulator של Hosting לא מחיל `headers` בכלל** (נבדק גם עם `**` על קובץ סטטי). ה-headers של `/connect` נבדקים ב-`tests/hosting` וב-`curl` אחרי הפריסה.
 
 **שלב 2: כתיבה**
 15. **תנאי מקדים:** review D4, E1, E2 ו-E2b ב-production (7.3). לא חלק מה-branch של MCP.

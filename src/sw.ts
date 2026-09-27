@@ -12,6 +12,7 @@ declare const self: ServiceWorkerGlobalScope;
 
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { SW_NAVIGATION_DENYLIST } from './utils/swRoutes';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
@@ -66,14 +67,16 @@ self.addEventListener('fetch', (event) => {
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// ניווטים - רשת תחילה, עם נפילה ל-cache אם הרשת איטית
+// ניווטים - רשת תחילה, עם נפילה ל-cache אם הרשת איטית.
+// חוץ מ-MCP ו-OAuth, שהולכים ישר לרשת (ראו `swRoutes.ts`).
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
       cacheName: 'pages-cache',
       networkTimeoutSeconds: 3,
       plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
-    })
+    }),
+    { denylist: SW_NAVIGATION_DENYLIST }
   )
 );
 
