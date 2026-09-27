@@ -9,6 +9,8 @@
  *
  * `findUserByEmail` - callable לשיתוף לפי אימייל (`userLookup.ts`).
  *
+ * `mcp` - שרת ה-MCP וה-OAuth של Claude (`mcp/http.ts`, `thinking/mcp-plan.md`).
+ *
  * למה בטריגר ולא בלקוח: יש כמה מסלולים ששומרים פתק (טופס הפתק, עריכה
  * inline, קליטת שיתוף, ובעתיד MCP), וטריגר רואה כל כתיבה בהגדרה - גם
  * מחיקה וארכוב - בלי קוד ייעודי בכל מסלול.
@@ -20,7 +22,7 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -255,3 +257,24 @@ export const sendDueReminders = onSchedule(
     }
   }
 );
+
+// ==================== שרת MCP ====================
+
+/**
+ * `/mcp`, `/oauth/*` ו-`/.well-known/*` דרך rewrites של Hosting (`firebase.json`).
+ *
+ * הקוד נטען רק בבקשה הראשונה (`import()`): כל הפונקציות נבנות מאותו
+ * `index.js`, ובלי זה ה-MCP SDK היה נטען גם ב-cold start של התזכורות
+ * ושל הטריגר על הפתקים, שאין להם בו צורך.
+ *
+ * - `timeoutSeconds: 30`: Claude מחכה 10 שניות ל-discovery ול-token, ו-30 ל-refresh.
+ * - `maxInstances: 5`: תקרת עלות. שימוש אישי לא מתקרב אליה.
+ * - בלי `minInstances`: עולה כסף גם בלי שימוש. ההחלטה אחרי מדידת cold
+ *   start (mcp-plan §1.1).
+ * - ציבורית (ברירת המחדל של `onRequest`): Hosting ו-Claude קוראים לה בלי
+ *   הרשאת IAM. האימות הוא ה-OAuth של האפליקציה.
+ */
+export const mcp = onRequest({ timeoutSeconds: 30, maxInstances: 5 }, async (req, res) => {
+  const { mcpApp } = await import('./mcp/http.js');
+  (await mcpApp())(req, res);
+});
