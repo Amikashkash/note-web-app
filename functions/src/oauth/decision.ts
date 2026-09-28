@@ -22,7 +22,7 @@
  */
 
 import type { Auth } from 'firebase-admin/auth';
-import { ISSUER, LIFETIMES } from './config';
+import { CONSENT_VERSION, ISSUER, LIFETIMES } from './config';
 import { OAuthError } from './errors';
 import { isUserAllowed } from './policy';
 import type { OAuthStore, RequestRecord } from './store';
@@ -161,6 +161,7 @@ export const decide = async ({
       uid,
       clientId: request.clientId,
       grantId: randomSecret(),
+      consentVersion: CONSENT_VERSION,
       codeChallenge: request.codeChallenge,
       redirectUri: request.redirectUri,
       resource: request.resource,

@@ -28,7 +28,6 @@ export const CategoryView: React.FC = () => {
   const {
     notes,
     saveNote,
-    updateNoteFields,
     moveToCategory,
     deleteNote,
     pinNote,
@@ -255,7 +254,6 @@ export const CategoryView: React.FC = () => {
           onClose={handleCloseNoteView}
           onDelete={deleteNote}
           onTogglePin={pinNote}
-          onUpdate={updateNoteFields}
           onMoveToCategory={moveToCategory}
           categories={categoriesForMove}
         />

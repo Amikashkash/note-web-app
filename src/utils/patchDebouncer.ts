@@ -17,6 +17,8 @@ export interface PatchDebouncer<T extends object> {
   flush: () => void;
   /** זורק את מה שנצבר בלי לשלוח */
   cancel: () => void;
+  /** יש שינוי שנצבר ועוד לא נשלח */
+  hasPending: () => boolean;
   /** מחליף את פונקציית השמירה (הקולבק של הקומפוננטה מתחלף בכל רינדור) */
   setSave: (save: (patch: Partial<T>) => void) => void;
 }
@@ -55,6 +57,7 @@ export const createPatchDebouncer = <T extends object>(
       clearTimer();
       pending = null;
     },
+    hasPending: () => pending !== null,
     setSave: (next) => {
       save = next;
     },

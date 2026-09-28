@@ -5,11 +5,15 @@
  * כתיבה נפרדת ל-Firestore - כלומר משפט אחד היה עולה עשרות כתיבות,
  * ומרוץ מול המאזין בזמן אמת. כעת השינויים נצברים ונשמרים פעם אחת
  * אחרי הפסקה בהקלדה, ובכל מקרה בסגירת המודאל.
+ *
+ * דריסה (C-1): הטיוטה, השמירה וההאזנה לשינויים מרחוק ב-`useNoteSync`.
+ * שינוי שהגיע מבחוץ מאומץ, ממוזג, או מוביל לבחירה של המשתמש - אף פעם
+ * לא נדרס בשקט.
  */
 
 import { useState } from 'react';
 import { Eye, Lock, PenOff, Pencil, Sparkles, X } from 'lucide-react';
-import { Note, TemplateType } from '@/types/note';
+import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
@@ -25,18 +29,14 @@ import { NoteHistory } from '@/components/note/NoteHistory/NoteHistory';
 import type { NoteVersion } from '@/types/version';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
-import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
-import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
+import { useNoteSync } from '@/hooks/useNoteSync';
+import { useNotePresence } from '@/hooks/useNotePresence';
+import { presenceMessage } from '@/utils/presence';
+import { LENGTH_LIMITS } from '@/utils/constants';
+import { DiscardedTextPanel, NoteConflictPanel } from './NoteConflict';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
 import { getErrorMessage } from '@/utils/errors';
-
-export interface NoteUpdates {
-  title?: string;
-  content?: string;
-  /** רק להמרה לטקסט חופשי של תוכן שהתבנית לא פענחה */
-  templateType?: TemplateType;
-}
 
 interface NoteViewProps {
   note: Note;
@@ -44,7 +44,6 @@ interface NoteViewProps {
   /** ארכוב - רק לבעלים. מי שאינו בעלים מקבל "הסר אותי" במקומו */
   onDelete?: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
-  onUpdate?: (noteId: string, updates: NoteUpdates) => void;
   onMoveToCategory?: (noteId: string, newCategoryId: string) => void;
   categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean; isReadOnly?: boolean }>;
 }
@@ -57,7 +56,6 @@ export const NoteView: React.FC<NoteViewProps> = ({
   onClose,
   onDelete,
   onTogglePin,
-  onUpdate,
   onMoveToCategory,
   categories = [],
 }) => {
@@ -68,40 +66,32 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [title, setTitle] = useState(note.title);
-  const [content, setContent] = useState(note.content);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [draftNoteId, setDraftNoteId] = useState(note.id);
+  const [shownNoteId, setShownNoteId] = useState(note.id);
+  const editor = useNoteSync(note);
+  const { title, content, conflict } = editor;
+  // "פתוח גם במקום אחר": נוחות בלבד. ההגנה מדריסה היא ב-useNoteSync
+  const presence = useNotePresence(note.id);
+  const openElsewhere = presence.myUid ? presenceMessage(presence.others, presence.myUid) : null;
 
-  // כשמוצג פתק אחר - מאתחלים את הטיוטה המקומית.
-  // האיפוס נעשה בזמן הרינדור ולא ב-effect, כך שאין רינדור ביניים
-  // שמציג את הפתק החדש עם הטקסט של הקודם.
-  //
-  // מסתנכרנים לפי מזהה הפתק בלבד: עדכון שמגיע מהמאזין בזמן אמת
-  // לא אמור לדרוס טקסט שהמשתמש מקליד ברגע זה.
-  if (draftNoteId !== note.id) {
-    setDraftNoteId(note.id);
-    setTitle(note.title);
-    setContent(note.content);
+  // פתק אחר - חוזרים לצפייה (הטיוטה עצמה מתאפסת ב-useNoteSync)
+  if (shownNoteId !== note.id) {
+    setShownNoteId(note.id);
     setIsEditMode(false);
   }
+
+  // בזמן התנגשות אין עריכה: העורך מציג את הטקסט של המשתמש, קפוא, עד שיבחר
+  const editing = isEditMode && !conflict;
 
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
 
-  const saveUpdates = useDebouncedPatch<NoteUpdates>((updates) => {
-    onUpdate?.(note.id, updates);
-  }, AUTOSAVE_DELAY_MS);
-
   const handleTitleChange = (newTitle: string) => {
-    const trimmed = newTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE);
-    setTitle(trimmed);
-    saveUpdates.call({ title: trimmed });
+    editor.edit({ title: newTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE) });
   };
 
   const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    saveUpdates.call({ content: newContent });
+    editor.edit({ content: newContent });
   };
 
   /**
@@ -110,8 +100,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * יחד עם כל שינוי שעוד ממתין.
    */
   const handleConvertToText = () => {
-    saveUpdates.call({ templateType: 'plain' });
-    saveUpdates.flush();
+    editor.edit({ templateType: 'plain' });
+    editor.flush();
   };
 
   /**
@@ -119,7 +109,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * בגרסאות ולא תדרוס שחזור שייעשה מתוך החלון.
    */
   const handleOpenHistory = () => {
-    saveUpdates.flush();
+    editor.flush();
     setShowHistory(true);
   };
 
@@ -127,15 +117,13 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * אחרי שחזור, הטיוטה המקומית מתחלפת בתוכן המשוחזר. בלי זה העריכה
    * הבאה הייתה שולחת את הטיוטה הישנה - ומבטלת את השחזור בשקט.
    */
-  const handleRestored = (version: NoteVersion) => {
-    saveUpdates.cancel();
-    setTitle(version.title);
-    setContent(version.content);
+  const handleRestored = (_version: NoteVersion) => {
+    editor.onRestored();
   };
 
   /** סוגר את המודאל אחרי ששמר שינוי שממתין */
   const handleClose = () => {
-    saveUpdates.flush();
+    editor.flush();
     onClose();
   };
 
@@ -145,7 +133,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
         'האם אתה בטוח שברצונך להעביר פתק זה לארכיון?\n\nתוכל לשחזר אותו מהארכיון במידת הצורך.'
       )
     ) {
-      saveUpdates.cancel();
+      editor.cancel();
       onDelete?.(note.id);
       onClose();
     }
@@ -166,7 +154,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
       return;
     }
 
-    saveUpdates.cancel();
+    editor.cancel();
     try {
       await noteAPI.leaveSharedNote(note.id);
       onClose();
@@ -202,7 +190,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * גרסה בהיסטוריה, כי זה לא שינוי תוכן.
    */
   const handleToggleSensitive = async () => {
-    saveUpdates.flush();
+    editor.flush();
     try {
       await noteAPI.setNoteSensitive(note.id, !note.isSensitive);
     } catch (error) {
@@ -212,7 +200,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
 
   /** קריאה בלבד ל-Claude. רק לבעלים (rules), ולא יוצר גרסה */
   const handleToggleReadOnly = async () => {
-    saveUpdates.flush();
+    editor.flush();
     try {
       await noteAPI.setNoteReadOnly(note.id, !note.isReadOnly);
     } catch (error) {
@@ -237,7 +225,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
       return;
     }
 
-    saveUpdates.flush();
+    editor.flush();
     onMoveToCategory(note.id, newCategoryId);
     setShowMoveMenu(false);
     onClose();
@@ -250,7 +238,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <AccountingTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={false}
+            readOnly={Boolean(conflict)}
             onConvertToText={handleConvertToText}
           />
         );
@@ -259,7 +247,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <ChecklistTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!isEditMode}
+            readOnly={!editing}
             onConvertToText={handleConvertToText}
           />
         );
@@ -268,7 +256,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <RecipeTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={false}
+            readOnly={Boolean(conflict)}
             onConvertToText={handleConvertToText}
           />
         );
@@ -277,7 +265,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <ShoppingTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={false}
+            readOnly={Boolean(conflict)}
             onConvertToText={handleConvertToText}
           />
         );
@@ -286,12 +274,12 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <WorkPlanTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!isEditMode}
+            readOnly={!editing}
             onConvertToText={handleConvertToText}
           />
         );
       default:
-        return isEditMode ? (
+        return editing ? (
           <EnhancedTextarea
             value={content}
             onChange={handleContentChange}
@@ -387,6 +375,26 @@ export const NoteView: React.FC<NoteViewProps> = ({
           )}
         </div>
 
+        {openElsewhere && (
+          <div
+            role="status"
+            className="mb-4 rounded-lg bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark p-3 text-sm"
+          >
+            👥 {openElsewhere} שינויים של כל צד יופיעו אצל השני. אם שניכם תשנו את אותו מקום, תתבקשו לבחור איזו גרסה
+            לשמור.
+          </div>
+        )}
+
+        {/* התנגשות עם שינוי מרחוק (C-1): השמירה עצרה, המשתמש בוחר */}
+        {conflict && <NoteConflictPanel onReload={editor.reloadRemote} onSaveMine={editor.saveMineAsNew} />}
+        {editor.discarded && (
+          <DiscardedTextPanel
+            text={editor.discarded}
+            templateType={note.templateType}
+            onDismiss={editor.dismissDiscarded}
+          />
+        )}
+
         {/* תוכן */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
@@ -396,7 +404,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
                 onClick={() => setIsEditMode((previous) => !previous)}
                 className="inline-flex items-center gap-1.5 text-body-sm h-9 px-4 rounded-lg bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark transition-colors font-medium"
               >
-                {isEditMode ? (
+                {editing ? (
                   <>
                     <Eye size={16} strokeWidth={1.75} />
                     צפייה

@@ -35,6 +35,18 @@ export const REDIRECT_URI_ALLOWLIST: readonly string[] = ['https://claude.ai/api
  * (RFC 6749 §6): צריך לנתק ולחבר מחדש כדי לקבל כתיבה.
  */
 export const RESOURCE_SCOPES = ['notes.read', 'notes.write'] as const;
+
+/**
+ * גרסת הנוסח שהמשתמש אישר במסך ההסכמה. נשמרת ב-grant.
+ * - 1 (עד v1.25): "יצירת פתקים חדשים, בלי עריכה".
+ * - 2 (מ-v1.26): גם עדכון משימות והוספת טקסט בסוף פתק.
+ *
+ * `notes.write` מכסה את שתיהן מבחינת הרשאה, אבל חיבור שאושר בנוסח 1
+ * לא הסכים לעריכה. לכן כלי העריכה דורשים 2, וחיבור ישן מקבל הודעה
+ * שצריך לחבר מחדש (בלי scope חדש).
+ */
+export const CONSENT_VERSION = 2;
+export const EDIT_CONSENT_VERSION = 2;
 export const SUPPORTED_SCOPES: readonly string[] = [...RESOURCE_SCOPES, 'offline_access'];
 export const DEFAULT_SCOPE = 'notes.read';
 

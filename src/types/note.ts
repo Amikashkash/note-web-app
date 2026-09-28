@@ -42,13 +42,18 @@ export interface Note {
   archivedAt?: Timestamp;
   /** מי כתב אחרון. נקבע ע"י שכבת השמירה ונאכף ב-rules; חסר בפתקים ישנים */
   updatedBy?: string;
+  /**
+   * מונה גרסאות של התוכן (C-1): כל כתיבה של כותרת/תוכן/תבנית מעלה אותו
+   * ב-1. פתק פתוח מזהה כך שינוי מרחוק. חסר בפתקים ישנים = 0.
+   */
+  revision: number;
 }
 // תזכורות אינן שדה של הפתק. הן שייכות למשימה בודדת ברשימת משימות,
 // ומתוחזקות בקולקציה נפרדת ע"י טריגר בענן - ראה `functions/src/index.ts`.
 
 export type NoteInput = Omit<
   Note,
-  'id' | 'createdAt' | 'updatedAt' | 'updatedBy' | 'isArchived' | 'archivedAt'
+  'id' | 'createdAt' | 'updatedAt' | 'updatedBy' | 'isArchived' | 'archivedAt' | 'revision'
 >;
 
 /**

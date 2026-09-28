@@ -86,8 +86,9 @@ describe('write access on the consent screen', () => {
     expect(requestsWrite(['notes.read', 'offline_access'])).toBe(false);
   });
 
-  it('says it creates notes and does not edit or delete them', () => {
+  it('says what write access allows, and that nothing is deleted', () => {
     expect(scopeLabel('notes.write')).toContain('יצירת פתקים חדשים');
-    expect(scopeLabel('notes.write')).toContain('בלי עריכה או מחיקה');
+    expect(scopeLabel('notes.write')).toContain('עדכון משימות');
+    expect(scopeLabel('notes.write')).toContain('בלי מחיקה');
   });
 });

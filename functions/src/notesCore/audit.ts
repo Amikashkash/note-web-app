@@ -30,19 +30,53 @@ export interface NoteCreatedSummary {
   reminderCount: number;
 }
 
+export type AuditAction = 'note.create' | 'checklist_item.update' | 'note.append';
+
 export interface AuditEntry {
   uid: string;
-  /** למי שייך הפתק. היום זהה ל-`uid` (יצירה רק בקטגוריה בבעלות) */
+  /** למי שייך הפתק. היום זהה ל-`uid` (יצירה ועריכה רק בבעלות) */
   noteOwnerId: string;
   grantId: string;
   clientId: string;
   clientName: string;
   source: 'mcp';
   tool: string;
-  action: 'note.create';
+  action: AuditAction;
   target: { collection: 'notes'; id: string };
-  summary: NoteCreatedSummary;
+  summary: NoteCreatedSummary | NoteEditedSummary;
+  /** בעריכה: החלק שהשתנה, לפני ואחרי (mcp-plan §6) */
+  changes?: { before: unknown; after: unknown };
 }
+
+export interface NoteEditedSummary {
+  title: string;
+  templateType: string;
+  categoryId: string;
+  /** תיאור קצר של השינוי, לרשימת "פעילות Claude" */
+  description: string;
+  revisionBefore: number;
+  revisionAfter: number;
+}
+
+export const noteEditedEntry = (
+  actor: WriteActor,
+  noteId: string,
+  action: Exclude<AuditAction, 'note.create'>,
+  summary: NoteEditedSummary,
+  changes: { before: unknown; after: unknown }
+): AuditEntry => ({
+  uid: actor.uid,
+  noteOwnerId: actor.uid,
+  grantId: actor.grantId,
+  clientId: actor.clientId,
+  clientName: actor.clientName,
+  source: 'mcp',
+  tool: actor.tool,
+  action,
+  target: { collection: 'notes', id: noteId },
+  summary,
+  changes,
+});
 
 export const noteCreatedEntry = (actor: WriteActor, noteId: string, summary: NoteCreatedSummary): AuditEntry => ({
   uid: actor.uid,

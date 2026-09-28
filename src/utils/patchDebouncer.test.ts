@@ -112,4 +112,16 @@ describe('createPatchDebouncer', () => {
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledWith({ title: 'a' });
   });
+
+  it('reports a pending patch until it is sent or cancelled (C-1: unsaved edits)', () => {
+    const debouncer = createPatchDebouncer<NoteUpdates>(vi.fn(), 600);
+    expect(debouncer.hasPending()).toBe(false);
+    debouncer.call({ content: 'x' });
+    expect(debouncer.hasPending()).toBe(true);
+    debouncer.flush();
+    expect(debouncer.hasPending()).toBe(false);
+    debouncer.call({ content: 'y' });
+    debouncer.cancel();
+    expect(debouncer.hasPending()).toBe(false);
+  });
 });

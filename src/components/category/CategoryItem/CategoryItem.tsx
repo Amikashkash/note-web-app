@@ -34,7 +34,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
   const {
     notes,
     saveNote,
-    updateNoteFields,
     moveToCategory,
     deleteNote,
     pinNote,
@@ -301,7 +300,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
           onClose={() => setViewingNote(null)}
           onDelete={deleteNote}
           onTogglePin={pinNote}
-          onUpdate={updateNoteFields}
           onMoveToCategory={moveToCategory}
           categories={categoriesForMove}
         />
