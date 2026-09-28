@@ -329,17 +329,20 @@ describe('the /mcp endpoint', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'notes-4-me' } } });
   });
 
-  it('lists the four read tools and create_note, each with a description', async () => {
+  it('lists the four read tools and the three write tools, each with a description', async () => {
     const { tools } = await clientA.listTools();
+    const writeTools = ['append_to_text_note', 'create_note', 'update_checklist_item'];
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'append_to_text_note',
       'create_note',
       'get_note',
       'list_categories',
       'list_notes',
       'search_notes',
+      'update_checklist_item',
     ]);
     for (const tool of tools) {
-      expect(tool.annotations).toMatchObject({ readOnlyHint: tool.name !== 'create_note', destructiveHint: false });
+      expect(tool.annotations).toMatchObject({ readOnlyHint: !writeTools.includes(tool.name), destructiveHint: false });
       expect(tool.description?.length).toBeGreaterThan(150);
     }
   });
@@ -436,7 +439,7 @@ describe('get_note', () => {
     expect(isError).toBe(false);
     expect(output).toContain(`Title: ${PRIVATE.title}`);
     expect(output).toContain('Category: בית');
-    expect(output).toContain(`- [ ] ${PRIVATE.item}\n- [x] לחם`);
+    expect(output).toContain(`- [ ] ${PRIVATE.item}  (item id: i1)\n- [x] לחם  (item id: i2)`);
     expect(output).toContain('--- end of note content ---');
   });
 

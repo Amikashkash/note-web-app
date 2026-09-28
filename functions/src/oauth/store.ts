@@ -61,6 +61,8 @@ export interface CodeRecord {
   uid: string;
   clientId: string;
   grantId: string;
+  /** גרסת נוסח ההסכמה שאושר (`CONSENT_VERSION`). חסר = 1 */
+  consentVersion?: number;
   codeChallenge: string;
   redirectUri: string;
   resource: string;
@@ -74,6 +76,8 @@ export interface GrantRecord {
   grantId: string;
   uid: string;
   clientId: string;
+  /** גרסת נוסח ההסכמה שאושר. חסר (חיבור מלפני v1.26) = 1 */
+  consentVersion?: number;
   clientName: string;
   scope: string;
   createdAt: number;

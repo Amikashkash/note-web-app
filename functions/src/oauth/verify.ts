@@ -34,6 +34,8 @@ export interface AuthContext {
   clientId: string;
   /** שם הלקוח מההרשמה, לרישום ב-audit */
   clientName: string;
+  /** גרסת נוסח ההסכמה שהמשתמש אישר לחיבור הזה (ראו `CONSENT_VERSION`) */
+  consentVersion: number;
   grantId: string;
   scopes: string[];
 }
@@ -117,6 +119,7 @@ export const verifyAccessToken = async ({
     identity: mintVerifiedIdentity(record.uid),
     clientId: record.clientId,
     clientName: grant.clientName,
+    consentVersion: grant.consentVersion ?? 1,
     grantId: record.grantId,
     scopes: record.scope.split(' ').filter(Boolean),
   };

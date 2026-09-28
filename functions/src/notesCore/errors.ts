@@ -42,6 +42,20 @@ export class ReadOnlyError extends Error {
   }
 }
 
+/**
+ * הפתק פתוח עכשיו באפליקציה (סימון נוכחות טרי). עריכה מהשרת בזמן הזה
+ * הייתה מתנגשת עם העורך הפתוח, ולכן לא כותבים ומבקשים לסגור אותו.
+ */
+export class OpenElsewhereError extends Error {
+  readonly code = 'open-elsewhere';
+  readonly devices: string[];
+  constructor(devices: string[]) {
+    super('The note is open in the app');
+    this.name = 'OpenElsewhereError';
+    this.devices = devices;
+  }
+}
+
 /** קלט שלא עבר ולידציה (שדה לא מותר, טיפוס שגוי, אורך חורג) */
 export class InvalidError extends Error {
   readonly code = 'invalid';

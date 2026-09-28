@@ -118,6 +118,7 @@ const exchangeCode = async (store: OAuthStore, params: Record<string, unknown>, 
 
     const grant: GrantRecord = {
       grantId: record.grantId,
+      consentVersion: record.consentVersion ?? 1,
       uid: record.uid,
       clientId: record.clientId,
       clientName: client.clientName,

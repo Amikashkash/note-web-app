@@ -16,6 +16,7 @@ import { parseContent } from '../notesCore/content';
 import type { Category, Note } from '../notesCore/model';
 import type { MatchField } from '../notesCore/search';
 import { OUTPUT } from './config';
+import { checklistRows, shownItemId } from './editNote';
 
 /**
  * "קטגוריה" וירטואלית לפתקים ששותפו עם המשתמש בתוך קטגוריה של הבעלים
@@ -144,8 +145,30 @@ export const formatCategories = (
 };
 
 /** פתק מלא ל-`get_note`. התוכן נחתך בתקרה, עם הודעה מפורשת */
+/**
+ * רשימת משימות עם המזהה של כל משימה - מה ש-`update_checklist_item` צריך.
+ * `null` כשהתוכן לא רשימה (אז מוצג הרינדור הרגיל).
+ */
+const checklistWithIds = (content: string): string | null => {
+  const rows = checklistRows(content);
+  if (!rows || rows.length === 0) return null;
+  return rows
+    .map((row, index) => {
+      const facts = [
+        `item id: ${shownItemId(row, index)}`,
+        row.dueDate ? `due ${[row.dueDate, row.dueTime].filter(Boolean).join(' ')}` : null,
+        row.repeat ? `repeats ${String(row.repeat)}` : null,
+      ].filter(Boolean);
+      return `- [${row.completed === true ? 'x' : ' '}] ${oneLine(String(row.text ?? ''))}  (${facts.join(' · ')})`;
+    })
+    .join('\n');
+};
+
 export const formatNote = (note: Note, categoryName: string): string => {
-  const text = note.content.trim() ? parseContent(note.templateType, note.content).text : '(this note is empty)';
+  const text = !note.content.trim()
+    ? '(this note is empty)'
+    : (note.templateType === 'checklist' && checklistWithIds(note.content)) ||
+      parseContent(note.templateType, note.content).text;
 
   const header = [
     `Title: ${oneLine(note.title) || '(untitled)'}`,

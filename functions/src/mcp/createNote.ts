@@ -17,8 +17,7 @@
 import { createHash } from 'node:crypto';
 import { InvalidError } from '../notesCore/errors';
 import type { NoteDraft } from '../notesCore/store';
-import { isRepeatRule, nextOccurrence } from '../recurrence';
-import { localDateTimeToDate } from '../timezone';
+import { MAX_YEARS_AHEAD, validateTiming } from './dates';
 
 export const CREATE_LIMITS = {
   /** כמו `LENGTH_LIMITS.NOTE_TITLE` באפליקציה */
@@ -27,8 +26,7 @@ export const CREATE_LIMITS = {
   items: 100,
   itemText: 500,
   quantity: 50,
-  /** תאריך יעד רחוק מזה הוא כמעט תמיד טעות (שנה שגויה) */
-  maxYearsAhead: 5,
+  maxYearsAhead: MAX_YEARS_AHEAD,
 } as const;
 
 export type CreateType = 'text' | 'checklist' | 'shopping';
@@ -73,58 +71,16 @@ const oneLine = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 const invalid = (message: string) => new InvalidError(message);
 
-/** תאריך אמיתי בלוח השנה, לא רק בצורה הנכונה (2026-02-30 נדחה) */
-const isCalendarDate = (value: string): boolean => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const [year, month, day] = match.slice(1).map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-};
-
-const isClockTime = (value: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-
 const validateItemTiming = (item: CreateItemInput, label: string, now: Date): ScheduledReminder | null => {
-  const { dueDate, dueTime, repeat } = item;
-  if (dueDate === undefined && dueTime === undefined && repeat === undefined) return null;
-
-  if (dueDate !== undefined && !isCalendarDate(dueDate)) {
-    throw invalid(`${label}: dueDate "${dueDate}" is not a valid date. Use YYYY-MM-DD, for example 2026-10-05`);
-  }
-  if (dueTime !== undefined && !isClockTime(dueTime)) {
-    throw invalid(`${label}: dueTime "${dueTime}" is not a valid time. Use 24-hour HH:MM, for example 09:30`);
-  }
-  if (dueTime !== undefined && dueDate === undefined) {
-    throw invalid(`${label}: dueTime needs a dueDate. Add the date, or leave out the time`);
-  }
-  if (repeat !== undefined && !isRepeatRule(repeat)) {
-    throw invalid(`${label}: repeat must be one of daily, weekly, monthly, yearly`);
-  }
-  if (repeat !== undefined && (dueDate === undefined || dueTime === undefined)) {
-    throw invalid(`${label}: repeat needs both dueDate and dueTime (the first occurrence)`);
-  }
-
-  const date = dueDate as string;
-  const limit = new Date(now);
-  limit.setUTCFullYear(limit.getUTCFullYear() + CREATE_LIMITS.maxYearsAhead);
-  if (Date.parse(`${date}T00:00:00Z`) > limit.getTime()) {
-    throw invalid(`${label}: dueDate ${date} is more than ${CREATE_LIMITS.maxYearsAhead} years ahead. Check the year`);
-  }
-
-  // תאריך בלי שעה: יעד בתצוגה בלבד, בלי תזכורת (כמו באפליקציה)
-  if (dueTime === undefined) return null;
-
-  const firstAt = isRepeatRule(repeat)
-    ? nextOccurrence(date, dueTime, repeat, now)
-    : localDateTimeToDate(date, dueTime);
-  if (!firstAt) throw invalid(`${label}: could not read ${date} ${dueTime}`);
-  if (firstAt.getTime() <= now.getTime()) {
-    throw invalid(
-      `${label}: ${date} ${dueTime} Israel time has already passed, so no reminder would be sent. ` +
-        'Ask the user for a future time, or leave out dueTime to keep only the date'
-    );
-  }
-  return { text: oneLine(item.text), dueDate: date, dueTime, repeat: repeat ?? null, firstAt };
+  const firstAt = validateTiming(item, label, now);
+  if (!firstAt) return null;
+  return {
+    text: oneLine(item.text),
+    dueDate: item.dueDate as string,
+    dueTime: item.dueTime as string,
+    repeat: item.repeat ?? null,
+    firstAt,
+  };
 };
 
 /**

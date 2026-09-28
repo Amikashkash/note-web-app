@@ -29,6 +29,8 @@ export interface NoteRecord {
   isReadOnly: boolean;
   /** `'mcp'` כשהפתק נוצר ע"י Claude */
   createdVia: 'mcp' | null;
+  /** מונה גרסאות התוכן (C-1). כל כותב מעלה ב-1. חסר = 0 */
+  revision: number;
   createdAt: string | null;
   updatedAt: string | null;
   archivedAt: string | null;

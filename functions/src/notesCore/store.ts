@@ -20,8 +20,14 @@
 
 import { createHash } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
-import { AUDIT_RETENTION_MS, noteCreatedEntry, type NoteCreatedSummary, type WriteActor } from './audit';
-import { ForbiddenError, NotFoundError, ReadOnlyError } from './errors';
+import {
+  AUDIT_RETENTION_MS,
+  noteCreatedEntry,
+  noteEditedEntry,
+  type NoteCreatedSummary,
+  type WriteActor,
+} from './audit';
+import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from './errors';
 import { isVerifiedIdentity, type VerifiedIdentity } from './identity';
 import { toCategoryRecord, toNoteRecord, toNoteVersion } from './mappers';
 import type { Access, Category, CategoryRecord, Note, NoteRecord, NoteVersion } from './model';
@@ -35,8 +41,14 @@ const VERSIONS = 'versions';
 const AUDIT = 'auditLog';
 const IDEMPOTENCY = 'mcpIdempotency';
 
-/** חלון מניעת הכפילויות של `createNote` */
+/** חלון מניעת הכפילויות של `createNote` ו-`editNote` */
 export const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * סימון "הפתק פתוח" שרוענן בדקה האחרונה נחשב פתוח. זהה ל-`PRESENCE_TTL_MS`
+ * באפליקציה (`src/utils/presence.ts`): העורך מרענן כל 30 שניות.
+ */
+export const PRESENCE_TTL_MS = 60 * 1000;
 
 /** מספר הגרסאות המרבי שמוחזר - אותו סדר גודל כמו מה שהאפליקציה שומרת */
 const MAX_VERSIONS = 50;
@@ -95,6 +107,35 @@ export interface CreateNoteResult {
   note: Note;
   categoryName: string;
   /** `true` כשפתק זהה נוצר בחלון של 10 הדקות, והוחזר הוא במקום ליצור חדש */
+  duplicate: boolean;
+}
+
+/** עריכה של פתק קיים (שלב 2ב-lite). נבנית ומאומתת ב-`mcp/editNote.ts` */
+export interface NoteEdit {
+  action: 'checklist_item.update' | 'note.append';
+  /**
+   * מחיל את השינוי על **הגרסה העדכנית** של הפתק, בתוך ה-transaction.
+   * `null` - אין מה לשנות (הערכים כבר כאלה). שגיאה - `InvalidError`.
+   */
+  apply: (note: NoteRecord) => EditOutcome | null;
+  /** בקשה זהה בתוך 10 דקות לא מוחלת פעמיים (append אחרי timeout) */
+  fingerprint?: string;
+}
+
+export interface EditOutcome {
+  content: string;
+  /** לרשימת "פעילות Claude" */
+  description: string;
+  /** החלק שהשתנה, לפני ואחרי, ל-audit */
+  before: unknown;
+  after: unknown;
+}
+
+export interface EditNoteResult {
+  note: Note;
+  /** `false` - לא היה מה לשנות */
+  changed: boolean;
+  /** בקשה זהה כבר הוחלה בחלון של 10 דקות */
   duplicate: boolean;
 }
 
@@ -299,6 +340,112 @@ export class UserScope {
 
       const record = toNoteRecord(noteRef.id, data);
       return { note: toNote(record, 'owner', false), categoryName: category.name, duplicate: false };
+    });
+  }
+
+  /**
+   * עריכה של פתק קיים, על הגרסה העדכנית, ב-transaction אחד (שלב 2ב-lite).
+   *
+   * לפי הסדר:
+   * - לא קיים, זר, רגיש (או קטגוריה רגישה/חסרה) - `NotFound`, כמו כל קריאה.
+   * - לא בבעלות המשתמש (שותף) - `Forbidden`: בינתיים רק פתקים שלו.
+   * - קריאה בלבד ל-Claude (הפתק או הקטגוריה) - `ReadOnlyError`.
+   * - מאורכב - `InvalidError`.
+   * - פתוח באפליקציה (סימון נוכחות מהדקה האחרונה) - `OpenElsewhereError`,
+   *   ולא כותבים. זו שכבת נוחות: גם בלעדיה העורך הפתוח לא דורס (C-1).
+   * - בקשה זהה בחלון של 10 דקות - מוחזר מה שכבר נעשה.
+   *
+   * הכתיבה: התוכן, `revision + 1` (כל עורך פתוח מזהה אותה, וכל שמירה ישנה
+   * שלו תידחה ע"י ה-rules), ו-`updatedBy: mcp:<clientId>` - כותב אחר, ולכן
+   * היסטוריית הגרסאות שומרת את המצב שלפני Claude. רשומת audit באותו transaction.
+   */
+  async editNote(
+    noteId: string,
+    edit: NoteEdit,
+    actor: Omit<WriteActor, 'uid'>,
+    now: number
+  ): Promise<EditNoteResult> {
+    if (!isDocId(noteId)) throw new NotFoundError();
+    const noteRef = this.#db.collection(NOTES).doc(noteId);
+    const keyRef = edit.fingerprint
+      ? this.#db
+          .collection(IDEMPOTENCY)
+          .doc(createHash('sha256').update(`${this.uid}\n${noteId}\n${edit.fingerprint}`).digest('hex'))
+      : null;
+
+    return this.#db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(noteRef);
+      if (!snapshot.exists) throw new NotFoundError();
+      const record = toNoteRecord(snapshot.id, snapshot.data() ?? {});
+
+      const [categorySnapshot, presence, key] = await Promise.all([
+        isDocId(record.categoryId) ? tx.get(this.#db.collection(CATEGORIES).doc(record.categoryId)) : null,
+        tx.get(noteRef.collection('presence')),
+        keyRef ? tx.get(keyRef) : null,
+      ]);
+
+      const categories = new Map<string, CategoryRecord>();
+      if (categorySnapshot?.exists) {
+        categories.set(categorySnapshot.id, toCategoryRecord(categorySnapshot.id, categorySnapshot.data() ?? {}));
+      }
+      const access = accessOf(record, this.uid);
+      if (!access || !isVisibleToMcp(record, categories)) throw new NotFoundError();
+      if (access !== 'owner') throw new ForbiddenError("Only the user's own notes can be changed for now");
+      if (isReadOnlyForMcp(record, categories)) throw new ReadOnlyError('The note is read-only for Claude');
+      if (record.isArchived) throw new InvalidError('the note is archived. Ask the user to restore it in the app first');
+
+      const openOn = presence.docs
+        .filter((marker) => {
+          const refreshedAt = marker.get('refreshedAt') as Timestamp | undefined;
+          return refreshedAt instanceof Timestamp && now - refreshedAt.toMillis() < PRESENCE_TTL_MS;
+        })
+        .map((marker) => String(marker.get('device') ?? ''));
+      if (openOn.length > 0) throw new OpenElsewhereError(openOn);
+
+      const current = toNote(record, 'owner', false);
+      const keyData = key?.data();
+      if (keyData?.noteId === noteId && ((keyData.expiresAt as Timestamp | undefined)?.toMillis() ?? 0) > now) {
+        return { note: current, changed: false, duplicate: true };
+      }
+
+      const outcome = edit.apply(record);
+      if (!outcome) return { note: current, changed: false, duplicate: false };
+
+      const revision = record.revision + 1;
+      const stamp = Timestamp.fromMillis(now);
+      tx.update(noteRef, {
+        content: outcome.content,
+        revision,
+        updatedAt: stamp,
+        updatedBy: `mcp:${actor.clientId}`,
+      });
+      if (keyRef) {
+        tx.set(keyRef, { uid: this.uid, noteId, expiresAt: Timestamp.fromMillis(now + DUPLICATE_WINDOW_MS) });
+      }
+      tx.create(this.#db.collection(AUDIT).doc(), {
+        ...noteEditedEntry(
+          { ...actor, uid: this.uid },
+          noteId,
+          edit.action,
+          {
+            title: record.title,
+            templateType: record.templateType,
+            categoryId: record.categoryId,
+            description: outcome.description,
+            revisionBefore: record.revision,
+            revisionAfter: revision,
+          },
+          { before: outcome.before, after: outcome.after }
+        ),
+        at: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(now + AUDIT_RETENTION_MS),
+      });
+
+      return {
+        note: toNote({ ...record, content: outcome.content, revision }, 'owner', false),
+        changed: true,
+        duplicate: false,
+      };
     });
   }
 

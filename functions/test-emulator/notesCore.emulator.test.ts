@@ -273,6 +273,17 @@ const BY_NOTE_ID: Record<string, Read> = {
   'loadNoteForUser(write)': (scope, noteId) => scope.loadNoteForUser(noteId, 'write'),
   'loadNoteForUser(owner)': (scope, noteId) => scope.loadNoteForUser(noteId, 'owner'),
   listVersionsForNote: (scope, noteId) => scope.listVersionsForNote(noteId),
+  // עריכה (2ב-lite): פתק מוסתר נדחה באותו NotFound, עוד לפני שהשינוי מוחל
+  editNote: (scope, noteId) =>
+    scope.editNote(
+      noteId,
+      {
+        action: 'note.append',
+        apply: (note) => ({ content: `${note.content}!`, description: 'test', before: null, after: null }),
+      },
+      { grantId: 'g', clientId: 'c', clientName: 'test', tool: 'test' },
+      Date.now()
+    ),
 };
 
 /** פונקציות שמקבלות מזהה קטגוריה */

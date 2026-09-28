@@ -19,13 +19,15 @@
 import { logger } from 'firebase-functions';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { InvalidError, NotFoundError, ReadOnlyError } from '../notesCore/errors';
+import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from '../notesCore/errors';
 import type { Category, Note } from '../notesCore/model';
 import type { UserScope } from '../notesCore/store';
+import { EDIT_CONSENT_VERSION } from '../oauth/config';
 import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
 import { OUTPUT } from './config';
 import { buildNote, CREATE_LIMITS, describeReminder } from './createNote';
+import { buildAppendEdit, buildChecklistItemEdit, EDIT_LIMITS } from './editNote';
 import {
   formatCategories,
   formatNote,
@@ -371,18 +373,137 @@ const createNote = defineTool({
   },
 });
 
-export const TOOLS = [listCategories, listNotes, searchNotes, getNote, createNote];
+/** כלי עריכה דורשים חיבור שאושר בנוסח שמזכיר עריכה (ראו `CONSENT_VERSION`) */
+const OLD_CONSENT_TEXT =
+  'This connection was approved before editing existed: the user agreed to "create new notes" only. To let Claude update ' +
+  "tasks or add text, the user must remove the Notes 4 Me connector in Claude's settings (or disconnect it in the app under " +
+  'Settings > Connected apps) and connect again. Nothing was changed.';
+
+class OldConsentError extends Error {}
+
+const requireEditConsent = (deps: ToolDeps) => {
+  if (deps.context.consentVersion < EDIT_CONSENT_VERSION) throw new OldConsentError(OLD_CONSENT_TEXT);
+};
+
+/** הגבלת הקצב של כתיבות משותפת ליצירה ולעריכה */
+const spendWriteQuota = async (deps: ToolDeps) => {
+  const quota = await deps.consumeWriteQuota();
+  if (!quota.allowed) {
+    const minutes = Math.max(1, Math.ceil(quota.retryAfterMs / 60_000));
+    throw new InvalidError(`too many changes were made recently. Wait about ${minutes} minutes and try again`);
+  }
+};
+
+const nullable = (schema: z.ZodString) => z.union([schema, z.null()]).optional();
+
+const updateChecklistItem = defineTool({
+  name: 'update_checklist_item',
+  title: 'Update a task in a checklist',
+  description:
+    "Change ONE task in one of the user's checklists: its text, mark it done or not done, or set, change or remove its " +
+    'due date, time and repeat. Identify the task by the item id that get_note shows next to it ("item id: ..."); call ' +
+    'get_note first. Only change what the user asked for in this conversation. All dates and times are Israel local time ' +
+    '(Asia/Jerusalem); a task with a date and a time gets a push reminder, and changing or clearing them moves or cancels ' +
+    'the reminder. It works on the user\'s own notes only, not on notes shared with them, not on notes marked read-only for ' +
+    'Claude, and not while the note is open in the app (then ask the user to close it). It cannot add or delete tasks.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The checklist note id.'),
+    itemId: z.string().min(1).max(128).describe('The task id, exactly as get_note shows it after "item id:".'),
+    text: z.string().max(2_000).optional().describe(`New text for the task, one line, at most ${EDIT_LIMITS.itemText} characters.`),
+    completed: z.boolean().optional().describe('true: mark done (its reminder is cancelled). false: mark not done.'),
+    dueDate: nullable(z.string().max(20)).describe('YYYY-MM-DD, Israel date. null removes the date, together with the time and repeat.'),
+    dueTime: nullable(z.string().max(10)).describe('HH:MM (24-hour), Israel time. Needs a date. null removes the time and repeat.'),
+    repeat: nullable(z.string().max(20)).describe('daily, weekly, monthly or yearly. Needs a date and a time. null stops repeating.'),
+  }),
+  run: async (deps, input) => {
+    requireEditConsent(deps);
+    const at = (deps.now ?? (() => new Date()))();
+    const { noteId, ...change } = input;
+    const edit = buildChecklistItemEdit(change, at);
+    await spendWriteQuota(deps);
+
+    const result = await deps.scope.editNote(
+      noteId,
+      edit,
+      { grantId: deps.context.grantId, clientId: deps.context.clientId, clientName: deps.context.clientName, tool: 'update_checklist_item' },
+      at.getTime()
+    );
+    if (!result.changed) return `Nothing changed: the task "${input.itemId}" already has these values.`;
+
+    const rows = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
+    const item = rows.find((row) => row.id === input.itemId) ?? {};
+    const when = [item.dueDate, item.dueTime].filter(Boolean).join(' ');
+    const reminder =
+      item.completed === true
+        ? 'It is done, so it has no reminder.'
+        : item.dueDate && item.dueTime
+          ? `A push reminder is set for ${when} Israel time${item.repeat ? `, repeating ${String(item.repeat)}` : ''}.`
+          : 'It has no reminder (a reminder needs a date and a time).';
+    return [
+      `Updated the task "${String(item.text ?? '')}" [item id: ${input.itemId}] in "${result.note.title}" [id: ${noteId}].`,
+      `Now: ${item.completed === true ? 'done' : 'not done'}${when ? `, due ${when}` : ''}. ${reminder}`,
+      'The previous version is kept in the note history in the app.',
+    ].join('\n');
+  },
+});
+
+const appendToTextNote = defineTool({
+  name: 'append_to_text_note',
+  title: 'Add text to the end of a text note',
+  description:
+    "Add text at the END of one of the user's text notes. Existing text is never changed or replaced. Only add what the " +
+    'user asked for in this conversation, in their language (usually Hebrew). It works on text notes only (for tasks use ' +
+    "update_checklist_item), on the user's own notes only, not on notes marked read-only for Claude, and not while the note " +
+    'is open in the app (then ask the user to close it). Sending exactly the same text to the same note again within 10 ' +
+    'minutes is ignored, so a retry after a timeout does not add it twice.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The text note id.'),
+    text: z.string().max(20_000).describe(`The text to add, at most ${EDIT_LIMITS.appendText} characters. It starts on a new line.`),
+  }),
+  run: async (deps, input) => {
+    requireEditConsent(deps);
+    const at = (deps.now ?? (() => new Date()))();
+    const edit = buildAppendEdit(input.text);
+    await spendWriteQuota(deps);
+
+    const result = await deps.scope.editNote(
+      input.noteId,
+      edit,
+      { grantId: deps.context.grantId, clientId: deps.context.clientId, clientName: deps.context.clientName, tool: 'append_to_text_note' },
+      at.getTime()
+    );
+    if (result.duplicate) {
+      return `This exact text was already added to "${result.note.title}" [id: ${input.noteId}] in the last 10 minutes. It was not added again.`;
+    }
+    return `Added the text at the end of "${result.note.title}" [id: ${input.noteId}]. The previous version is kept in the note history in the app.`;
+  },
+});
+
+export const TOOLS = [listCategories, listNotes, searchNotes, getNote, createNote, updateChecklistItem, appendToTextNote];
 
 // ---------------------------------------------------------------------------
 // רישום
 // ---------------------------------------------------------------------------
 
-type Outcome = 'ok' | 'not_found' | 'invalid' | 'read_only' | 'forbidden_scope' | 'error';
+type Outcome =
+  | 'ok'
+  | 'not_found'
+  | 'invalid'
+  | 'read_only'
+  | 'open_elsewhere'
+  | 'not_owner'
+  | 'old_consent'
+  | 'forbidden_scope'
+  | 'error';
 
 const MISSING_SCOPE_TEXT: Record<ToolDefinition<z.ZodObject>['scope'], string> = {
   'notes.read': 'This connection does not have permission to read notes. Reconnect the app to grant it.',
   'notes.write':
-    'This connection was approved for reading only, so it cannot create notes. To allow it, the user must remove the ' +
+    'This connection was approved for reading only, so it cannot create or change notes. To allow it, the user must remove the ' +
     "Notes 4 Me connector in Claude's settings (or disconnect it in the app under Settings > Connected apps) and connect " +
     'again, approving "create new notes" on the consent screen.',
 };
@@ -407,6 +528,20 @@ const runTool = async <Schema extends z.ZodObject>(
     if (error instanceof NotFoundError) {
       outcome = 'not_found';
       text = NOT_FOUND_TEXT;
+    } else if (error instanceof OpenElsewhereError) {
+      outcome = 'open_elsewhere';
+      const where = [...new Set(error.devices.filter(Boolean))].join(', ');
+      text =
+        `The note is open in the app right now${where ? ` (on: ${where})` : ''}. To avoid clashing with the open editor, ` +
+        'nothing was changed. Ask the user to close the note in the app, then try again.';
+    } else if (error instanceof ForbiddenError) {
+      outcome = 'not_owner';
+      text =
+        "This note belongs to another user who shared it with the user. For now Claude can change only the user's own " +
+        'notes. Nothing was changed.';
+    } else if (error instanceof OldConsentError) {
+      outcome = 'old_consent';
+      text = error.message;
     } else if (error instanceof ReadOnlyError) {
       outcome = 'read_only';
       text =

@@ -21,8 +21,9 @@ export const defaultScopeFactory: ScopeFactory = (identity) => UserScope.for(ide
 const INSTRUCTIONS =
   "Access to the user's personal notes in the Notes 4 Me app. Notes and categories are mostly in Hebrew. " +
   'Start with list_categories or search_notes, then read a note with get_note. Notes the user marked as sensitive are ' +
-  'not available at all. With write access, create_note adds a new note - only when the user asked for it; existing ' +
-  'notes cannot be changed.';
+  'not available at all. With write access: create_note adds a new note, update_checklist_item changes one task, and ' +
+  'append_to_text_note adds text at the end of a text note - only what the user asked for. Nothing can be deleted, and ' +
+  "notes marked read-only for Claude, notes shared by other users and notes open in the app cannot be changed.";
 
 export interface ServerDeps {
   scopeFor?: ScopeFactory;
