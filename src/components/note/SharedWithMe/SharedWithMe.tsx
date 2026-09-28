@@ -11,7 +11,6 @@
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
 import { useOrphanSharedNotes } from '@/hooks/useOrphanSharedNotes';
-import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { NoteCard } from '@/components/note/NoteCard';
 import { NoteView } from '@/components/note/NoteView';
 import { leaveSharedNote } from '@/services/api/notes';
@@ -25,7 +24,7 @@ export const SharedWithMe: React.FC = () => {
   // הפתקים שייכים לקטגוריה של מישהו אחר, ולכן אין כאן קטגוריה משלנו
   // להעביר. הפעולות: צפייה, עריכה, והסרה של עצמי מהשיתוף - מה שהכללים
   // מתירים למי ששותפו איתו. (קודם היה כאן "מחק" שלא עשה כלום.)
-  const { updateNoteFields } = useNoteEditor('');
+  // העריכה עצמה נשמרת מתוך NoteView (useNoteSync).
 
   const handleLeave = async (note: Note) => {
     if (
@@ -79,7 +78,6 @@ export const SharedWithMe: React.FC = () => {
         <NoteView
           note={activeNote}
           onClose={() => setViewingNote(null)}
-          onUpdate={updateNoteFields}
         />
       )}
     </section>

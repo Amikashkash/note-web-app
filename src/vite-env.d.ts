@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string
   /** `'true'` רושם את מסך ההסכמה `/connect` (שרת ה-MCP). ראו `router.tsx` */
   readonly VITE_MCP_CONNECT?: string
+  /** `'true'` בפיתוח: האפליקציה מתחברת ל-emulators המקומיים. ראו `services/firebase/config.ts` */
+  readonly VITE_USE_EMULATORS?: string
 }
 
 interface ImportMeta {

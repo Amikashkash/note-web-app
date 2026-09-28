@@ -22,6 +22,7 @@ import {
 import {
   arrayRemove,
   arrayUnion,
+  increment,
   collection,
   deleteDoc,
   doc,
@@ -599,6 +600,66 @@ describe('read-only for Claude (isReadOnly)', () => {
       await setDoc(doc(context.firestore(), 'notes/readonly-2'), { ...baseNote, isReadOnly: true });
     });
     await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/readonly-2'), { content: '[]', updatedBy: SHARED }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// revision (C-1), שלב 1: לא חובה, אבל אם נשלח - בדיוק הקודם + 1
+// ---------------------------------------------------------------------------
+
+describe('revision (C-1, phase 1)', () => {
+  const seedRevision = (revision: number | null) =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const data = revision === null ? baseNote : { ...baseNote, revision };
+      await setDoc(doc(context.firestore(), 'notes/rev-1'), data);
+    });
+
+  it('an old client that does not send revision keeps working', async () => {
+    await seedRevision(4);
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { content: 'ישן', updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/rev-1'), { content: 'ישן', updatedBy: SHARED }));
+  });
+
+  /** שמירה של העורך: revision מפורש ו-saveId חדש, כמו `saveNoteText` */
+  const save = (uid: string, content: string, revision: number) =>
+    updateDoc(doc(as(uid), 'notes/rev-1'), { content, revision, saveId: `s-${Math.random()}`, updatedBy: uid });
+
+  it('a save based on the current version (old + 1) is accepted', async () => {
+    await seedRevision(4);
+    await assertSucceeds(save(OWNER, 'חדש', 5));
+  });
+
+  it('a save based on a stale version is rejected instead of overwriting', async () => {
+    await seedRevision(4);
+    // המכשיר פתח בגרסה 3, ובינתיים מישהו כתב את 4: הוא שולח 3 + 1 = 4 - אותו ערך שכבר בשרת
+    await assertFails(save(OWNER, 'דורס', 4));
+    await assertFails(save(SHARED, 'דורס', 4));
+  });
+
+  it('skipping ahead is rejected too', async () => {
+    await seedRevision(4);
+    await assertFails(save(OWNER, 'x', 9));
+  });
+
+  it('a note from before the field counts as 0', async () => {
+    await seedRevision(null);
+    await assertSucceeds(save(OWNER, 'x', 1));
+  });
+
+  it('increment(1) always passes, since the rule sees the result', async () => {
+    await seedRevision(4);
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { title: 'x', revision: increment(1), updatedBy: OWNER }));
+  });
+
+  it('two devices: the first save wins, the second, from the same base, is rejected', async () => {
+    await seedRevision(4);
+    await assertSucceeds(save(OWNER, 'טלפון', 5));
+    await assertFails(save(SHARED, 'מחשב', 5));
+  });
+
+  it('a note is created at revision 0 (or without it), never higher', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-rev'), { ...baseNote, sharedWith: [], revision: 0 }));
+    await assertFails(setDoc(doc(as(OWNER), 'notes/new-rev-2'), { ...baseNote, sharedWith: [], revision: 7 }));
   });
 });
 

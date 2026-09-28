@@ -10,7 +10,7 @@ import { useNotes } from './useNotes';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import type { Note, NoteFormData, NoteInput, TemplateType } from '@/types/note';
+import type { Note, NoteFormData, NoteInput } from '@/types/note';
 
 export const useNoteEditor = (categoryId: string) => {
   const user = useAuthStore((state) => state.user);
@@ -72,13 +72,6 @@ export const useNoteEditor = (categoryId: string) => {
     [categoryId, createNote, notes.length, run, updateNote, user]
   );
 
-  /** עדכון חלקי מתוך תצוגת הפתק (עריכה inline) */
-  const updateNoteFields = useCallback(
-    (noteId: string, updates: { title?: string; content?: string; templateType?: TemplateType }) =>
-      run(() => updateNote(noteId, updates)),
-    [run, updateNote]
-  );
-
   const moveToCategory = useCallback(
     (noteId: string, newCategoryId: string) =>
       run(() => updateNote(noteId, { categoryId: newCategoryId })),
@@ -118,7 +111,6 @@ export const useNoteEditor = (categoryId: string) => {
     notes,
     allNotes,
     saveNote,
-    updateNoteFields,
     moveToCategory,
     deleteNote,
     pinNote,

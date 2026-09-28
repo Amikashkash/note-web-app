@@ -66,6 +66,7 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     createdVia: data.createdVia === 'mcp' ? 'mcp' : undefined,
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
+    revision: asNumber(data.revision),
   };
 };
 

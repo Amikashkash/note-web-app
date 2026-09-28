@@ -29,6 +29,7 @@ const makeNote = (overrides: Partial<Note> = {}): Note => ({
   isArchived: false,
   isSensitive: false,
   isReadOnly: false,
+  revision: 0,
   ...overrides,
 });
 

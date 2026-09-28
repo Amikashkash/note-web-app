@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   onSnapshot,
   query,
   runTransaction,
@@ -72,6 +73,11 @@ const stripImmutableFields = (updates: Partial<NoteInput>): Record<string, unkno
     Object.entries(updates).filter(([key]) => !IMMUTABLE_FIELDS.includes(key))
   );
 
+/** שדות התוכן: כתיבה שלהם מעלה את `revision` (C-1) */
+const CONTENT_FIELDS: readonly string[] = ['title', 'content', 'templateType'];
+
+const touchesContent = (updates: object): boolean => Object.keys(updates).some((key) => CONTENT_FIELDS.includes(key));
+
 /**
  * יצירת פתק חדש
  */
@@ -79,6 +85,7 @@ export const createNote = async (noteInput: NoteInput): Promise<string> => {
   try {
     const docRef = await addDoc(notesRef(), {
       ...noteInput,
+      revision: 0,
       isArchived: false,
       createdAt: serverTimestamp(),
       ...writeStamp(),
@@ -103,6 +110,10 @@ export const updateNote = async (
   try {
     await updateDoc(noteRef(noteId), {
       ...stripImmutableFields(updates),
+      // כתיבה של תוכן מעלה את המונה, כדי שפתק פתוח במכשיר אחר יזהה אותה.
+      // `increment` תמיד עובר את ה-rule (old + 1); מי שצריך בדיקת התנגשות
+      // (העורך הפתוח) משתמש ב-`saveNoteText` עם revision מפורש.
+      ...(touchesContent(updates) && { revision: increment(1) }),
       ...writeStamp(),
     });
   } catch (error) {
@@ -110,6 +121,72 @@ export const updateNote = async (
     throw wrapError('שגיאה בעדכון הפתק', error);
   }
 };
+
+export interface NoteTextPatch {
+  title?: string;
+  content?: string;
+  templateType?: Note['templateType'];
+}
+
+/**
+ * שמירה מהעורך הפתוח, עם בדיקת התנגשות (C-1).
+ *
+ * `revision` הוא מפורש: הגרסה שהעריכה נשענת עליה + 1. ה-rules מקבלים
+ * רק `old + 1`, כך שאם מישהו אחר כתב בינתיים (מכשיר אחר, או Claude),
+ * הכתיבה נדחית - גם אם היא המתינה offline - במקום לדרוס. הדחייה חוזרת
+ * כ-`permission-denied`, וה-snapshot חוזר לגרסת השרת; העורך מזהה זאת
+ * ומציג בחירה, בלי לאבד את הטקסט.
+ */
+export const saveNoteText = (noteId: string, patch: NoteTextPatch, revision: number): Promise<void> =>
+  updateDoc(noteRef(noteId), {
+    ...patch,
+    revision,
+    // משתנה בכל שמירה, כדי שה-rules תמיד יבדקו אותה (ראו revisionPhase1)
+    saveId: crypto.randomUUID(),
+    ...writeStamp(),
+  });
+
+/** מה שהעורך הפתוח צריך מהמסמך: התוכן, המונה, והאם זה הד מקומי */
+export interface LiveNoteText {
+  exists: boolean;
+  title: string;
+  content: string;
+  templateType: string;
+  revision: number;
+  /** hasPendingWrites: כתיבה מקומית שהשרת עוד לא אישר */
+  pending: boolean;
+}
+
+/**
+ * מאזין למסמך אחד, עם metadata. המאזין הכללי (`subscribeToNotes`) לא
+ * מבחין בין הד מקומי לגרסה מאושרת, וההבחנה הזו היא מה שמאפשר לזהות
+ * שכתיבה שלנו נדחתה. עלות: קריאה אחת בפתיחה ואחת לכל שינוי בפתק הפתוח.
+ */
+export const subscribeToNoteText = (
+  noteId: string,
+  onChange: (note: LiveNoteText) => void,
+  onError: (error: unknown) => void
+): Unsubscribe =>
+  onSnapshot(
+    noteRef(noteId),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        onChange({ exists: false, title: '', content: '', templateType: 'plain', revision: 0, pending: false });
+        return;
+      }
+      const note = toNote(snapshot);
+      onChange({
+        exists: true,
+        title: note.title,
+        content: note.content,
+        templateType: note.templateType,
+        revision: note.revision,
+        pending: snapshot.metadata.hasPendingWrites,
+      });
+    },
+    onError
+  );
 
 /**
  * הוספת תוכן משותף לפתק קיים, על התוכן העדכני בשרת.
@@ -138,6 +215,7 @@ export const appendToNote = async (
       if (result.ok) {
         transaction.update(noteRef(noteId), {
           content: result.content,
+          revision: note.revision + 1,
           ...writeStamp(),
         });
       }
@@ -166,6 +244,7 @@ export const restoreNoteVersion = async (noteId: string, version: NoteVersion): 
       color: version.color,
       restoredFrom: version.id,
       restoredAt: serverTimestamp(),
+      revision: increment(1),
       ...writeStamp(),
     });
   } catch (error) {

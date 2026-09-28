@@ -10,10 +10,10 @@
  */
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth, Auth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getFunctions, Functions } from 'firebase/functions';
+import { connectFunctionsEmulator, getFunctions, Functions } from 'firebase/functions';
 
 // בדיקת משתני סביבה
 const requiredEnvVars = {
@@ -65,6 +65,16 @@ if (isFirebaseConfigured) {
   storageInstance = getStorage(app);
   // אותו region שבו הפונקציות נפרסות (`setGlobalOptions` ב-`functions/src/index.ts`)
   functionsInstance = getFunctions(app, 'europe-west1');
+
+  // פיתוח בלבד: האפליקציה מול ה-emulators, בלי לגעת בנתונים אמיתיים.
+  // `VITE_USE_EMULATORS=true npm run dev`, עם `firebase emulators:start
+  // --only auth,firestore,functions --project demo-notes-4-me`. בפרודקשן
+  // `import.meta.env.DEV` הוא false, והקוד הזה נמחק מה-bundle.
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
+    connectAuthEmulator(authInstance, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFirestoreEmulator(dbInstance, '127.0.0.1', 8080);
+    connectFunctionsEmulator(functionsInstance, '127.0.0.1', 5001);
+  }
 } else {
   console.error(
     [
