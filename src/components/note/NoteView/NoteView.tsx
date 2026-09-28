@@ -30,6 +30,8 @@ import type { NoteVersion } from '@/types/version';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
 import { useNoteSync } from '@/hooks/useNoteSync';
+import { useNotePresence } from '@/hooks/useNotePresence';
+import { presenceMessage } from '@/utils/presence';
 import { LENGTH_LIMITS } from '@/utils/constants';
 import { DiscardedTextPanel, NoteConflictPanel } from './NoteConflict';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
@@ -68,6 +70,9 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [shownNoteId, setShownNoteId] = useState(note.id);
   const editor = useNoteSync(note);
   const { title, content, conflict } = editor;
+  // "פתוח גם במקום אחר": נוחות בלבד. ההגנה מדריסה היא ב-useNoteSync
+  const presence = useNotePresence(note.id);
+  const openElsewhere = presence.myUid ? presenceMessage(presence.others, presence.myUid) : null;
 
   // פתק אחר - חוזרים לצפייה (הטיוטה עצמה מתאפסת ב-useNoteSync)
   if (shownNoteId !== note.id) {
@@ -369,6 +374,16 @@ export const NoteView: React.FC<NoteViewProps> = ({
             </button>
           )}
         </div>
+
+        {openElsewhere && (
+          <div
+            role="status"
+            className="mb-4 rounded-lg bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark p-3 text-sm"
+          >
+            👥 {openElsewhere} שינויים של כל צד יופיעו אצל השני. אם שניכם תשנו את אותו מקום, תתבקשו לבחור איזו גרסה
+            לשמור.
+          </div>
+        )}
 
         {/* התנגשות עם שינוי מרחוק (C-1): השמירה עצרה, המשתמש בוחר */}
         {conflict && <NoteConflictPanel onReload={editor.reloadRemote} onSaveMine={editor.saveMineAsNew} />}

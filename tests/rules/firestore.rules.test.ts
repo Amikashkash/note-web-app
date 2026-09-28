@@ -29,7 +29,9 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
   type Firestore,
@@ -660,6 +662,54 @@ describe('revision (C-1, phase 1)', () => {
   it('a note is created at revision 0 (or without it), never higher', async () => {
     await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-rev'), { ...baseNote, sharedWith: [], revision: 0 }));
     await assertFails(setDoc(doc(as(OWNER), 'notes/new-rev-2'), { ...baseNote, sharedWith: [], revision: 7 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "הפתק פתוח" - סימוני נוכחות
+// ---------------------------------------------------------------------------
+
+describe('presence markers (note open elsewhere)', () => {
+  const marker = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    device: 'iPhone',
+    refreshedAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+    ...extra,
+  });
+
+  it('the owner and a shared user each write and refresh their own marker', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-owner'), marker(OWNER)));
+    await assertSucceeds(setDoc(doc(as(SHARED), 'notes/note-1/presence/s-shared'), marker(SHARED)));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-owner'), marker(OWNER)));
+  });
+
+  it('both can see who has the note open; a stranger cannot', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-owner'), marker(OWNER)));
+    await assertSucceeds(getDocs(collection(as(SHARED), 'notes/note-1/presence')));
+    await assertFails(getDocs(collection(as(STRANGER), 'notes/note-1/presence')));
+  });
+
+  it('a stranger cannot mark the note as open', async () => {
+    await assertFails(setDoc(doc(as(STRANGER), 'notes/note-1/presence/s-x'), marker(STRANGER)));
+  });
+
+  it('nobody writes a marker in someone else\'s name, or takes over or deletes it', async () => {
+    await assertFails(setDoc(doc(as(SHARED), 'notes/note-1/presence/s-fake'), marker(OWNER)));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-owner'), marker(OWNER)));
+    await assertFails(setDoc(doc(as(SHARED), 'notes/note-1/presence/s-owner'), marker(SHARED)));
+    await assertFails(deleteDoc(doc(as(SHARED), 'notes/note-1/presence/s-owner')));
+    await assertSucceeds(deleteDoc(doc(as(OWNER), 'notes/note-1/presence/s-owner')));
+  });
+
+  it('the refresh time is the server time, and the expiry at most 5 minutes ahead', async () => {
+    await assertFails(
+      setDoc(doc(as(OWNER), 'notes/note-1/presence/s-1'), marker(OWNER, { refreshedAt: Timestamp.fromMillis(Date.now() + 86_400_000) }))
+    );
+    await assertFails(
+      setDoc(doc(as(OWNER), 'notes/note-1/presence/s-2'), marker(OWNER, { expiresAt: Timestamp.fromMillis(Date.now() + 86_400_000) }))
+    );
+    await assertFails(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-3'), marker(OWNER, { extra: 'x' })));
   });
 });
 
