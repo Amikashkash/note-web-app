@@ -448,7 +448,22 @@ defineTool({
 
 **החלטה: שלב 2 מתפצל לשניים.**
 - **2א - יצירה בלבד (`create_note`), מומש ב-branch `claude/mcp-create`.** פתק חדש לא פתוח בשום מכשיר, ולכן אין לו סיכון של C-1 (דריסה בין עורך פתוח לכתיבה מהשרת). אפשר לעשות את זה עכשיו, בלי קבוצות D ו-E.
-- **2ב - עריכה (`add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note`), אחרי קבוצות D ו-E ב-review.** כל עריכה של פתק קיים עלולה להידרס ע"י עורך פתוח (C-1) עד שמודל ה-`items` (D4, E1) וה-autosave בלי דריסה (E2, E2b) בפרודקשן. 2ב גם חייב לסרב לכל פתק שהוא **קריאה בלבד ל-Claude** (ראו למטה).
+- **2ב-lite - עריכה מוגבלת לפני D ו-E, מומש ב-branch `claude/mcp-edit-lite`.** ראו "שלב 2ב-lite" למטה.
+- **2ב המלא - עריכה (`add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note`), אחרי קבוצות D ו-E ב-review.** מה שנשאר אחרי 2ב-lite מפורט שם. 2ב גם חייב לסרב לכל פתק שהוא **קריאה בלבד ל-Claude** (ראו למטה).
+
+**שלב 2ב-lite: שני כלי עריכה + ההגנה המינימלית מ-C-1 (מומש)**
+- **תנאי מקדים, בצד הלקוח (נכנס ראשון, commit נפרד, v1.26.0):**
+  - פתק פתוח מאזין למסמך שלו עם metadata (`hasPendingWrites`), ומבחין בין הד מקומי לגרסה שהשרת אישר (`useNoteSync`, ההחלטות ב-`utils/noteSync.ts`).
+  - שינוי מרחוק בלי עריכה מקומית: מאומץ בשקט. עם עריכה מקומית: מיזוג לפי `id` כשהצדדים שינו פריטים שונים (`utils/noteMerge.ts`), אחרת השמירה נעצרת ומוצגת בחירה: "טען את הגרסה העדכנית" (הטקסט של המשתמש נשאר גלוי להעתקה) או "שמור את הגרסה שלי כפתק חדש".
+  - **`revision`, שלב 1 (כמו `updatedBy`):** כל כתיבת תוכן מעלה אותו. העורך שולח `בסיס + 1` מפורש ו-`saveId` אקראי; ה-rule (`revisionPhase1`) מקבל רק `הקודם + 1` כששדה מהשניים משתנה. שמירה על בסיס ישן נדחית במקום לדרוס - גם כשהמתינה offline. לקוח ישן שלא שולח אף אחד מהם - עובר כמו קודם. `saveId` נדרש כי בלעדיו שמירה ישנה ששולחת במקרה את הערך הנוכחי (בסיס 3 → 4 כשבשרת כבר 4) לא "משנה" את השדה ונראית כמו לקוח ישן.
+  - שמירה שנדחתה אחרי שהעורך נסגר (נסגר offline, החיבור חזר) הופכת לפתק "טקסט שלא נשמר - ...", עם אותם דגלים. שום טקסט לא אובד.
+  - **offline:** הבדיקה לא דורשת את השרת בזמן העריכה. offline אין snapshots מרחוק, ולכן אין זיהוי עד שהחיבור חוזר; השמירות נכנסות לתור של Firestore עם revisions רצופים. בחזרה: אם אף אחד לא כתב בינתיים - הכל עובר. אם כן - ה-rules דוחים, והעורך (אם פתוח) מציג בחירה, או (אם נסגר) נוצר עותק. סגירת האפליקציה offline מאבדת את התור - כמו היום (אין `persistentLocalCache` עד E2b). קודם: השמירה offline דרסה בשקט את השינוי של הצד השני.
+- **סימון נוכחות (1ב):** `notes/{id}/presence/{sessionId}` = `{uid, device, refreshedAt (זמן שרת), expiresAt}`, רענון כל 30 שניות כשהטאב גלוי, מחיקה בסגירה, נחשב סגור אחרי 60 שניות בלי רענון. האפליקציה מציגה "פתוח גם ב..."; כלי העריכה בשרת **לא כותבים** כשיש סימון טרי, ומחזירים ל-Claude הודעה לבקש מהמשתמש לסגור. נוחות בלבד: ההגנה היא ה-revision. עלות לפתק פתוח 5 דקות: בערך 12 כתיבות ו-25 קריאות.
+- **`update_checklist_item`:** משימה אחת לפי המזהה ש-`get_note` מציג: טקסט, בוצע/לא, `dueDate`/`dueTime`/`repeat` (או `null` למחיקה). שעון ישראל, אותה ולידציה כמו `create_note` (`mcp/dates.ts`). **מזהים:** משימה ישנה בלי `id` מוצגת כ-`item-<מיקום>` - בדיוק כמו המפענח באפליקציה והטריגר של התזכורות - ובעריכה הראשונה המזהים נשמרים בפתק (רק השדה `id` נוסף). אין מיגרציה נפרדת.
+- **`append_to_text_note`:** הוספה בסוף פתק טקסט, בשורה חדשה. הטקסט הקיים לא משתנה. אותו טקסט לאותו פתק בתוך 10 דקות לא נוסף פעמיים (retry).
+- **לשני הכלים (`UserScope.editNote`):** transaction על הגרסה העדכנית; `revision + 1`; `updatedBy: mcp:<clientId>` (כותב אחר, ולכן היסטוריית הגרסאות שומרת את המצב שלפני Claude, ו-`NoteHistory` מציג "Claude"); `NotFound` לרגיש/זר; `Forbidden` למשותף (בעלים בלבד בינתיים); `ReadOnlyError` לקריאה בלבד; סירוב לפתק מאורכב ולפתק פתוח; audit עם `changes.before/after` של החלק שהשתנה; אותה הגבלת קצב לכתיבות.
+- **scope:** אין חדש. `notes.write` הוא "כתיבה לפתקים" ומכסה עריכה. אבל חיבור שאושר בנוסח של v1.25 ("יצירה, בלי עריכה") לא הסכים לעריכה, ולכן כל grant שומר `consentVersion` (2 מ-v1.26), וכלי העריכה דורשים 2. חיבור ישן ממשיך לקרוא וליצור, ומקבל הודעה שצריך לחבר מחדש כדי לערוך.
+- **מה נשאר ל-2ב המלא:** מודל `items` כ-map (D4) וכתיבות field-path (E1) במקום כתיבת התוכן כולו; `draftJournal` ב-IndexedDB ו-merge בדחייה גם אחרי סגירת האפליקציה (E2); `persistentLocalCache` וחיווי "ממתין לחיבור" (E2b); שלב 2 של `revision` (חובה בכל כתיבה, אחרי שכל המכשירים מעודכנים); `minClientVersion`; עריכה ע"י שותפים; הוספה ומחיקה של משימות, `update_note`, `move_note_to_category`, `archive_note`.
 
 **קריאה בלבד ל-Claude (`isReadOnly`, נוסף ב-2א):** דגל על פתק ועל קטגוריה, באותו דפוס כמו `isSensitive`: רק הבעלים משנה (rules), מתג וסמל נפרד (`PenOff`) באפליקציה. אפקטיבי = הדגל של הפתק **או** של הקטגוריה.
 - פתק לקריאה בלבד **גלוי** ל-MCP. `list_notes`, `get_note` ו-`list_categories` מציינים שהוא לקריאה בלבד.
@@ -635,7 +650,10 @@ match /config/{id}         { allow read, write: if false; }
 17. `create_note` (scope `notes.write`), כולל תזכורות ובדיקה שהתזכורת נוצרת ונשלחת, מניעת כפילויות ו-rate limit לכתיבות.
 18. E5 מ-review (claim-then-send ב-`sendDueReminders`) - התנאי ש-Claude ייצור משימות עם שעות בלי כפילויות התראות.
 
-**שלב 2ב: עריכה**
+**שלב 2ב-lite: עריכה מוגבלת** - מומש ב-branch `claude/mcp-edit-lite`
+- ההגנה בצד הלקוח (C-1 חלקי + נוכחות) חייבת להיות במכשירים **לפני** שהכלים נפרסים. פירוט למעלה, בסעיף "שלב 2ב-lite".
+
+**שלב 2ב המלא: עריכה**
 19. **תנאי מקדים:** review D4, E1, E2 ו-E2b ב-production (7.3). לא חלק מה-branch של MCP.
 20. `add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note` - כולם מסרבים לפתק לקריאה בלבד.
 21. audit עם `changes.before/after`.
@@ -652,6 +670,8 @@ gcloud firestore fields ttls update expiresAt --collection-group=rateLimits    -
 # נוספו ב-2א
 gcloud firestore fields ttls update expiresAt --collection-group=auditLog       --enable-ttl --project=notes-4-me
 gcloud firestore fields ttls update expiresAt --collection-group=mcpIdempotency --enable-ttl --project=notes-4-me
+# נוסף ב-2ב-lite (סימוני "הפתק פתוח")
+gcloud firestore fields ttls update expiresAt --collection-group=presence       --enable-ttl --project=notes-4-me
 ```
 - התוקף נבדק בקוד בכל שימוש. ה-TTL רק מנקה, ואיחור שלו לא מאריך אף token.
 - `oauthClients`: השדה נמחק כשהונפק ללקוח token ראשון, ולכן רק לקוחות שלא השתמשו בהם נמחקים.
