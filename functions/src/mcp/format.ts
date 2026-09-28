@@ -164,10 +164,27 @@ const checklistWithIds = (content: string): string | null => {
     .join('\n');
 };
 
+/**
+ * תכנית עבודה עם המזהה של כל סעיף - מה שכלי העריכה של תכניות עבודה צריכים.
+ * הכותרת והתוכן מוצגים כפי שהם שמורים, כדי ש-`edit_note_text` יוכל להעתיק מהם.
+ */
+const workplanWithIds = (content: string): string | null => {
+  const rows = checklistRows(content);
+  if (!rows || rows.length === 0) return null;
+  return rows
+    .map((row, index) => {
+      const header = String(row.header ?? '');
+      const body = String(row.content ?? '');
+      return `## ${header || '(no header)'}  (section id: ${shownItemId(row, index)})${body ? `\n${body}` : ''}`;
+    })
+    .join('\n\n');
+};
+
 export const formatNote = (note: Note, categoryName: string): string => {
   const text = !note.content.trim()
     ? '(this note is empty)'
     : (note.templateType === 'checklist' && checklistWithIds(note.content)) ||
+      (note.templateType === 'workplan' && workplanWithIds(note.content)) ||
       parseContent(note.templateType, note.content).text;
 
   const header = [

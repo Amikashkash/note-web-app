@@ -22,12 +22,19 @@ import { z } from 'zod';
 import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from '../notesCore/errors';
 import type { Category, Note } from '../notesCore/model';
 import type { UserScope } from '../notesCore/store';
-import { EDIT_CONSENT_VERSION } from '../oauth/config';
+import { EDIT_CONSENT_VERSION, REWRITE_CONSENT_VERSION } from '../oauth/config';
 import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
 import { OUTPUT } from './config';
 import { buildNote, CREATE_LIMITS, describeReminder } from './createNote';
-import { buildAppendEdit, buildChecklistItemEdit, EDIT_LIMITS } from './editNote';
+import {
+  buildAddSectionEdit,
+  buildAppendEdit,
+  buildChecklistItemEdit,
+  buildRemoveSectionEdit,
+  buildReplaceEdit,
+  EDIT_LIMITS,
+} from './editNote';
 import {
   formatCategories,
   formatNote,
@@ -290,9 +297,12 @@ const createNote = defineTool({
   title: 'Create a note',
   description:
     "Create a NEW note in the user's Notes 4 Me app. Only create a note the user asked for or explicitly approved in this " +
-    'conversation - never on your own initiative, and not as a place to keep your own notes. It cannot edit, append to or ' +
-    'delete existing notes. Types: "text" (free text in `text`), "checklist" (tasks in `items`) and "shopping" (a shopping ' +
-    'list in `items`, with an optional `quantity`). Checklist items may have dueDate (YYYY-MM-DD), dueTime (HH:MM, 24-hour) ' +
+    'conversation - never on your own initiative, and not as a place to keep your own notes. Types: "text" (free text in ' +
+    '`text`), "checklist" (tasks in `items`), "shopping" (a shopping list in `items`, with an optional `quantity`) and ' +
+    '"workplan" (a project plan in `sections`, each with a header and content). WORK PLANS: keep ONE work plan per project ' +
+    'and grow it over time. Before creating one, look for an existing plan for the same project (search_notes, list_notes); ' +
+    'if there is one, add to it with add_workplan_section or append_text instead of creating a new note for every recording ' +
+    'or conversation. Checklist items may have dueDate (YYYY-MM-DD), dueTime (HH:MM, 24-hour) ' +
     'and repeat (daily, weekly, monthly, yearly): a task with a date and a time gets a push reminder at that time. All ' +
     "dates and times are Israel local time (Asia/Jerusalem): convert from the user's words, and the time must be in the " +
     'future. Get categoryId from list_categories: it must be a category the user owns and not one marked read-only for ' +
@@ -307,7 +317,9 @@ const createNote = defineTool({
       .max(128)
       .describe("The category's id from list_categories. Must be one of the user's own categories."),
     title: z.string().max(200).describe(`A short title, at most ${CREATE_LIMITS.title} characters.`),
-    type: z.enum(['text', 'checklist', 'shopping']).describe('text, checklist (tasks) or shopping (shopping list).'),
+    type: z
+      .enum(['text', 'checklist', 'shopping', 'workplan'])
+      .describe('text, checklist (tasks), shopping (shopping list) or workplan (project plan with sections).'),
     text: z
       .string()
       .max(40_000)
@@ -334,6 +346,16 @@ const createNote = defineTool({
       .max(200)
       .optional()
       .describe(`For checklist and shopping: 1 to ${CREATE_LIMITS.items} items, in order.`),
+    sections: z
+      .array(
+        z.object({
+          header: z.string().max(1_000).describe(`Section header, one line, at most ${CREATE_LIMITS.sectionHeader} characters.`),
+          content: z.string().max(40_000).describe(`Section text, at most ${CREATE_LIMITS.sectionContent} characters.`),
+        })
+      )
+      .max(100)
+      .optional()
+      .describe(`For workplan only: 1 to ${CREATE_LIMITS.sections} sections, in order.`),
   }),
   run: async ({ scope, context, consumeWriteQuota, now = () => new Date() }, input) => {
     const at = now();
@@ -359,8 +381,9 @@ const createNote = defineTool({
       );
     }
 
-    const kind = { text: 'text note', checklist: 'checklist', shopping: 'shopping list' }[input.type];
-    const size = draft.summary.itemCount > 0 ? ` with ${draft.summary.itemCount} items` : '';
+    const kind = { text: 'text note', checklist: 'checklist', shopping: 'shopping list', workplan: 'work plan' }[input.type];
+    const unit = input.type === 'workplan' ? 'sections' : 'items';
+    const size = draft.summary.itemCount > 0 ? ` with ${draft.summary.itemCount} ${unit}` : '';
     const lines = [`Created the ${kind} "${note.title}" [id: ${note.id}] in category "${categoryName}"${size}.`];
     if (reminders.length > 0) {
       lines.push(
@@ -374,16 +397,36 @@ const createNote = defineTool({
 });
 
 /** כלי עריכה דורשים חיבור שאושר בנוסח שמזכיר עריכה (ראו `CONSENT_VERSION`) */
-const OLD_CONSENT_TEXT =
-  'This connection was approved before editing existed: the user agreed to "create new notes" only. To let Claude update ' +
-  "tasks or add text, the user must remove the Notes 4 Me connector in Claude's settings (or disconnect it in the app under " +
-  'Settings > Connected apps) and connect again. Nothing was changed.';
+const oldConsentText = (what: string) =>
+  `This connection was approved before Claude could ${what}, so the user has not agreed to it yet. To allow it, the ` +
+  "user must remove the Notes 4 Me connector in Claude's settings (or disconnect it in the app under Settings > " +
+  'Connected apps) and connect again, approving the new permissions. Nothing was changed.';
 
 class OldConsentError extends Error {}
 
-const requireEditConsent = (deps: ToolDeps) => {
-  if (deps.context.consentVersion < EDIT_CONSENT_VERSION) throw new OldConsentError(OLD_CONSENT_TEXT);
+/**
+ * הנוסח שהמשתמש אישר לחיבור הזה חייב לכסות את הפעולה (ראו `CONSENT_VERSION`):
+ * 2 - עדכון משימות והוספה בסוף פתק טקסט. 3 - עבודה עם סעיפים, החלפה ומחיקה.
+ */
+const requireConsent = (deps: ToolDeps, version: number, what: string) => {
+  if (deps.context.consentVersion < version) throw new OldConsentError(oldConsentText(what));
 };
+
+const requireEditConsent = (deps: ToolDeps) => requireConsent(deps, EDIT_CONSENT_VERSION, 'update tasks or add text');
+
+/** הרצת עריכה אחת ב-`UserScope.editNote`, עם פרטי החיבור ל-audit */
+const runEdit = (deps: ToolDeps, noteId: string, edit: Parameters<UserScope['editNote']>[1], tool: string, at: Date) =>
+  deps.scope.editNote(
+    noteId,
+    edit,
+    { grantId: deps.context.grantId, clientId: deps.context.clientId, clientName: deps.context.clientName, tool },
+    at.getTime()
+  );
+
+const RECOVERABLE =
+  "The previous version is kept in the note's history in the app, so the user can restore it.";
+
+const READ_FIRST = 'Call get_note on the note right before editing, and use its ids and text exactly as shown.';
 
 /** הגבלת הקצב של כתיבות משותפת ליצירה ולעריכה */
 const spendWriteQuota = async (deps: ToolDeps) => {
@@ -424,12 +467,7 @@ const updateChecklistItem = defineTool({
     const edit = buildChecklistItemEdit(change, at);
     await spendWriteQuota(deps);
 
-    const result = await deps.scope.editNote(
-      noteId,
-      edit,
-      { grantId: deps.context.grantId, clientId: deps.context.clientId, clientName: deps.context.clientName, tool: 'update_checklist_item' },
-      at.getTime()
-    );
+    const result = await runEdit(deps, noteId, edit, 'update_checklist_item', at);
     if (!result.changed) return `Nothing changed: the task "${input.itemId}" already has these values.`;
 
     const rows = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
@@ -444,46 +482,168 @@ const updateChecklistItem = defineTool({
     return [
       `Updated the task "${String(item.text ?? '')}" [item id: ${input.itemId}] in "${result.note.title}" [id: ${noteId}].`,
       `Now: ${item.completed === true ? 'done' : 'not done'}${when ? `, due ${when}` : ''}. ${reminder}`,
-      'The previous version is kept in the note history in the app.',
+      RECOVERABLE,
     ].join('\n');
   },
 });
 
-const appendToTextNote = defineTool({
-  name: 'append_to_text_note',
-  title: 'Add text to the end of a text note',
+const appendText = defineTool({
+  name: 'append_text',
+  title: 'Add text to the end of a note or a work plan section',
   description:
-    "Add text at the END of one of the user's text notes. Existing text is never changed or replaced. Only add what the " +
-    'user asked for in this conversation, in their language (usually Hebrew). It works on text notes only (for tasks use ' +
-    "update_checklist_item), on the user's own notes only, not on notes marked read-only for Claude, and not while the note " +
-    'is open in the app (then ask the user to close it). Sending exactly the same text to the same note again within 10 ' +
-    'minutes is ignored, so a retry after a timeout does not add it twice.',
+    'Add text at the END of a text note, or at the end of one section of a work plan (give sectionId from get_note). ' +
+    'Existing text is never changed or replaced. Use it to grow a note over time - for example to add what the user said ' +
+    'in a new recording to the right section of their existing work plan. Only add what the user asked for in this ' +
+    `conversation, in their language (usually Hebrew). ${READ_FIRST} It works on the user's own notes only, not on notes ` +
+    'marked read-only for Claude, and not while the note is open in the app (then ask the user to close it). Sending ' +
+    'exactly the same text to the same place again within 10 minutes is ignored, so a retry does not add it twice.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
-    noteId: z.string().min(1).max(128).describe('The text note id.'),
+    noteId: z.string().min(1).max(128).describe('The note id (a text note or a work plan).'),
     text: z.string().max(20_000).describe(`The text to add, at most ${EDIT_LIMITS.appendText} characters. It starts on a new line.`),
+    sectionId: z
+      .string()
+      .min(1)
+      .max(128)
+      .optional()
+      .describe('Work plans only: the section id from get_note ("section id: ..."). Leave out for a text note.'),
   }),
   run: async (deps, input) => {
-    requireEditConsent(deps);
+    if (input.sectionId === undefined) requireEditConsent(deps);
+    else requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
     const at = (deps.now ?? (() => new Date()))();
-    const edit = buildAppendEdit(input.text);
+    const edit = buildAppendEdit(input.text, input.sectionId);
     await spendWriteQuota(deps);
 
-    const result = await deps.scope.editNote(
-      input.noteId,
-      edit,
-      { grantId: deps.context.grantId, clientId: deps.context.clientId, clientName: deps.context.clientName, tool: 'append_to_text_note' },
-      at.getTime()
-    );
+    const result = await runEdit(deps, input.noteId, edit, 'append_text', at);
+    const where = input.sectionId ? `section [section id: ${input.sectionId}] of "${result.note.title}"` : `"${result.note.title}"`;
     if (result.duplicate) {
-      return `This exact text was already added to "${result.note.title}" [id: ${input.noteId}] in the last 10 minutes. It was not added again.`;
+      return `This exact text was already added to ${where} [id: ${input.noteId}] in the last 10 minutes. It was not added again.`;
     }
-    return `Added the text at the end of "${result.note.title}" [id: ${input.noteId}]. The previous version is kept in the note history in the app.`;
+    return `Added the text at the end of ${where} [id: ${input.noteId}]. ${RECOVERABLE}`;
   },
 });
 
-export const TOOLS = [listCategories, listNotes, searchNotes, getNote, createNote, updateChecklistItem, appendToTextNote];
+const addWorkplanSection = defineTool({
+  name: 'add_workplan_section',
+  title: 'Add a section to a work plan',
+  description:
+    "Add a new section (header + content) to one of the user's work plans: at the end, or right after a given section. " +
+    'Use it to grow an existing plan for a project instead of creating a new note - for example a new topic from a ' +
+    `recording the user dictated. Only add what the user asked for in this conversation, in their language. ${READ_FIRST} ` +
+    "It works on the user's own notes only, not on notes marked read-only for Claude, and not while the note is open in " +
+    'the app. The same section added again within 10 minutes is ignored.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    header: z.string().max(1_000).describe(`Section header, one line, at most ${EDIT_LIMITS.sectionHeader} characters.`),
+    content: z.string().max(20_000).describe(`Section text, at most ${EDIT_LIMITS.appendText} characters.`),
+    afterSectionId: z
+      .string()
+      .min(1)
+      .max(128)
+      .optional()
+      .describe('Put the new section right after this section (id from get_note). Leave out to add it at the end.'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
+    const at = (deps.now ?? (() => new Date()))();
+    const edit = buildAddSectionEdit(input, at);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'add_workplan_section', at);
+    if (result.duplicate) {
+      return `This exact section was already added to "${result.note.title}" [id: ${input.noteId}] in the last 10 minutes. It was not added again.`;
+    }
+    const sections = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
+    const added = sections.find((section) => section.header === input.header.replace(/\s+/g, ' ').trim()) ?? sections.at(-1);
+    return (
+      `Added the section "${String(added?.header ?? '')}" [section id: ${String(added?.id ?? '')}] to "${result.note.title}" ` +
+      `[id: ${input.noteId}]. ${RECOVERABLE}`
+    );
+  },
+});
+
+const editNoteText = defineTool({
+  name: 'edit_note_text',
+  title: 'Replace an exact piece of text',
+  description:
+    'Replace ONE exact piece of text with new text, in a text note or in one work plan section (its header or its content). ' +
+    'Only when the user explicitly asked for this change in this conversation. oldText must appear exactly once: copy it ' +
+    `from get_note, with enough surrounding words to be unique. ${READ_FIRST} If it is found zero times or more than once, ` +
+    'nothing is changed and the result says so - do not guess, read the note again. An empty newText removes the piece - ' +
+    'only when the user explicitly asked to delete it. Line endings, invisible direction marks and the order of Hebrew ' +
+    'vowel points do not matter when matching; if there is no exact match, differences in spaces and Hebrew/ASCII quotes ' +
+    "or dashes are tolerated, still only if the result is a single match. It works on the user's own notes only, not on " +
+    'notes marked read-only for Claude, and not while the note is open in the app. For checklist tasks use ' +
+    'update_checklist_item. The previous version stays in the note history.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The note id (a text note or a work plan).'),
+    oldText: z.string().max(40_000).describe('The exact text to replace, copied from get_note. Must appear exactly once.'),
+    newText: z.string().max(40_000).describe('The new text. Empty removes oldText (only if the user explicitly asked).'),
+    sectionId: z.string().min(1).max(128).optional().describe('Work plans only: the section id from get_note.'),
+    field: z
+      .enum(['header', 'content'])
+      .optional()
+      .describe('Work plans only: replace in the section header or in its content (default: content).'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'replace or remove text');
+    const at = (deps.now ?? (() => new Date()))();
+    const edit = buildReplaceEdit(input);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'edit_note_text', at);
+    if (!result.changed) return 'Nothing changed: the new text is the same as the old text.';
+    const where = input.sectionId
+      ? `the ${input.field ?? 'content'} of section [section id: ${input.sectionId}] in "${result.note.title}"`
+      : `"${result.note.title}"`;
+    const action = input.newText === '' ? 'Removed the text from' : 'Replaced the text in';
+    return `${action} ${where} [id: ${input.noteId}]. ${RECOVERABLE}`;
+  },
+});
+
+const removeWorkplanSection = defineTool({
+  name: 'remove_workplan_section',
+  title: 'Remove a section from a work plan',
+  description:
+    'Remove ONE whole section (header and content) from a work plan. Only when the user explicitly asked in this ' +
+    `conversation to remove that section. ${READ_FIRST} Identify it by its section id from get_note. It works on the ` +
+    "user's own notes only, not on notes marked read-only for Claude, and not while the note is open in the app. The " +
+    'removed section stays in the note history and can be restored from there.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    sectionId: z.string().min(1).max(128).describe('The section id from get_note ("section id: ...").'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'remove work plan sections');
+    const at = (deps.now ?? (() => new Date()))();
+    const edit = buildRemoveSectionEdit(input.sectionId);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'remove_workplan_section', at);
+    return `Removed the section [section id: ${input.sectionId}] from "${result.note.title}" [id: ${input.noteId}]. ${RECOVERABLE}`;
+  },
+});
+
+export const TOOLS = [
+  listCategories,
+  listNotes,
+  searchNotes,
+  getNote,
+  createNote,
+  updateChecklistItem,
+  appendText,
+  addWorkplanSection,
+  editNoteText,
+  removeWorkplanSection,
+];
 
 // ---------------------------------------------------------------------------
 // רישום

@@ -30,7 +30,14 @@ export interface NoteCreatedSummary {
   reminderCount: number;
 }
 
-export type AuditAction = 'note.create' | 'checklist_item.update' | 'note.append';
+export type AuditAction =
+  | 'note.create'
+  | 'checklist_item.update'
+  | 'note.append'
+  | 'note.replace'
+  | 'workplan_section.add'
+  | 'workplan_section.append'
+  | 'workplan_section.remove';
 
 export interface AuditEntry {
   uid: string;

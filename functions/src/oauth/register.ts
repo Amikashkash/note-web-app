@@ -23,7 +23,7 @@ const cleanClientName = (value: unknown): string => {
   if (value === undefined) return 'MCP client';
   if (typeof value !== 'string') throw invalidMetadata('client_name must be a string');
   // eslint-disable-next-line no-control-regex
-  const name = value.replace(/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim();
+  const name = value.replace(/[\u0000-\u001f\u007f-\u009f\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim();
   return (name || 'MCP client').slice(0, MAX_CLIENT_NAME);
 };
 

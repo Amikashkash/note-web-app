@@ -39,14 +39,19 @@ export const RESOURCE_SCOPES = ['notes.read', 'notes.write'] as const;
 /**
  * גרסת הנוסח שהמשתמש אישר במסך ההסכמה. נשמרת ב-grant.
  * - 1 (עד v1.25): "יצירת פתקים חדשים, בלי עריכה".
- * - 2 (מ-v1.26): גם עדכון משימות והוספת טקסט בסוף פתק.
+ * - 2 (v1.26): גם עדכון משימות והוספת טקסט בסוף פתק.
+ * - 3 (מ-v1.27): גם תכניות עבודה (הוספת סעיפים וטקסט בסעיף), החלפת טקסט
+ *   מדויקת והסרת סעיפים - רק כשהמשתמש ביקש במפורש, והכל ניתן לשחזור.
  *
  * `notes.write` מכסה את שתיהן מבחינת הרשאה, אבל חיבור שאושר בנוסח 1
  * לא הסכים לעריכה. לכן כלי העריכה דורשים 2, וחיבור ישן מקבל הודעה
  * שצריך לחבר מחדש (בלי scope חדש).
  */
-export const CONSENT_VERSION = 2;
+export const CONSENT_VERSION = 3;
+/** עדכון משימות והוספה בסוף פתק טקסט */
 export const EDIT_CONSENT_VERSION = 2;
+/** מ-v1.27: סעיפים בתכנית עבודה, החלפת טקסט והסרת סעיפים */
+export const REWRITE_CONSENT_VERSION = 3;
 export const SUPPORTED_SCOPES: readonly string[] = [...RESOURCE_SCOPES, 'offline_access'];
 export const DEFAULT_SCOPE = 'notes.read';
 

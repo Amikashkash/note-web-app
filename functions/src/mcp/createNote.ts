@@ -26,10 +26,20 @@ export const CREATE_LIMITS = {
   items: 100,
   itemText: 500,
   quantity: 50,
+  sections: 50,
+  sectionHeader: 200,
+  sectionContent: 20_000,
+  /** אותה תקרה כמו לתוכן מלא (mcp-plan §3.3) */
+  noteContent: 100 * 1024,
   maxYearsAhead: MAX_YEARS_AHEAD,
 } as const;
 
-export type CreateType = 'text' | 'checklist' | 'shopping';
+export type CreateType = 'text' | 'checklist' | 'shopping' | 'workplan';
+
+export interface CreateSectionInput {
+  header: string;
+  content: string;
+}
 
 export interface CreateItemInput {
   text: string;
@@ -45,6 +55,8 @@ export interface CreateNoteInput {
   type: CreateType;
   text?: string;
   items?: CreateItemInput[];
+  /** תכנית עבודה: סעיפים (כותרת + תוכן) */
+  sections?: CreateSectionInput[];
 }
 
 export interface ScheduledReminder {
@@ -65,6 +77,7 @@ const TEMPLATE: Record<CreateType, NoteDraft['templateType']> = {
   text: 'plain',
   checklist: 'checklist',
   shopping: 'shopping',
+  workplan: 'workplan',
 };
 
 const oneLine = (value: string): string => value.replace(/\s+/g, ' ').trim();
@@ -98,7 +111,40 @@ export const buildNote = (input: CreateNoteInput, now: Date): BuiltNote => {
   let canonical: unknown;
   let itemCount = 0;
 
-  if (input.type === 'text') {
+  if (input.type !== 'workplan' && input.sections !== undefined) {
+    throw invalid('sections are for work plans. Use type "workplan", or text/items for other types');
+  }
+
+  if (input.type === 'workplan') {
+    if (input.text !== undefined || input.items !== undefined) {
+      throw invalid('a work plan uses sections (header + content), not text or items');
+    }
+    const sections = input.sections ?? [];
+    if (sections.length === 0) throw invalid('a work plan needs at least one section');
+    if (sections.length > CREATE_LIMITS.sections) {
+      throw invalid(`${sections.length} sections; the limit is ${CREATE_LIMITS.sections}. Split the plan or merge sections`);
+    }
+    itemCount = sections.length;
+    const stamp = now.getTime();
+    const rows = sections.map((section, index) => {
+      const label = `section ${index + 1}`;
+      const header = oneLine(section.header ?? '');
+      const body = (section.content ?? '').replace(/\s+$/, '');
+      if (header.length > CREATE_LIMITS.sectionHeader) {
+        throw invalid(`${label}: header is ${header.length} characters; the limit is ${CREATE_LIMITS.sectionHeader}`);
+      }
+      if (body.length > CREATE_LIMITS.sectionContent) {
+        throw invalid(`${label}: content is ${body.length} characters; the limit is ${CREATE_LIMITS.sectionContent}`);
+      }
+      if (!header && !body.trim()) throw invalid(`${label} is empty. Give it a header, content or both`);
+      return { id: `${stamp}-${index}`, header, content: body };
+    });
+    content = JSON.stringify(rows);
+    if (content.length > CREATE_LIMITS.noteContent) {
+      throw invalid('the work plan is too long for one note. Split it into several notes');
+    }
+    canonical = rows.map(({ id: _id, ...rest }) => rest);
+  } else if (input.type === 'text') {
     if (input.items !== undefined) throw invalid('items are for checklist and shopping notes. For a text note use text');
     const text = (input.text ?? '').trim();
     if (!text) throw invalid('text is empty. A text note needs text');

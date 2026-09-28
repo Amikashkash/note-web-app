@@ -1,5 +1,5 @@
 /**
- * `update_checklist_item` ו-`append_to_text_note` מקצה לקצה (שלב 2ב-lite).
+ * `update_checklist_item` ו-`append_text` מקצה לקצה (שלב 2ב-lite).
  *
  * הלקוח הרשמי של ה-SDK קורא לכלים; אחרי כל עריכה רץ `handleNoteWritten`
  * (אותו קוד ש-`onNoteWritten` מריץ) על המצב לפני ואחרי, ובודקים:
@@ -241,7 +241,8 @@ describe('update_checklist_item and reminders', () => {
     const after = await stored(noteId);
     expect(JSON.parse(after.content)).toEqual([{ ...items()[0], completed: true }, items()[1]]);
     expect(after.revision).toBe(5);
-    expect(after.updatedBy).toBe('mcp:test-client');
+    // כותב ייחודי לכל עריכה של Claude: כל עריכה היא גרסה נפרדת בהיסטוריה
+    expect(after.updatedBy).toMatch(/^mcp:test-client:[0-9a-f]{8}$/);
 
     const audit = (await db.collection('auditLog').where('target.id', '==', noteId).get()).docs.map((doc) => doc.data());
     expect(audit).toHaveLength(1);
@@ -323,14 +324,14 @@ describe('update_checklist_item and reminders', () => {
 });
 
 // ---------------------------------------------------------------------------
-// append_to_text_note
+// append_text
 // ---------------------------------------------------------------------------
 
-describe('append_to_text_note', () => {
+describe('append_text', () => {
   it('adds at the end, keeps the rest, and the version history keeps the state before Claude', async () => {
     const noteId = await seed(note(users.a, C.home, { content: 'שורה ראשונה' }));
     const before = await stored(noteId);
-    const result = await call(clientA, 'append_to_text_note', { noteId, text: 'שורה שנוספה' });
+    const result = await call(clientA, 'append_text', { noteId, text: 'שורה שנוספה' });
     expect(result.isError).toBe(false);
 
     const after = await stored(noteId);
@@ -340,7 +341,8 @@ describe('append_to_text_note', () => {
     await runTrigger(noteId, before);
     const versions = (await db.collection(`notes/${noteId}/versions`).get()).docs.map((doc) => doc.data());
     expect(versions).toHaveLength(1);
-    expect(versions[0]).toMatchObject({ content: 'שורה ראשונה', reason: 'writer', replacedBy: 'mcp:test-client' });
+    expect(versions[0]).toMatchObject({ content: 'שורה ראשונה', reason: 'writer' });
+    expect(versions[0].replacedBy).toMatch(/^mcp:test-client:/);
 
     const [entry] = (await db.collection('auditLog').where('target.id', '==', noteId).get()).docs.map((doc) => doc.data());
     expect(entry).toMatchObject({ action: 'note.append', changes: { after: { appended: 'שורה שנוספה' } } });
@@ -348,15 +350,15 @@ describe('append_to_text_note', () => {
 
   it('the same text again within 10 minutes is not added twice', async () => {
     const noteId = await seed(note(users.a, C.home, { content: 'א' }));
-    await call(clientA, 'append_to_text_note', { noteId, text: 'ב' });
-    const again = await call(clientA, 'append_to_text_note', { noteId, text: 'ב' });
+    await call(clientA, 'append_text', { noteId, text: 'ב' });
+    const again = await call(clientA, 'append_text', { noteId, text: 'ב' });
     expect(again.text).toContain('already added');
     expect((await stored(noteId)).content).toBe('א\nב');
   });
 
   it('refuses a checklist', async () => {
     const noteId = await seed(note(users.a, C.home, { templateType: 'checklist', content: '[]' }));
-    expect((await call(clientA, 'append_to_text_note', { noteId, text: 'x' })).text).toContain('not a text note');
+    expect((await call(clientA, 'append_text', { noteId, text: 'x' })).text).toContain('append_text works on text notes and work plans');
   });
 });
 
@@ -366,7 +368,7 @@ describe('append_to_text_note', () => {
 
 describe('what Claude may not change', () => {
   const tryBoth = async (noteId: string) => [
-    await call(clientA, 'append_to_text_note', { noteId, text: 'x' }),
+    await call(clientA, 'append_text', { noteId, text: 'x' }),
     await call(clientA, 'update_checklist_item', { noteId, itemId: 'a', completed: true }),
   ];
 
@@ -402,7 +404,7 @@ describe('what Claude may not change', () => {
 
   it('an archived note', async () => {
     const noteId = await seed(note(users.a, C.home, { isArchived: true }));
-    expect((await call(clientA, 'append_to_text_note', { noteId, text: 'x' })).text).toContain('archived');
+    expect((await call(clientA, 'append_text', { noteId, text: 'x' })).text).toContain('archived');
   });
 
   it('a note open in the app is not changed; Claude is told to ask the user to close it', async () => {
@@ -413,7 +415,7 @@ describe('what Claude may not change', () => {
       refreshedAt: Timestamp.fromMillis(Date.now() - 20_000),
       expiresAt: Timestamp.fromMillis(Date.now() + 40_000),
     });
-    const result = await call(clientA, 'append_to_text_note', { noteId, text: 'x' });
+    const result = await call(clientA, 'append_text', { noteId, text: 'x' });
     expect(result.isError).toBe(true);
     expect(result.text).toContain('open in the app right now (on: iPhone)');
     expect(result.text).toContain('Ask the user to close the note');
@@ -428,16 +430,16 @@ describe('what Claude may not change', () => {
       refreshedAt: Timestamp.fromMillis(Date.now() - 90_000),
       expiresAt: Timestamp.fromMillis(Date.now() - 30_000),
     });
-    expect((await call(clientA, 'append_to_text_note', { noteId, text: 'x' })).isError).toBe(false);
+    expect((await call(clientA, 'append_text', { noteId, text: 'x' })).isError).toBe(false);
   });
 
   it('a connection approved before editing existed is told to reconnect, and nothing is written', async () => {
     const oldClient = await connect((await issueToken(users.a, null)).token);
     try {
       const noteId = await seed(note(users.a, C.home, { content: 'ישן' }));
-      const result = await call(oldClient, 'append_to_text_note', { noteId, text: 'x' });
+      const result = await call(oldClient, 'append_text', { noteId, text: 'x' });
       expect(result.isError).toBe(true);
-      expect(result.text).toContain('approved before editing existed');
+      expect(result.text).toContain('approved before Claude could update tasks or add text');
       expect((await stored(noteId)).content).toBe('ישן');
       // יצירה עדיין מותרת לחיבור הזה - היא מה שהוא אישר
       expect(
