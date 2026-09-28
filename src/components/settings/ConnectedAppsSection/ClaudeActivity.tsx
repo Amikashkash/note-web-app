@@ -2,7 +2,7 @@
  * "פעילות Claude": מה Claude עשה בשם המשתמש, מתוך `auditLog`.
  *
  * כל כתיבה דרך שרת ה-MCP נרשמת שם באותו transaction של הכתיבה עצמה, כך
- * שאין פתק שנוצר בלי רשומה. היום יש רק יצירת פתקים (שלב 2א).
+ * שאין שינוי בלי רשומה: יצירת פתק, עדכון משימה, הוספת טקסט.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -20,6 +20,7 @@ const formatWhen = (date: Date | null): string =>
     : '';
 
 const describe = (entry: Activity): string => {
+  if (entry.action !== 'note.create') return entry.description;
   const parts = [getTemplateLabel(entry.templateType)];
   if (entry.itemCount > 0) parts.push(`${entry.itemCount} פריטים`);
   if (entry.reminderCount > 0) parts.push(`${entry.reminderCount} תזכורות`);
@@ -58,7 +59,7 @@ export const ClaudeActivity: React.FC<{ uid: string }> = ({ uid }) => {
         <p className="text-sm text-ink-2-light dark:text-ink-2-dark">לא ניתן לטעון את הפעילות כרגע.</p>
       )}
       {load.kind === 'loaded' && load.entries.length === 0 && (
-        <p className="text-sm text-ink-2-light dark:text-ink-2-dark">Claude עוד לא יצר פתקים.</p>
+        <p className="text-sm text-ink-2-light dark:text-ink-2-dark">Claude עוד לא יצר או שינה פתקים.</p>
       )}
 
       {load.kind === 'loaded' && load.entries.length > 0 && (
@@ -66,7 +67,7 @@ export const ClaudeActivity: React.FC<{ uid: string }> = ({ uid }) => {
           {load.entries.map((entry) => (
             <li key={entry.id} className="text-sm">
               <p className="text-ink-light dark:text-ink-dark">
-                <bdi>{entry.clientName}</bdi> יצר את{' '}
+                <bdi>{entry.clientName}</bdi> {entry.action === 'note.create' ? 'יצר את' : 'עדכן את'}{' '}
                 {entry.categoryId && entry.noteId ? (
                   <Link
                     to={`/category/${encodeURIComponent(entry.categoryId)}?note=${encodeURIComponent(entry.noteId)}`}

@@ -28,7 +28,7 @@ export type ConnectProblem =
 
 export const SCOPE_LABELS: Record<string, string> = {
   'notes.read': 'קריאת הפתקים והקטגוריות שלך',
-  'notes.write': 'יצירת פתקים חדשים (בלי עריכה או מחיקה של פתקים קיימים)',
+  'notes.write': 'יצירת פתקים חדשים, עדכון משימות והוספת טקסט בסוף פתקים (בלי מחיקה)',
   offline_access: 'שמירת החיבור לאורך זמן, בלי להתחבר מחדש בכל פעם',
 };
 

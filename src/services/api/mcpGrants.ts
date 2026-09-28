@@ -70,6 +70,10 @@ export const revokeMcpConnection = async (grantId: string): Promise<void> => {
 export interface ClaudeActivity {
   id: string;
   at: Date | null;
+  /** `note.create`, `checklist_item.update`, `note.append` */
+  action: string;
+  /** בעריכה: תיאור קצר של השינוי */
+  description: string;
   clientName: string;
   noteId: string;
   title: string;
@@ -95,6 +99,8 @@ export const listClaudeActivity = async (uid: string): Promise<ClaudeActivity[]>
     return {
       id: doc.id,
       at: asDate(data.at),
+      action: text(data.action) || 'note.create',
+      description: text(summary.description),
       clientName: text(data.clientName) || 'MCP client',
       noteId: text((data.target as { id?: unknown } | undefined)?.id),
       title: text(summary.title),
