@@ -2,7 +2,7 @@
  * "פעילות Claude": מה Claude עשה בשם המשתמש, מתוך `auditLog`.
  *
  * כל כתיבה דרך שרת ה-MCP נרשמת שם באותו transaction של הכתיבה עצמה, כך
- * שאין שינוי בלי רשומה: יצירת פתק, עדכון משימה, הוספת טקסט.
+ * שאין שינוי בלי רשומה: יצירת פתק, עדכון משימה, הוספת טקסט, ארכוב, העברה.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -26,6 +26,21 @@ const describe = (entry: Activity): string => {
   if (entry.reminderCount > 0) parts.push(`${entry.reminderCount} תזכורות`);
   if (entry.categoryName) parts.push(`בקטגוריה ${entry.categoryName}`);
   return parts.join(' · ');
+};
+
+const VERBS: Record<string, string> = {
+  'note.create': 'יצר את',
+  'note.archive': 'העביר לארכיון את',
+  'note.unarchive': 'שחזר מהארכיון את',
+  'note.move': 'העביר את',
+};
+
+/** פתק שעבר לארכיון נמצא בדף הארכיון, לא בקטגוריה */
+const linkFor = (entry: Activity): string | null => {
+  if (!entry.noteId) return null;
+  if (entry.action === 'note.archive') return '/archive';
+  if (!entry.categoryId) return null;
+  return `/category/${encodeURIComponent(entry.categoryId)}?note=${encodeURIComponent(entry.noteId)}`;
 };
 
 export const ClaudeActivity: React.FC<{ uid: string }> = ({ uid }) => {
@@ -67,10 +82,10 @@ export const ClaudeActivity: React.FC<{ uid: string }> = ({ uid }) => {
           {load.entries.map((entry) => (
             <li key={entry.id} className="text-sm">
               <p className="text-ink-light dark:text-ink-dark">
-                <bdi>{entry.clientName}</bdi> {entry.action === 'note.create' ? 'יצר את' : 'עדכן את'}{' '}
-                {entry.categoryId && entry.noteId ? (
+                <bdi>{entry.clientName}</bdi> {VERBS[entry.action] ?? 'עדכן את'}{' '}
+                {linkFor(entry) ? (
                   <Link
-                    to={`/category/${encodeURIComponent(entry.categoryId)}?note=${encodeURIComponent(entry.noteId)}`}
+                    to={linkFor(entry) ?? ''}
                     className="font-medium text-brand dark:text-brand-dark hover:underline"
                   >
                     <bdi>{entry.title || 'פתק'}</bdi>

@@ -89,6 +89,7 @@ describe('write access on the consent screen', () => {
   it('says what write access allows, and that it happens only on request', () => {
     expect(scopeLabel('notes.write')).toContain('יצירת פתקים');
     expect(scopeLabel('notes.write')).toContain('תכניות עבודה');
+    expect(scopeLabel('notes.write')).toContain('ארכיון');
     expect(scopeLabel('notes.write')).toContain('לפי בקשה שלך');
   });
 });
