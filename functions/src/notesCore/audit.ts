@@ -37,7 +37,12 @@ export type AuditAction =
   | 'note.replace'
   | 'workplan_section.add'
   | 'workplan_section.append'
-  | 'workplan_section.remove';
+  | 'workplan_section.remove'
+  | 'note.archive'
+  | 'note.unarchive'
+  | 'note.move'
+  | 'checklist_item.add'
+  | 'checklist_item.remove';
 
 export interface AuditEntry {
   uid: string;

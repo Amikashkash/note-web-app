@@ -34,7 +34,7 @@ const note = (content: unknown, templateType = 'checklist'): NoteRecord => ({
 });
 
 const apply = (change: ChecklistItemChange, content: unknown) => buildChecklistItemEdit(change, NOW).apply(note(content));
-const rowsOf = (outcome: ReturnType<typeof apply>) => JSON.parse(outcome!.content);
+const rowsOf = (outcome: ReturnType<typeof apply>) => JSON.parse(outcome!.content ?? '');
 
 const list = [
   { id: 'a', text: 'לקנות חלב', completed: false, priority: 2 },
@@ -118,7 +118,7 @@ describe('append_to_text_note', () => {
   it('adds the text on a new line at the end, and changes nothing before it', () => {
     const outcome = append('שורה חדשה', 'שורה ראשונה');
     expect(outcome?.content).toBe('שורה ראשונה\nשורה חדשה');
-    expect(outcome?.after).toEqual({ contentLength: outcome!.content.length, appended: 'שורה חדשה' });
+    expect(outcome?.after).toEqual({ contentLength: outcome!.content!.length, appended: 'שורה חדשה' });
   });
 
   it('does not add a second newline, and fills an empty note', () => {

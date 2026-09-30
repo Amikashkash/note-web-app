@@ -40,6 +40,7 @@ const NOTES = 'notes';
 const CATEGORIES = 'categories';
 const VERSIONS = 'versions';
 const AUDIT = 'auditLog';
+const REMINDERS = 'reminders';
 const IDEMPOTENCY = 'mcpIdempotency';
 
 /** חלון מניעת הכפילויות של `createNote` ו-`editNote` */
@@ -118,19 +119,46 @@ export interface NoteEdit {
    * מחיל את השינוי על **הגרסה העדכנית** של הפתק, בתוך ה-transaction.
    * `null` - אין מה לשנות (הערכים כבר כאלה). שגיאה - `InvalidError`.
    */
-  apply: (note: NoteRecord) => EditOutcome | null;
+  apply: (note: NoteRecord, context?: EditContext) => EditOutcome | null;
   /** בקשה זהה בתוך 10 דקות לא מוחלת פעמיים (append אחרי timeout) */
   fingerprint?: string;
+  /** `any` - גם פתק מאורכב (ארכוב ושחזור). ברירת מחדל: רק פתק פעיל */
+  archived?: 'active' | 'any';
+  /** קטגוריית יעד (העברה): נקראת בתוך ה-transaction ומועברת ל-`apply` */
+  targetCategoryId?: string;
 }
 
+/** מה ש-`editNote` קרא בשביל העריכה, בתוך ה-transaction */
+export interface EditContext {
+  /** קטגוריית היעד, אם `targetCategoryId` - `null` כשלא קיימת */
+  targetCategory: CategoryRecord | null;
+}
+
+/**
+ * התזכורות של הפתק, שמשתנות **באותו transaction** של העריכה - כדי שלא
+ * יהיה רגע שבו פתק מאורכב או משימה שנמחקה עדיין שולחים. הטריגר
+ * (`onNoteWritten`) מסנכרן אחר כך כרגיל, ומגיע לאותה תוצאה.
+ */
+export type ReminderChange =
+  | { kind: 'deleteAll' }
+  | { kind: 'deleteItems'; itemIds: string[] }
+  | { kind: 'setCategory'; categoryId: string };
+
 export interface EditOutcome {
-  content: string;
+  /** תוכן חדש. חסר - התוכן לא משתנה */
+  content?: string;
+  /** שדות אחרים של הפתק (ארכיון, קטגוריה) */
+  fields?: Partial<Pick<NoteRecord, 'isArchived' | 'categoryId'>>;
+  reminders?: ReminderChange;
   /** לרשימת "פעילות Claude" */
   description: string;
   /** החלק שהשתנה, לפני ואחרי, ל-audit */
   before: unknown;
   after: unknown;
 }
+
+/** קטגוריית יעד שלא קיימת, של משתמש אחר, או רגישה - בלי לומר איזה מהם */
+export class TargetCategoryNotFoundError extends NotFoundError {}
 
 export interface EditNoteResult {
   note: Note;
@@ -393,7 +421,9 @@ export class UserScope {
       if (!access || !isVisibleToMcp(record, categories)) throw new NotFoundError();
       if (access !== 'owner') throw new ForbiddenError("Only the user's own notes can be changed for now");
       if (isReadOnlyForMcp(record, categories)) throw new ReadOnlyError('The note is read-only for Claude');
-      if (record.isArchived) throw new InvalidError('the note is archived. Ask the user to restore it in the app first');
+      if ((edit.archived ?? 'active') === 'active' && record.isArchived) {
+        throw new InvalidError('the note is archived. Restore it with unarchive_note first, if the user wants');
+      }
 
       const openOn = presence.docs
         .filter((marker) => {
@@ -403,19 +433,34 @@ export class UserScope {
         .map((marker) => String(marker.get('device') ?? ''));
       if (openOn.length > 0) throw new OpenElsewhereError(openOn);
 
+      // קריאות נוספות, לפני כל הכתיבות
+      const [targetSnapshot, reminders] = await Promise.all([
+        edit.targetCategoryId && isDocId(edit.targetCategoryId)
+          ? tx.get(this.#db.collection(CATEGORIES).doc(edit.targetCategoryId))
+          : null,
+        tx.get(this.#db.collection(REMINDERS).where('noteId', '==', noteId)),
+      ]);
+      const targetCategory = targetSnapshot?.exists
+        ? toCategoryRecord(targetSnapshot.id, targetSnapshot.data() ?? {})
+        : null;
+
       const current = toNote(record, 'owner', false);
       const keyData = key?.data();
       if (keyData?.noteId === noteId && ((keyData.expiresAt as Timestamp | undefined)?.toMillis() ?? 0) > now) {
         return { note: current, changed: false, duplicate: true };
       }
 
-      const outcome = edit.apply(record);
+      const outcome = edit.apply(record, { targetCategory });
       if (!outcome) return { note: current, changed: false, duplicate: false };
 
       const revision = record.revision + 1;
       const stamp = Timestamp.fromMillis(now);
+      const fields: Record<string, unknown> = { ...outcome.fields };
+      if (outcome.fields?.isArchived === true) fields.archivedAt = stamp;
+      if (outcome.fields?.isArchived === false) fields.archivedAt = null;
       tx.update(noteRef, {
-        content: outcome.content,
+        ...(outcome.content !== undefined && { content: outcome.content }),
+        ...fields,
         revision,
         updatedAt: stamp,
         // מזהה ייחודי לכל עריכה: כל עריכה של Claude היא "כותב אחר", ולכן
@@ -426,6 +471,12 @@ export class UserScope {
       if (keyRef) {
         tx.set(keyRef, { uid: this.uid, noteId, expiresAt: Timestamp.fromMillis(now + DUPLICATE_WINDOW_MS) });
       }
+      const change = outcome.reminders;
+      for (const reminder of reminders.docs) {
+        if (change?.kind === 'deleteAll') tx.delete(reminder.ref);
+        else if (change?.kind === 'deleteItems' && change.itemIds.includes(String(reminder.get('itemId')))) tx.delete(reminder.ref);
+        else if (change?.kind === 'setCategory') tx.update(reminder.ref, { categoryId: change.categoryId });
+      }
       tx.create(this.#db.collection(AUDIT).doc(), {
         ...noteEditedEntry(
           { ...actor, uid: this.uid },
@@ -434,7 +485,8 @@ export class UserScope {
           {
             title: record.title,
             templateType: record.templateType,
-            categoryId: record.categoryId,
+            // אחרי העברה - הקטגוריה החדשה, כדי שהקישור ב"פעילות Claude" יוביל לפתק
+            categoryId: outcome.fields?.categoryId ?? record.categoryId,
             description: outcome.description,
             revisionBefore: record.revision,
             revisionAfter: revision,
@@ -446,7 +498,11 @@ export class UserScope {
       });
 
       return {
-        note: toNote({ ...record, content: outcome.content, revision }, 'owner', false),
+        note: toNote(
+          { ...record, ...outcome.fields, content: outcome.content ?? record.content, revision },
+          'owner',
+          false
+        ),
         changed: true,
         duplicate: false,
       };
