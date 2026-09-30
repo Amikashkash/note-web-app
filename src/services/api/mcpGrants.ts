@@ -70,7 +70,7 @@ export const revokeMcpConnection = async (grantId: string): Promise<void> => {
 export interface ClaudeActivity {
   id: string;
   at: Date | null;
-  /** `note.create`, `checklist_item.update`, `note.append` */
+  /** `note.create`, `checklist_item.update`, `note.archive`, `note.move`... */
   action: string;
   /** בעריכה: תיאור קצר של השינוי */
   description: string;

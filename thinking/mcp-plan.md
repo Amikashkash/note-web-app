@@ -480,6 +480,19 @@ defineTool({
 - **הסכמה:** `CONSENT_VERSION = 3`. סעיפים, החלפה והסרה דורשים 3; עדכון משימות והוספה בסוף פתק טקסט - 2, כמו קודם. חיבור שאושר בנוסח 2 ממשיך במה שאישר ומקבל הודעה לחבר מחדש לשאר. ה-scope לא השתנה (`notes.write`).
 - **פריסה:** רק `functions:mcp` (בנוסף ל-Hosting מה-CI, בשביל נוסח ההסכמה).
 
+**המשך 2ב-lite: ארכיון, העברה, הוספה והסרה של משימות (מומש ב-branch `claude/mcp-archive-items`, v1.28.0)**
+- **הכלים (אחד-עשר כלי כתיבה בסך הכל):** נוספו `archive_note`, `unarchive_note`, `add_checklist_items`, `remove_checklist_item`, `move_note_to_category`. כולם דרך `UserScope.editNote`, עם אותם כללים (transaction על הגרסה העדכנית, `revision + 1`, סימון נוכחות, קריאה בלבד, רגיש/זר, משותף, audit עם לפני ואחרי, גרסה בהיסטוריה עם "Claude").
+- **"מחיקה" = ארכיון.** אין כלי מחיקה. התיאור של `archive_note` וה-instructions של השרת אומרים ל-Claude ש"מחק"/"הסר" פתק פירושו ארכיון, שאפשר לשחזר. `unarchive_note` מוצא את הפתק דרך `list_notes` עם `archived: true`. שני הכלים עובדים גם על פתק מאורכב (`archived: 'any'`); שאר כלי העריכה מסרבים לפתק מאורכב ומפנים ל-`unarchive_note`.
+- **תזכורות של פתק מאורכב - מה היה:** הטריגר `onNoteWritten` מחק את התזכורות בארכוב ויצר אותן מחדש בשחזור (רק עתידיות; חוזרות - המופע הבא). אבל היה חלון: אם התזכורת הגיעה לפני שהטריגר רץ, `sendDueReminders` שלח אותה, כי הוא לא הסתכל על הפתק. **עכשיו:**
+  - `editNote` מוחק/מעדכן את התזכורות **באותו transaction** של העריכה (`ReminderChange`: מחיקת הכל בארכוב, מחיקת המשימה בהסרה, עדכון `categoryId` בהעברה).
+  - `sendDueReminders` קורא את הפתק בתוך ה-transaction של ה-claim (`isStillWanted`): פתק שלא קיים, מאורכב, לא רשימה, או שהמשימה לא קיימת או בוצעה - התזכורת נמחקת ולא נשלחת (`stale`). זה סוגר את החלון גם לשינויים מהאפליקציה.
+  - שחזור: התזכורות חוזרות דרך הטריגר, בלי שינוי בו.
+- **`add_checklist_items`:** משימה אחת או יותר (עד 50), בסוף או אחרי `afterItemId`, עם `dueDate`/`dueTime`/`repeat` ואותה ולידציה כמו `create_note`. תזכורות דרך הטריגר. מניעת כפילויות ב-retry לפי fingerprint של המשימות (בלי המזהים), 10 דקות.
+- **`remove_checklist_item`:** משימה אחת לפי מזהה, רק כשהמשתמש ביקש במפורש (`destructiveHint`). התזכורת שלה נמחקת באותו transaction. התשובה אומרת שהגרסה הקודמת בהיסטוריה.
+- **`move_note_to_category`:** לקטגוריה **של המשתמש**, גלויה ולא לקריאה בלבד. קטגוריה רגישה, של מישהו אחר (גם משותפת איתו) או שלא קיימת - אותה תשובה, שאומרת שהעברה לקטגוריה רגישה נעשית באפליקציה (Claude לא רואה אותה, והפתק היה נעלם לו). קטגוריה לקריאה בלבד - "Read-only". התזכורות מקבלות את ה-`categoryId` החדש באותו transaction, ורשומת ה-audit מקשרת לקטגוריה החדשה. **ידוע, קיים מקודם (F-3):** העברה מהאפליקציה לא מעדכנת את `categoryId` של התזכורות (הטריגר לא מתייחס ל-`categoryId`), ולכן הקישור בהתראה מוביל לקטגוריה הישנה. לא תוקן כאן.
+- **הסכמה:** `CONSENT_VERSION = 4` (`ORGANIZE_CONSENT_VERSION`). חמשת הכלים דורשים 4; חיבור בנוסח 3 ממשיך במה שאישר ומקבל הודעה לחבר מחדש. ה-scope לא השתנה.
+- **פריסה:** `functions:mcp` ו-`functions:sendDueReminders` (בנוסף ל-Hosting מה-CI, קודם, בשביל נוסח ההסכמה).
+
 **קריאה בלבד ל-Claude (`isReadOnly`, נוסף ב-2א):** דגל על פתק ועל קטגוריה, באותו דפוס כמו `isSensitive`: רק הבעלים משנה (rules), מתג וסמל נפרד (`PenOff`) באפליקציה. אפקטיבי = הדגל של הפתק **או** של הקטגוריה.
 - פתק לקריאה בלבד **גלוי** ל-MCP. `list_notes`, `get_note` ו-`list_categories` מציינים שהוא לקריאה בלבד.
 - קטגוריה לקריאה בלבד לא מקבלת פתקים מ-`create_note`: תשובה מפורשת "Read-only", לא `NotFound` (הקטגוריה גלויה ממילא).
@@ -494,11 +507,11 @@ defineTool({
 | `move_note_to_category` | `noteId`, `categoryId` | **בעלים בלבד** (החלטה). היעד חייב להיות קטגוריה **בבעלות המשתמש** ולא רגישה (אותו כלל כמו ב-`create_note`). מעדכן `categoryId` ו-`pos` (סוף הקטגוריה). **לא** משנה `sharedWith`, עד להחלטת SH-3 ב-review. |
 | `archive_note` | `noteId` | `isArchived:true`, `archivedAt: serverTimestamp()`, כמו `archiveNote` בלקוח. הטריגר מוחק את התזכורות. בעלים בלבד. אפשר לשחזר מהאפליקציה. |
 
-שאר ה-tools בטבלה (`add_checklist_item`, `update_note`, `move_note_to_category`, `archive_note`) הם **2ב**, אחרי D ו-E, וכולם מסרבים לפתק לקריאה בלבד.
+שאר ה-tools בטבלה הם התכנון המקורי. `add_checklist_items`, `move_note_to_category` ו-`archive_note` מומשו ב-v1.28.0 על הפורמט הנוכחי (ראו למעלה); `update_note` ומודל ה-`items` נשארו ל-2ב המלא.
 
 **אין `delete_note` ואין שום נתיב קוד שקורא ל-`.delete()` על notes או categories.** בדיקה סטטית ב-CI: grep על `notesCore/` שנכשל אם יש `delete(`.
 
-**שקול להוסיף בהמשך:** `complete_checklist_item` (קיצור נפוץ), `unarchive_note`, ו-`list_upcoming_reminders` (קריאה מ-`reminders` לפי `userId`).
+**שקול להוסיף בהמשך:** `complete_checklist_item` (קיצור נפוץ), ו-`list_upcoming_reminders` (קריאה מ-`reminders` לפי `userId`).
 
 ---
 

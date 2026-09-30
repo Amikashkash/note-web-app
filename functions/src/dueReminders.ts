@@ -15,6 +15,12 @@
  *
  * שתי הרצות במקביל (retry של Cloud Scheduler, או חפיפה) לא ישלחו פעמיים:
  * רק אחת מהן מצליחה ב-claim.
+ *
+ * בדיקה מול הפתק, באותו claim: הטריגר (`onNoteWritten`) מוחק תזכורות כשפתק
+ * מאורכב, נמחק, או כשמשימה סומנה או הוסרה - אבל שניות אחרי הכתיבה. אם
+ * המתזמן רץ בדיוק בפער, תזכורת כזו הייתה נשלחת. לכן ה-claim קורא גם את
+ * הפתק: פתק שלא קיים, מאורכב, שאינו רשימת משימות, או משימה שכבר לא קיימת
+ * או בוצעה - התזכורת נמחקת ולא נשלחת. עלות: קריאה אחת לכל תזכורת שהגיע מועדה.
  */
 
 import { FieldValue, Timestamp, type DocumentData, type Firestore } from 'firebase-admin/firestore';
@@ -43,8 +49,29 @@ export interface DueReminderResult {
   claimed: number;
   sent: number;
   skipped: number;
+  /** נמחקו כי הפתק או המשימה כבר לא מצדיקים תזכורת */
+  stale: number;
   failed: number;
 }
+
+/**
+ * האם הפתק עדיין מצדיק את התזכורת: קיים, לא מאורכב, רשימת משימות, והמשימה
+ * קיימת ולא בוצעה. המזהה - השמור, או `item-<מיקום>`, כמו בטריגר.
+ */
+export const isStillWanted = (note: DocumentData | undefined, itemId: string): boolean => {
+  if (!note || note.isArchived === true || note.templateType !== 'checklist') return false;
+  let items: unknown;
+  try {
+    items = JSON.parse(typeof note.content === 'string' ? note.content : '');
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(items)) return false;
+  const item = items.find(
+    (row, index) => row && typeof row === 'object' && ((row as { id?: unknown }).id || `item-${index}`) === itemId
+  ) as { completed?: unknown } | undefined;
+  return item !== undefined && item.completed !== true;
+};
 
 export const processDueReminders = async ({
   db,
@@ -61,7 +88,7 @@ export const processDueReminders = async ({
     .limit(limit)
     .get();
 
-  const result: DueReminderResult = { claimed: 0, sent: 0, skipped: 0, failed: 0 };
+  const result: DueReminderResult = { claimed: 0, sent: 0, skipped: 0, stale: 0, failed: 0 };
   if (due.empty) return result;
 
   log(`Processing ${due.size} due reminders`);
@@ -73,12 +100,19 @@ export const processDueReminders = async ({
     const seenRemindAt = doc.get('remindAt') as Timestamp;
 
     // 1. claim
-    let claimed: DocumentData | null;
+    let claimed: DocumentData | 'stale' | null;
     try {
       claimed = await db.runTransaction(async (tx) => {
         const fresh = await tx.get(doc.ref);
         const data = fresh.data();
         if (!data || data.sent !== false || !(data.remindAt as Timestamp)?.isEqual(seenRemindAt)) return null;
+
+        const noteId = typeof data.noteId === 'string' ? data.noteId : '';
+        const note = noteId ? (await tx.get(db.collection('notes').doc(noteId))).data() : undefined;
+        if (!isStillWanted(note, String(data.itemId ?? ''))) {
+          tx.delete(doc.ref);
+          return 'stale' as const;
+        }
 
         // בתזכורת חוזרת "מטופלת" פירושה מתגלגלת למועד הבא ולא נסגרת.
         // החישוב מתאריך הבסיס ולא מהמועד שנורה - אחרת קיצוץ לסוף חודש
@@ -106,6 +140,11 @@ export const processDueReminders = async ({
     if (!claimed) {
       // נמחק, כבר נשלח ע"י הרצה אחרת, או שהשעה שונתה בינתיים
       result.skipped += 1;
+      continue;
+    }
+    if (claimed === 'stale') {
+      result.stale += 1;
+      log('Reminder no longer wanted, deleted', { reminderId: doc.id });
       continue;
     }
     result.claimed += 1;

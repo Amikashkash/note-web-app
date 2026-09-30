@@ -329,31 +329,27 @@ describe('the /mcp endpoint', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'notes-4-me' } } });
   });
 
-  it('lists the four read tools and the six write tools, each with a description', async () => {
+  it('lists the four read tools and the eleven write tools, each with a description', async () => {
     const { tools } = await clientA.listTools();
     const writeTools = [
+      'add_checklist_items',
       'add_workplan_section',
       'append_text',
+      'archive_note',
       'create_note',
       'edit_note_text',
+      'move_note_to_category',
+      'remove_checklist_item',
       'remove_workplan_section',
+      'unarchive_note',
       'update_checklist_item',
     ];
-    expect(tools.map((tool) => tool.name).sort()).toEqual([
-      'add_workplan_section',
-      'append_text',
-      'create_note',
-      'edit_note_text',
-      'get_note',
-      'list_categories',
-      'list_notes',
-      'remove_workplan_section',
-      'search_notes',
-      'update_checklist_item',
-    ]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(
+      [...writeTools, 'get_note', 'list_categories', 'list_notes', 'search_notes'].sort()
+    );
     for (const tool of tools) {
       // מחליף או מסיר טקסט - מסומן destructive, כדי שהלקוח יוכל לבקש אישור
-      const destructive = ['edit_note_text', 'remove_workplan_section'].includes(tool.name);
+      const destructive = ['edit_note_text', 'remove_workplan_section', 'remove_checklist_item'].includes(tool.name);
       expect(tool.annotations).toMatchObject({ readOnlyHint: !writeTools.includes(tool.name), destructiveHint: destructive });
       expect(tool.description?.length).toBeGreaterThan(150);
     }

@@ -43,7 +43,7 @@ const plan = [
   { id: 's2', header: 'קבלנים', content: 'לבקש 3 הצעות' },
 ];
 
-const rowsOf = (outcome: { content: string } | null) => JSON.parse(outcome!.content);
+const rowsOf = (outcome: { content?: string } | null) => JSON.parse(outcome!.content ?? '');
 
 describe('create_note with type "workplan"', () => {
   it('builds sections with ids, in the format the app reads', () => {
