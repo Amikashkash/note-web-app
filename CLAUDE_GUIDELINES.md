@@ -252,6 +252,14 @@ clears it; the rules deny it to shared users, and a shared user cannot change
 is always written, including as `false`, and it is not a content field: it
 creates no version and does not touch reminders.
 
+**MCP consent version** — `CONSENT_VERSION` (`functions/src/oauth/config.ts`)
+is bumped **only when the permissions actually expand**: a new kind of action
+Claude can take (for example archiving or moving notes). Never bump it for
+wording changes, clarifications or new tools that do what an approved kind of
+action already covers. A bump is strict: every existing connection is cut off at
+once, reads included, until the user approves the consent page again
+(`isConsentCurrent`). Update the consent text on `/connect` in the same change.
+
 **Finding users** — sharing by email calls the `findUserByEmail` callable
 (Firebase Auth, verified accounts only, rate-limited). `userLookup` is read
 only by id (`get`) for display names; a `list` query against it is denied.

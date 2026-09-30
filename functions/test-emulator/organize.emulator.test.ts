@@ -15,7 +15,7 @@ import { getFirestore, Timestamp, type DocumentData } from 'firebase-admin/fires
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { UserScope } from '../src/notesCore/store';
 import { OAuthStore } from '../src/oauth/store';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 import { handleNoteWritten } from '../src/noteWritten';
 import { processDueReminders } from '../src/dueReminders';
 import { localDateTimeToDate } from '../src/timezone';
@@ -102,7 +102,7 @@ let server: Server;
 let base = '';
 const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
 
-const issueToken = async (uid: string, consentVersion = 4) => {
+const issueToken = async (uid: string, consentVersion = CONSENT_VERSION) => {
   const token = `n4m_at_${randomBytes(32).toString('base64url')}`;
   const grantId = randomBytes(32).toString('base64url');
   const now = Date.now();
@@ -398,18 +398,5 @@ describe('the usual refusals', () => {
     const noteId = id(`org-${counter++}`);
     await db.doc(`notes/${noteId}`).set(note(users.b, C.bOwn, { sharedWith: [users.a] }));
     await expectAll(noteId, (text) => expect(text).toContain("only the user's own notes"));
-  });
-
-  it('a connection approved before these tools is told to reconnect', async () => {
-    const older = await connect(await issueToken(users.a, 3));
-    try {
-      const noteId = await seedWithReminders();
-      for (const [tool, args] of [...everyTool(noteId), ['unarchive_note', { noteId }] as const]) {
-        const result = await call(older, tool, args);
-        expect(result.text).toContain('connect again');
-      }
-    } finally {
-      await older.close();
-    }
   });
 });

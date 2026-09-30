@@ -8,7 +8,8 @@
  * - `Authorization: Bearer` בלבד. token ב-query string או ב-body נדחה.
  * - `oauthTokens/{hash}`: `type == 'access'`, לא בוטל, לא פג, ו-`resource`
  *   הוא ה-canonical (audience, RFC 8707).
- * - ה-grant קיים, לא בוטל ולא עבר את התקרה.
+ * - ה-grant קיים, לא בוטל ולא עבר את התקרה, ואושר בנוסח ההסכמה הנוכחי
+ *   (`isConsentCurrent`). grant בנוסח ישן נדחה, כדי שהלקוח יחזור למסך ההסכמה.
  * - המשתמש ב-allowlist (`config/mcp`). הסרה מהרשימה מנתקת מיד.
  * - Firebase Auth: המשתמש קיים, לא מושבת, ו-`tokensValidAfterTime` לא
  *   מאוחר מיצירת ה-grant ("התנתק מכל המכשירים" מנתק גם את Claude).
@@ -22,7 +23,7 @@
 import type { Auth } from 'firebase-admin/auth';
 import type { NextFunction, Request, Response } from 'express';
 import { mintVerifiedIdentity, type VerifiedIdentity } from '../notesCore/identity';
-import { RESOURCE, RESOURCE_SCOPES } from './config';
+import { isConsentCurrent, RESOURCE, RESOURCE_SCOPES } from './config';
 import { bearerToken } from './decision';
 import { PROTECTED_RESOURCE_METADATA_URL } from './metadata';
 import { isUserAllowed } from './policy';
@@ -99,6 +100,7 @@ export const verifyAccessToken = async ({
 
   const [grant, config] = await Promise.all([store.getGrant(record.grantId), store.getAccessConfig()]);
   if (!grant || grant.revoked || grant.absoluteExpiresAt <= now || grant.uid !== record.uid) throw invalidToken();
+  if (!isConsentCurrent(grant.consentVersion)) throw invalidToken();
   if (!isUserAllowed(config, record.uid)) throw invalidToken();
 
   let user;

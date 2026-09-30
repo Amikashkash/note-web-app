@@ -20,7 +20,7 @@ import { getFirestore, Timestamp, type DocumentData } from 'firebase-admin/fires
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { UserScope } from '../src/notesCore/store';
 import { OAuthStore } from '../src/oauth/store';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 import { handleNoteWritten } from '../src/noteWritten';
 import { localDateTimeToDate } from '../src/timezone';
 
@@ -101,7 +101,7 @@ const listen = (app: ReturnType<HttpModule['createMcpApp']>) =>
 
 const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
 
-const issueToken = async (uid: string, consentVersion: number | null = 2) => {
+const issueToken = async (uid: string, consentVersion: number | null = CONSENT_VERSION) => {
   const token = `n4m_at_${randomBytes(32).toString('base64url')}`;
   const grantId = randomBytes(32).toString('base64url');
   const now = Date.now();
@@ -431,22 +431,5 @@ describe('what Claude may not change', () => {
       expiresAt: Timestamp.fromMillis(Date.now() - 30_000),
     });
     expect((await call(clientA, 'append_text', { noteId, text: 'x' })).isError).toBe(false);
-  });
-
-  it('a connection approved before editing existed is told to reconnect, and nothing is written', async () => {
-    const oldClient = await connect((await issueToken(users.a, null)).token);
-    try {
-      const noteId = await seed(note(users.a, C.home, { content: 'ישן' }));
-      const result = await call(oldClient, 'append_text', { noteId, text: 'x' });
-      expect(result.isError).toBe(true);
-      expect(result.text).toContain('approved before Claude could update tasks or add text');
-      expect((await stored(noteId)).content).toBe('ישן');
-      // יצירה עדיין מותרת לחיבור הזה - היא מה שהוא אישר
-      expect(
-        (await call(oldClient, 'create_note', { categoryId: C.home, title: `ישן ${RUN}`, type: 'text', text: 'x' })).isError
-      ).toBe(false);
-    } finally {
-      await oldClient.close();
-    }
   });
 });

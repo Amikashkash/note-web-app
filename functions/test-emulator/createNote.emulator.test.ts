@@ -20,7 +20,7 @@ import { getFirestore, Timestamp, type DocumentData } from 'firebase-admin/fires
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { UserScope } from '../src/notesCore/store';
 import { OAuthStore } from '../src/oauth/store';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 import { handleNoteWritten } from '../src/noteWritten';
 import { processDueReminders } from '../src/dueReminders';
 import { localDateTimeToDate } from '../src/timezone';
@@ -179,6 +179,7 @@ const issueToken = async (uid: string, scope = 'notes.read notes.write offline_a
     clientId: 'test-client',
     clientName: 'Claude',
     scope,
+    consentVersion: CONSENT_VERSION,
     createdAt: Timestamp.fromMillis(now),
     lastUsedAt: Timestamp.fromMillis(now),
     absoluteExpiresAt: Timestamp.fromMillis(now + 90 * 86_400_000),

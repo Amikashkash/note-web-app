@@ -45,11 +45,19 @@ export const RESOURCE_SCOPES = ['notes.read', 'notes.write'] as const;
  * - 4 (מ-v1.28): גם ארכוב ושחזור מהארכיון, העברה בין קטגוריות, והוספה
  *   והסרה של משימות.
  *
- * `notes.write` מכסה את שתיהן מבחינת הרשאה, אבל חיבור שאושר בנוסח 1
- * לא הסכים לעריכה. לכן כלי העריכה דורשים 2, וחיבור ישן מקבל הודעה
- * שצריך לחבר מחדש (בלי scope חדש).
+ * `notes.write` מכסה את כולן מבחינת הרשאה, אבל חיבור שאושר בנוסח ישן לא
+ * הסכים למה שנוסף אחריו. לכן grant בנוסח ישן **לא ממשיך**: ה-access token
+ * שלו נדחה (401) וה-refresh נכשל (`invalid_grant`, וה-grant מבוטל), כך
+ * שהלקוח מתחיל authorization חדש והמשתמש רואה את מסך ההסכמה. בלי זה,
+ * הסרה והוספה של ה-connector ב-claude.ai המשיכה את ה-grant הישן דרך
+ * ה-refresh token השמור, ומסך ההסכמה לא הופיע.
+ * הבדיקות לפי גרסה בכלים עצמם (`*_CONSENT_VERSION`) נשארות כהגנה נוספת.
  */
 export const CONSENT_VERSION = 4;
+
+/** האם ה-grant אושר בנוסח הנוכחי. חסר = 1 */
+export const isConsentCurrent = (consentVersion: number | undefined): boolean =>
+  (consentVersion ?? 1) >= CONSENT_VERSION;
 /** עדכון משימות והוספה בסוף פתק טקסט */
 export const EDIT_CONSENT_VERSION = 2;
 /** מ-v1.27: סעיפים בתכנית עבודה, החלפת טקסט והסרת סעיפים */
