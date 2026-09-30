@@ -18,12 +18,13 @@
  * ולא רץ בפרודקשן. הקורא הראשון יהיה שרת ה-MCP (שלב 1ג).
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
 import {
   AUDIT_RETENTION_MS,
   noteCreatedEntry,
   noteEditedEntry,
+  type AuditAction,
   type NoteCreatedSummary,
   type WriteActor,
 } from './audit';
@@ -95,7 +96,7 @@ export interface SearchOptions {
 export interface NoteDraft {
   categoryId: string;
   title: string;
-  templateType: 'plain' | 'checklist' | 'shopping';
+  templateType: 'plain' | 'checklist' | 'shopping' | 'workplan';
   /** התוכן בפורמט של האפליקציה (טקסט, או JSON של הפריטים) */
   content: string;
   /** זהה לשני פתקים זהים - בלי מזהים שנוצרו ובלי זמנים. למניעת כפילויות */
@@ -112,7 +113,7 @@ export interface CreateNoteResult {
 
 /** עריכה של פתק קיים (שלב 2ב-lite). נבנית ומאומתת ב-`mcp/editNote.ts` */
 export interface NoteEdit {
-  action: 'checklist_item.update' | 'note.append';
+  action: Exclude<AuditAction, 'note.create'>;
   /**
    * מחיל את השינוי על **הגרסה העדכנית** של הפתק, בתוך ה-transaction.
    * `null` - אין מה לשנות (הערכים כבר כאלה). שגיאה - `InvalidError`.
@@ -356,8 +357,8 @@ export class UserScope {
    * - בקשה זהה בחלון של 10 דקות - מוחזר מה שכבר נעשה.
    *
    * הכתיבה: התוכן, `revision + 1` (כל עורך פתוח מזהה אותה, וכל שמירה ישנה
-   * שלו תידחה ע"י ה-rules), ו-`updatedBy: mcp:<clientId>` - כותב אחר, ולכן
-   * היסטוריית הגרסאות שומרת את המצב שלפני Claude. רשומת audit באותו transaction.
+   * שלו תידחה ע"י ה-rules), ו-`updatedBy: mcp:<clientId>:<edit>` - כותב אחר
+   * בכל עריכה, ולכן היסטוריית הגרסאות שומרת את המצב שלפני כל עריכה של Claude. רשומת audit באותו transaction.
    */
   async editNote(
     noteId: string,
@@ -417,7 +418,10 @@ export class UserScope {
         content: outcome.content,
         revision,
         updatedAt: stamp,
-        updatedBy: `mcp:${actor.clientId}`,
+        // מזהה ייחודי לכל עריכה: כל עריכה של Claude היא "כותב אחר", ולכן
+        // היסטוריית הגרסאות שומרת את המצב שלפני **כל** אחת מהן (ולא רק
+        // שלפני הראשונה בחלון של 10 דקות). ההיסטוריה מציגה כל `mcp:` כ-"Claude"
+        updatedBy: `mcp:${actor.clientId}:${randomUUID().slice(0, 8)}`,
       });
       if (keyRef) {
         tx.set(keyRef, { uid: this.uid, noteId, expiresAt: Timestamp.fromMillis(now + DUPLICATE_WINDOW_MS) });

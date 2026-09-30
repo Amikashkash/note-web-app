@@ -130,8 +130,8 @@ describe('append_to_text_note', () => {
     expect(append('ב', 'א  ')?.content).toBe('א  \nב');
   });
 
-  it('refuses a note that is not a text note', () => {
-    expect(() => append('x', '[]', 'checklist')).toThrow('not a text note');
+  it('refuses a checklist (text notes and work plans only)', () => {
+    expect(() => append('x', '[]', 'checklist')).toThrow('append_text works on text notes and work plans');
   });
 
   it('the same text gives the same fingerprint, so a retry is not added twice', () => {

@@ -22,7 +22,7 @@ const formatWhen = (date: Date | null): string =>
 const describe = (entry: Activity): string => {
   if (entry.action !== 'note.create') return entry.description;
   const parts = [getTemplateLabel(entry.templateType)];
-  if (entry.itemCount > 0) parts.push(`${entry.itemCount} פריטים`);
+  if (entry.itemCount > 0) parts.push(`${entry.itemCount} ${entry.templateType === 'workplan' ? 'סעיפים' : 'פריטים'}`);
   if (entry.reminderCount > 0) parts.push(`${entry.reminderCount} תזכורות`);
   if (entry.categoryName) parts.push(`בקטגוריה ${entry.categoryName}`);
   return parts.join(' · ');
