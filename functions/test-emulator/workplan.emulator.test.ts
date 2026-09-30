@@ -16,7 +16,7 @@ import { getFirestore, Timestamp, type DocumentData } from 'firebase-admin/fires
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { UserScope } from '../src/notesCore/store';
 import { OAuthStore } from '../src/oauth/store';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 import { handleNoteWritten } from '../src/noteWritten';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -90,7 +90,7 @@ let base = '';
 
 const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
 
-const issueToken = async (uid: string, consentVersion = 3) => {
+const issueToken = async (uid: string, consentVersion = CONSENT_VERSION) => {
   const token = `n4m_at_${randomBytes(32).toString('base64url')}`;
   const grantId = randomBytes(32).toString('base64url');
   const now = Date.now();
@@ -355,23 +355,6 @@ describe('what the new tools refuse', () => {
   it("a note another user shared with the user: owner only", async () => {
     const noteId = await seed(note(users.b, C.bOwn, { sharedWith: [users.a] }));
     await expectAll(noteId, (result) => expect(result.text).toContain("only the user's own notes"));
-  });
-
-  it('a connection approved before these tools existed is told to reconnect', async () => {
-    const olderClient = await connect(await issueToken(users.a, 2));
-    try {
-      const noteId = await seed(note(users.a, C.home));
-      for (const [tool, args] of everyTool(noteId)) {
-        const result = await call(olderClient, tool, args);
-        expect(result.isError).toBe(true);
-        expect(result.text).toContain('connect again');
-      }
-      // מה שהנוסח הקודם כן כיסה - עדיין עובד
-      const textNoteId = await seed(note(users.a, C.home, { templateType: 'plain', content: 'א' }));
-      expect((await call(olderClient, 'append_text', { noteId: textNoteId, text: 'ב' })).isError).toBe(false);
-    } finally {
-      await olderClient.close();
-    }
   });
 });
 

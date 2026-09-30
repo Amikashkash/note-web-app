@@ -19,7 +19,7 @@ import { getFirestore, Timestamp, type DocumentData } from 'firebase-admin/fires
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { UserScope } from '../src/notesCore/store';
 import { OAuthStore } from '../src/oauth/store';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
   throw new Error('Run through `npm run test:functions:emulator` - emulator hosts are not set');
@@ -209,7 +209,7 @@ afterAll(async () => {
 const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /** access token תקף, כמו ש-`/oauth/token` היה מנפיק */
-const issueToken = async (uid: string, scope = 'notes.read offline_access') => {
+const issueToken = async (uid: string, scope = 'notes.read offline_access', consentVersion: number | null = CONSENT_VERSION) => {
   const token = `n4m_at_${randomBytes(32).toString('base64url')}`;
   const grantId = randomBytes(32).toString('base64url');
   const now = Date.now();
@@ -219,6 +219,7 @@ const issueToken = async (uid: string, scope = 'notes.read offline_access') => {
     clientId: 'test-client',
     clientName: 'Claude',
     scope,
+    ...(consentVersion === null ? {} : { consentVersion }),
     createdAt: Timestamp.fromMillis(now),
     lastUsedAt: Timestamp.fromMillis(now),
     absoluteExpiresAt: Timestamp.fromMillis(now + 90 * 86_400_000),
@@ -297,6 +298,21 @@ describe('the /mcp endpoint', () => {
     expect((await fetch(`${base}/mcp`, init)).status).toBe(401);
     const { token } = await issueToken(users.a);
     expect((await fetch(`${base}/mcp?access_token=${token}`, { method: 'POST', body: '{}' })).status).toBe(401);
+  });
+
+  it.each([
+    ['no version (approved before versions existed)', null],
+    ['version 2', 2],
+    ['version 3', 3],
+  ])('a connection approved under an older consent text (%s) is refused, so the client asks for consent again', async (_label, version) => {
+    const { token } = await issueToken(users.a, 'notes.read notes.write offline_access', version);
+    const response = await fetch(`${base}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
   });
 
   it('GET and DELETE are not supported (stateless)', async () => {

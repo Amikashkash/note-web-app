@@ -17,10 +17,10 @@ import type { Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deleteApp, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { OAuthStore } from '../src/oauth/store';
 import { McpAuthError, verifyAccessToken, type AuthContext } from '../src/oauth/verify';
-import { RATE_LIMITS } from '../src/oauth/config';
+import { CONSENT_VERSION, RATE_LIMITS } from '../src/oauth/config';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
   throw new Error('Run through `npm run test:functions:emulator` - emulator hosts are not set');
@@ -490,6 +490,89 @@ describe('refresh tokens', () => {
   it('an access token cannot be used as a refresh token', async () => {
     const { clientId, tokens } = await connect();
     await expectOAuthError(await refresh(clientId, tokens.access_token), 400, 'invalid_grant');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// נוסח הסכמה חדש: חיבור קיים חוזר למסך ההסכמה
+// ---------------------------------------------------------------------------
+
+describe('a connection approved under an older consent text', () => {
+  const grantOf = async (clientId: string) => {
+    const grants = await db.collection('oauthGrants').where('clientId', '==', clientId).get();
+    return grants.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as { id: string } & Record<string, unknown>);
+  };
+
+  /** אותו לקוח (ה-connector שהוסר והוסף) מתחיל authorization מחדש, עם ה-scope שהוא מבקש */
+  const authorizeAgain = async (clientId: string, scope: string) => {
+    const { verifier, challenge } = pkce();
+    const response = await getManual(authorizeUrl({ ...validAuthorizeParams(clientId, challenge), scope }));
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(`${location.origin}${location.pathname}`).toBe(`${ISSUER}/connect`);
+    return { verifier, reqId: secret(location.searchParams.get('req') ?? '') };
+  };
+
+  it('removing and re-adding the connector: the stored tokens stop working, and the consent page is shown again', async () => {
+    const { clientId, tokens } = await connect();
+    const [before] = await grantOf(clientId);
+    // כאילו אושר לפני שהנוסח השתנה
+    await db.doc(`oauthGrants/${before.id}`).update({ consentVersion: CONSENT_VERSION - 1 });
+
+    // ה-access token השמור נדחה, וה-refresh token לא ממשיך את ה-grant הישן
+    const refused = await expectRejected(verify(tokens.access_token));
+    expect(refused.status).toBe(401);
+    expect(refused.wwwAuthenticate).toContain('error="invalid_token"');
+    await expectOAuthError(await refresh(clientId, tokens.refresh_token), 400, 'invalid_grant');
+    expect((await grantOf(clientId))[0]).toMatchObject({ revoked: true, revokedReason: 'consent_outdated' });
+
+    // הלקוח מתחיל authorization: הבקשה מגיעה למסך ההסכמה, שמציג אותה
+    const { verifier, reqId } = await authorizeAgain(clientId, 'notes.read notes.write offline_access');
+    const idToken = await signIn('owner');
+    const described = await describeRequest(idToken, reqId);
+    expect(described.status).toBe(200);
+    expect(await described.json()).toMatchObject({ scopes: ['notes.read', 'notes.write', 'offline_access'] });
+
+    const callback = await consent(idToken, reqId);
+    const exchanged = await codeExchange(clientId, secret(callback.searchParams.get('code') ?? ''), verifier);
+    expect(exchanged.status).toBe(200);
+    const fresh = await readTokens(exchanged);
+
+    const context = await verify(fresh.access_token);
+    expect(context).toMatchObject({ consentVersion: CONSENT_VERSION, scopes: ['notes.read', 'notes.write', 'offline_access'] });
+    expect(context.grantId).not.toBe(before.id);
+    // ומעכשיו ה-refresh עובד כרגיל
+    expect((await refresh(clientId, fresh.refresh_token)).status).toBe(200);
+  });
+
+  it('a grant with no consent version at all is treated as the first text, and refused the same way', async () => {
+    const { clientId, tokens } = await connect();
+    const [grant] = await grantOf(clientId);
+    await db.doc(`oauthGrants/${grant.id}`).update({ consentVersion: FieldValue.delete() });
+    await expectRejected(verify(tokens.access_token));
+    await expectOAuthError(await refresh(clientId, tokens.refresh_token), 400, 'invalid_grant');
+  });
+
+  it('a grant on the current text keeps working, through refresh', async () => {
+    const { clientId, tokens } = await connect();
+    expect((await verify(tokens.access_token)).consentVersion).toBe(CONSENT_VERSION);
+    const refreshed = await readTokens(await refresh(clientId, tokens.refresh_token));
+    expect((await verify(refreshed.access_token)).consentVersion).toBe(CONSENT_VERSION);
+  });
+
+  it('a connection that lacks a scope it now asks for is not widened: authorize shows the consent page with the new scope', async () => {
+    const { clientId, tokens } = await connect(); // notes.read offline_access
+    await expectOAuthError(
+      await tokenRequest({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId, scope: 'notes.read notes.write' }),
+      400,
+      'invalid_scope'
+    );
+    const { verifier, reqId } = await authorizeAgain(clientId, 'notes.read notes.write offline_access');
+    const idToken = await signIn('owner');
+    expect(await (await describeRequest(idToken, reqId)).json()).toMatchObject({ scopes: ['notes.read', 'notes.write', 'offline_access'] });
+    const callback = await consent(idToken, reqId);
+    const fresh = await readTokens(await codeExchange(clientId, secret(callback.searchParams.get('code') ?? ''), verifier));
+    expect((await verify(fresh.access_token)).scopes).toContain('notes.write');
   });
 });
 

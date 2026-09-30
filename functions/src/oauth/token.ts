@@ -18,7 +18,7 @@
  * משתמש שהוסר מה-allowlist מקבל גם הוא `invalid_grant`.
  */
 
-import { LIFETIMES } from './config';
+import { isConsentCurrent, LIFETIMES } from './config';
 import { invalidGrant, OAuthError } from './errors';
 import { isScopeSubset, isUserAllowed, parseScope, singleParam } from './policy';
 import type { GrantRecord, OAuthStore, OAuthTransaction, TokenRecord } from './store';
@@ -168,6 +168,13 @@ const refresh = async (store: OAuthStore, params: Record<string, unknown>, now: 
       (resource === undefined || resource === record.resource) &&
       isUserAllowed(config, record.uid);
     if (!valid || !grant) return { kind: 'invalid' };
+
+    // אושר בנוסח ישן: לא ממשיכים אותו. `invalid_grant` גורם ללקוח להתחיל
+    // authorization חדש, עם מסך ההסכמה. ה-grant מבוטל - שלא יישאר ברשימה
+    if (!isConsentCurrent(grant.consentVersion)) {
+      tx.revokeGrant(grant.grantId, 'consent_outdated');
+      return { kind: 'invalid' };
+    }
 
     // אפשר לצמצם scope ב-refresh, לא להרחיב (RFC 6749 §6)
     const scope = requestedScopes ? requestedScopes.join(' ') : record.scope;
