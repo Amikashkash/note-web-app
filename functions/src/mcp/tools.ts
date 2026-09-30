@@ -21,19 +21,25 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from '../notesCore/errors';
 import type { Category, Note } from '../notesCore/model';
-import type { UserScope } from '../notesCore/store';
-import { EDIT_CONSENT_VERSION, REWRITE_CONSENT_VERSION } from '../oauth/config';
+import { TargetCategoryNotFoundError, type UserScope } from '../notesCore/store';
+import { EDIT_CONSENT_VERSION, ORGANIZE_CONSENT_VERSION, REWRITE_CONSENT_VERSION } from '../oauth/config';
 import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
 import { OUTPUT } from './config';
 import { buildNote, CREATE_LIMITS, describeReminder } from './createNote';
 import {
+  buildAddChecklistItemsEdit,
   buildAddSectionEdit,
   buildAppendEdit,
+  buildArchiveEdit,
   buildChecklistItemEdit,
+  buildMoveEdit,
+  buildRemoveChecklistItemEdit,
   buildRemoveSectionEdit,
   buildReplaceEdit,
+  buildUnarchiveEdit,
   EDIT_LIMITS,
+  MAX_NEW_TASKS,
 } from './editNote';
 import {
   formatCategories,
@@ -632,6 +638,134 @@ const removeWorkplanSection = defineTool({
   },
 });
 
+const ORGANIZE = 'archive, move and add or remove tasks';
+const noteIdSchema = z.string().min(1).max(128).describe('The note id.');
+const at = (deps: ToolDeps) => (deps.now ?? (() => new Date()))();
+
+/** כלי הארגון: אותו מסלול - הסכמה, מכסה, עריכה */
+const organize = async (deps: ToolDeps, noteId: string, edit: Parameters<typeof runEdit>[2], tool: string) => {
+  requireConsent(deps, ORGANIZE_CONSENT_VERSION, ORGANIZE);
+  const now = at(deps);
+  await spendWriteQuota(deps);
+  return runEdit(deps, noteId, edit, tool, now);
+};
+
+const archiveNote = defineTool({
+  name: 'archive_note',
+  title: 'Archive a note',
+  description:
+    'Move a note to the archive. When the user asks to "delete" or "remove" a note, this is what they mean: there is no ' +
+    'delete tool, and archived notes can be restored with unarchive_note. Its reminders stop. Only when the user asked. ' +
+    "User's own notes only; not read-only notes, and not while the note is open in the app.",
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({ noteId: noteIdSchema }),
+  run: async (deps, input) => {
+    const result = await organize(deps, input.noteId, buildArchiveEdit(), 'archive_note');
+    if (!result.changed) return `"${result.note.title}" [id: ${input.noteId}] is already in the archive.`;
+    return `Archived "${result.note.title}" [id: ${input.noteId}]. Its reminders are cancelled. It can be restored with unarchive_note or from the archive in the app.`;
+  },
+});
+
+const unarchiveNote = defineTool({
+  name: 'unarchive_note',
+  title: 'Restore a note from the archive',
+  description:
+    'Bring an archived note back (find it with list_notes archived: true). Reminders of its tasks come back if their time ' +
+    "is still ahead. User's own notes only.",
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({ noteId: noteIdSchema }),
+  run: async (deps, input) => {
+    const result = await organize(deps, input.noteId, buildUnarchiveEdit(), 'unarchive_note');
+    if (!result.changed) return `"${result.note.title}" [id: ${input.noteId}] is not in the archive.`;
+    return `Restored "${result.note.title}" [id: ${input.noteId}] from the archive. Reminders for tasks still ahead are back.`;
+  },
+});
+
+const addChecklistItems = defineTool({
+  name: 'add_checklist_items',
+  title: 'Add tasks to a checklist',
+  description:
+    'Add one or more tasks to an existing checklist: at the end, or after a given item id (from get_note). Each task may ' +
+    'have dueDate, dueTime (Israel time, in the future) and repeat, like create_note; a date and a time give a reminder. ' +
+    `Only tasks the user asked for. ${READ_FIRST} Sending the same tasks again within 10 minutes adds nothing.`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The checklist note id.'),
+    items: z
+      .array(
+        z.object({
+          text: z.string().max(2_000).describe('The task, one line.'),
+          dueDate: z.string().max(20).optional().describe('YYYY-MM-DD, Israel date.'),
+          dueTime: z.string().max(10).optional().describe('HH:MM (24-hour), Israel time. Needs dueDate.'),
+          repeat: z.string().max(20).optional().describe('daily, weekly, monthly or yearly. Needs dueDate and dueTime.'),
+        })
+      )
+      .max(200)
+      .describe(`1 to ${MAX_NEW_TASKS} tasks, in order.`),
+    afterItemId: z.string().min(1).max(128).optional().describe('Add after this item. Leave out to add at the end.'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, ORGANIZE_CONSENT_VERSION, ORGANIZE);
+    const now = at(deps);
+    const edit = buildAddChecklistItemsEdit(input.items, input.afterItemId, now);
+    await spendWriteQuota(deps);
+    const result = await runEdit(deps, input.noteId, edit, 'add_checklist_items', now);
+    if (result.duplicate) {
+      return `These tasks were already added to "${result.note.title}" [id: ${input.noteId}] in the last 10 minutes. Nothing was added again.`;
+    }
+    const withTime = input.items.filter((item) => item.dueDate && item.dueTime).length;
+    return (
+      `Added ${input.items.length} task(s) to "${result.note.title}" [id: ${input.noteId}]` +
+      `${withTime ? `, ${withTime} with a reminder (Israel time)` : ''}. Call get_note to see their ids.`
+    );
+  },
+});
+
+const removeChecklistItem = defineTool({
+  name: 'remove_checklist_item',
+  title: 'Remove a task from a checklist',
+  description:
+    'Remove ONE task, by its item id from get_note. Only when the user explicitly asked to remove it (to mark it done, ' +
+    `use update_checklist_item). Its reminder is cancelled. ${READ_FIRST} The previous version stays in the note history.`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The checklist note id.'),
+    itemId: z.string().min(1).max(128).describe('The task id, exactly as get_note shows it.'),
+  }),
+  run: async (deps, input) => {
+    const result = await organize(deps, input.noteId, buildRemoveChecklistItemEdit(input.itemId), 'remove_checklist_item');
+    return `Removed the task [item id: ${input.itemId}] from "${result.note.title}" [id: ${input.noteId}]. Its reminder is cancelled. ${RECOVERABLE}`;
+  },
+});
+
+const MOVE_TARGET_NOT_FOUND =
+  "Not found: no category with this id among the user's own categories that Claude can see. Use list_categories. " +
+  'Categories marked sensitive are hidden from Claude: to move a note into one, the user can do it in the app. Nothing was changed.';
+
+const moveNoteToCategory = defineTool({
+  name: 'move_note_to_category',
+  title: 'Move a note to another category',
+  description:
+    "Move a note to another of the user's own categories (id from list_categories). Not into a category marked read-only " +
+    'for Claude. Sensitive categories are hidden from Claude, so moving into them is done by the user in the app. Only ' +
+    'when the user asked. Not while the note is open in the app.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: noteIdSchema,
+    categoryId: z.string().min(1).max(128).describe("The target category id, one of the user's own categories."),
+  }),
+  run: async (deps, input) => {
+    const result = await organize(deps, input.noteId, buildMoveEdit(input.categoryId), 'move_note_to_category');
+    if (!result.changed) return `"${result.note.title}" [id: ${input.noteId}] is already in that category.`;
+    return `Moved "${result.note.title}" [id: ${input.noteId}] to the category [id: ${input.categoryId}]. ${RECOVERABLE}`;
+  },
+});
+
 export const TOOLS = [
   listCategories,
   listNotes,
@@ -643,6 +777,11 @@ export const TOOLS = [
   addWorkplanSection,
   editNoteText,
   removeWorkplanSection,
+  addChecklistItems,
+  removeChecklistItem,
+  archiveNote,
+  unarchiveNote,
+  moveNoteToCategory,
 ];
 
 // ---------------------------------------------------------------------------
@@ -685,7 +824,10 @@ const runTool = async <Schema extends z.ZodObject>(
       text = await tool.run(deps, input);
     }
   } catch (error) {
-    if (error instanceof NotFoundError) {
+    if (error instanceof TargetCategoryNotFoundError) {
+      outcome = 'not_found';
+      text = MOVE_TARGET_NOT_FOUND;
+    } else if (error instanceof NotFoundError) {
       outcome = 'not_found';
       text = NOT_FOUND_TEXT;
     } else if (error instanceof OpenElsewhereError) {

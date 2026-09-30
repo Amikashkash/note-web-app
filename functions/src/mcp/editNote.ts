@@ -15,8 +15,8 @@
  */
 
 import { createHash } from 'node:crypto';
-import { InvalidError } from '../notesCore/errors';
-import type { NoteEdit } from '../notesCore/store';
+import { InvalidError, ReadOnlyError } from '../notesCore/errors';
+import { TargetCategoryNotFoundError, type NoteEdit } from '../notesCore/store';
 import { validateTiming } from './dates';
 import { findUnique, replaceRange } from './textMatch';
 
@@ -403,3 +403,175 @@ export const buildReplaceEdit = (input: ReplaceInput): NoteEdit => {
     },
   };
 };
+
+// ---------------------------------------------------------------------------
+// ארכיון, העברה, והוספה/הסרה של משימות
+// ---------------------------------------------------------------------------
+
+/**
+ * `archive_note`: "מחיקה" מבחינת המשתמש - הפתק עובר לארכיון ואפשר לשחזר.
+ * התזכורות שלו נמחקות באותו transaction, כך שפתק מאורכב לא שולח אף אחת.
+ */
+export const buildArchiveEdit = (): NoteEdit => ({
+  action: 'note.archive',
+  archived: 'any',
+  apply: (note) =>
+    note.isArchived
+      ? null
+      : {
+          fields: { isArchived: true },
+          reminders: { kind: 'deleteAll' },
+          description: 'הפתק הועבר לארכיון',
+          before: { isArchived: false },
+          after: { isArchived: true },
+        },
+});
+
+/**
+ * `unarchive_note`: חזרה מהארכיון. התזכורות חוזרות דרך הטריגר - רק למשימות
+ * שמועדן עוד לא עבר (ולחוזרות, המופע הבא).
+ */
+export const buildUnarchiveEdit = (): NoteEdit => ({
+  action: 'note.unarchive',
+  archived: 'any',
+  apply: (note) =>
+    note.isArchived
+      ? {
+          fields: { isArchived: false },
+          description: 'הפתק שוחזר מהארכיון',
+          before: { isArchived: true },
+          after: { isArchived: false },
+        }
+      : null,
+});
+
+/**
+ * `move_note_to_category`: לקטגוריה של המשתמש, גלויה ולא לקריאה בלבד.
+ * קטגוריה שלא קיימת, של משתמש אחר או רגישה - אותה תשובה (רגישה לא
+ * גלויה ל-Claude בכלל). התזכורות מקבלות את הקטגוריה החדשה (לקישור בהתראה).
+ */
+export const buildMoveEdit = (categoryId: string): NoteEdit => ({
+  action: 'note.move',
+  targetCategoryId: categoryId,
+  apply: (note, context) => {
+    if (note.categoryId === categoryId) return null;
+    const target = context?.targetCategory ?? null;
+    if (!target || target.userId !== note.userId || target.isSensitive) throw new TargetCategoryNotFoundError();
+    if (target.isReadOnly) throw new ReadOnlyError('The target category is read-only for Claude');
+    return {
+      fields: { categoryId },
+      reminders: { kind: 'setCategory', categoryId },
+      description: `הפתק הועבר לקטגוריה "${target.name}"`,
+      before: { categoryId: note.categoryId },
+      after: { categoryId, categoryName: target.name },
+    };
+  },
+});
+
+export interface NewTaskInput {
+  text: string;
+  dueDate?: string;
+  dueTime?: string;
+  repeat?: string;
+}
+
+/** כמה משימות בקריאה אחת - רשימה ארוכה יותר היא כנראה פתק חדש */
+export const MAX_NEW_TASKS = 50;
+
+/**
+ * `add_checklist_items`: משימות חדשות בסוף, או אחרי משימה נתונה. אותה
+ * ולידציה כמו `create_note` (שעון ישראל, שעה עתידית). התזכורות - דרך הטריגר.
+ * אותה בקשה בתוך 10 דקות לא מוסיפה פעמיים.
+ */
+export const buildAddChecklistItemsEdit = (tasks: NewTaskInput[], afterItemId: string | undefined, now: Date): NoteEdit => {
+  if (tasks.length === 0) throw new InvalidError('give at least one task');
+  if (tasks.length > MAX_NEW_TASKS) {
+    throw new InvalidError(`${tasks.length} tasks; the limit is ${MAX_NEW_TASKS} per call. Split them`);
+  }
+  const stamp = now.getTime();
+  const rows = tasks.map((task, index) => {
+    const label = `task ${index + 1}`;
+    const text = oneLine(task.text ?? '');
+    if (!text) throw new InvalidError(`${label} is empty`);
+    if (text.length > EDIT_LIMITS.itemText) {
+      throw new InvalidError(`${label} is ${text.length} characters; the limit is ${EDIT_LIMITS.itemText}`);
+    }
+    validateTiming(task, label, now);
+    return {
+      id: `${stamp}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+      text,
+      completed: false,
+      ...(task.dueDate !== undefined && { dueDate: task.dueDate }),
+      ...(task.dueTime !== undefined && { dueTime: task.dueTime }),
+      ...(task.repeat !== undefined && { repeat: task.repeat }),
+    };
+  });
+  const canonical = rows.map(({ id: _id, ...rest }) => rest);
+
+  return {
+    action: 'checklist_item.add',
+    fingerprint: createHash('sha256')
+      .update(`add-tasks\n${afterItemId ?? ''}\n${JSON.stringify(canonical)}`)
+      .digest('hex'),
+    apply: (note) => {
+      if (note.templateType !== 'checklist') {
+        throw new InvalidError(`this note is not a checklist (it is "${note.templateType}"). Tasks can be added to checklists only`);
+      }
+      const existing = checklistRows(note.content);
+      if (!existing) throw new InvalidError('the checklist content could not be read. Ask the user to open the note in the app');
+      const ids = existing.map(shownItemId);
+      const withIds = existing.map((row, position) => (row.id === ids[position] ? row : { ...row, id: ids[position] }));
+      let at = withIds.length;
+      if (afterItemId !== undefined) {
+        const matches = ids.flatMap((id, index) => (id === afterItemId ? [index] : []));
+        if (matches.length !== 1) {
+          throw new InvalidError(`there is no single item with id "${afterItemId}". Call get_note to see the current item ids`);
+        }
+        at = matches[0] + 1;
+      }
+      const content = JSON.stringify([...withIds.slice(0, at), ...rows, ...withIds.slice(at)]);
+      if (content.length > EDIT_LIMITS.noteContent) {
+        throw new InvalidError('the checklist would become too long. Ask the user whether to start a new one');
+      }
+      return {
+        content,
+        description: rows.length === 1 ? `נוספה משימה "${rows[0].text}"` : `נוספו ${rows.length} משימות`,
+        before: { itemCount: existing.length, afterItemId: afterItemId ?? null },
+        after: rows,
+      };
+    },
+  };
+};
+
+/**
+ * `remove_checklist_item`: הסרה של משימה אחת. התזכורת שלה נמחקת באותו
+ * transaction. הגרסה הקודמת נשמרת בהיסטוריה.
+ */
+export const buildRemoveChecklistItemEdit = (itemId: string): NoteEdit => ({
+  action: 'checklist_item.remove',
+  apply: (note) => {
+    if (note.templateType !== 'checklist') {
+      throw new InvalidError(`this note is not a checklist (it is "${note.templateType}")`);
+    }
+    const rows = checklistRows(note.content);
+    if (!rows) throw new InvalidError('the checklist content could not be read. Ask the user to open the note in the app');
+    const ids = rows.map(shownItemId);
+    const matches = ids.flatMap((id, index) => (id === itemId ? [index] : []));
+    if (matches.length === 0) {
+      throw new InvalidError(`there is no item with id "${itemId}" in this note. Call get_note to see the current item ids`);
+    }
+    if (matches.length > 1) {
+      throw new InvalidError(`several items share the id "${itemId}". Ask the user to remove this task in the app`);
+    }
+    const index = matches[0];
+    const withIds = rows.map((row, position) => (row.id === ids[position] ? row : { ...row, id: ids[position] }));
+    const removed = withIds[index];
+    return {
+      content: JSON.stringify(withIds.filter((_, position) => position !== index)),
+      reminders: { kind: 'deleteItems', itemIds: [itemId] },
+      description: `הוסרה המשימה "${String(removed.text ?? '')}"`,
+      before: removed,
+      after: null,
+    };
+  },
+});
