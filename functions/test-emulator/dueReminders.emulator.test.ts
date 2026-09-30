@@ -26,9 +26,21 @@ const NOW = new Date('2026-10-01T09:00:00Z');
 const MINUTE = 60_000;
 let counter = 0;
 
-/** תזכורת שהגיע מועדה, עם noteId ייחודי לבדיקה */
-const seed = async (extra: DocumentData = {}) => {
+/**
+ * תזכורת שהגיע מועדה, עם noteId ייחודי לבדיקה, והפתק שלה: רשימת משימות
+ * פעילה שבה המשימה i1 לא בוצעה. `note` משנה את הפתק (null - בלי פתק).
+ */
+const seed = async (extra: DocumentData = {}, note: DocumentData | null = {}) => {
   const noteId = `due-${Date.now()}-${counter++}`;
+  if (note !== null) {
+    await db.doc(`notes/${noteId}`).set({
+      userId: `user-${noteId}`,
+      templateType: 'checklist',
+      isArchived: false,
+      content: JSON.stringify([{ id: 'i1', text: 'לקנות חלב', completed: false }]),
+      ...note,
+    });
+  }
   const ref = db.collection('reminders').doc(`${noteId}__i1`);
   await ref.set({
     userId: `user-${noteId}`,
@@ -63,6 +75,51 @@ const recorder = (onSend?: (payload: ReminderPushData) => Promise<void> | void) 
 };
 
 const count = (list: string[], noteId: string) => list.filter((id) => id === noteId).length;
+
+describe('the note is checked at send time', () => {
+  // הטריגר מוחק תזכורות כאלה - אבל שניות אחרי הכתיבה. כאן: התזכורת עוד קיימת
+  it.each([
+    ['the note was archived', { isArchived: true }],
+    ['the task was ticked done', { content: JSON.stringify([{ id: 'i1', text: 'x', completed: true }]) }],
+    ['the task was removed', { content: JSON.stringify([{ id: 'other', text: 'x', completed: false }]) }],
+    ['the note is no longer a checklist', { templateType: 'plain', content: 'טקסט' }],
+  ])('%s: not sent, and the reminder is deleted', async (_label, note) => {
+    const { noteId, ref } = await seed({}, note);
+    const run = recorder();
+    const result = await processDueReminders({ db, now: NOW, ...run.deps });
+    expect(count(run.sentFor, noteId)).toBe(0);
+    expect(result.stale).toBeGreaterThanOrEqual(1);
+    expect((await ref.get()).exists).toBe(false);
+  });
+
+  it('the note was deleted: not sent, and the orphan reminder is deleted', async () => {
+    const { noteId, ref } = await seed({}, null);
+    const run = recorder();
+    await processDueReminders({ db, now: NOW, ...run.deps });
+    expect(count(run.sentFor, noteId)).toBe(0);
+    expect((await ref.get()).exists).toBe(false);
+  });
+
+  it('an old task without a stored id still matches by position (item-<n>)', async () => {
+    const noteId = `due-${Date.now()}-${counter++}`;
+    await db.doc(`notes/${noteId}`).set({
+      templateType: 'checklist',
+      isArchived: false,
+      content: JSON.stringify([{ text: 'ישן', completed: false }]),
+    });
+    await db.doc(`reminders/${noteId}__item-0`).set({
+      userId: 'u',
+      noteId,
+      itemId: 'item-0',
+      remindAt: Timestamp.fromMillis(NOW.getTime() - MINUTE),
+      repeat: null,
+      sent: false,
+    });
+    const run = recorder();
+    await processDueReminders({ db, now: NOW, ...run.deps });
+    expect(count(run.sentFor, noteId)).toBe(1);
+  });
+});
 
 describe('claim-then-send', () => {
   it('sends a due reminder once and marks it sent; the next run sends nothing', async () => {
