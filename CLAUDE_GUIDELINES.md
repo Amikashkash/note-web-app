@@ -42,14 +42,16 @@ numbers for changes no user could observe.)
 
 ## Git Workflow
 
-### Branches and Pull Requests
-- One branch per task or stage, named `claude/<topic>` (for example
-  `claude/group-c-security`). No session IDs.
+### Commits and Pushes
+- Work directly on `main` and push to it. (Branches and PRs that the owner
+  merged were used while the MCP server was built; that is over.)
 - Each logical step is its own commit.
-- Push the branch and open a PR when the task says so. **Never merge** — the
-  owner reviews and merges.
-- Merging to `main` triggers CI: tests, then a deploy of Hosting and Firestore
-  rules/indexes (see `.github/workflows/SETUP.md`).
+- Before every push, run the relevant suites locally (lint, tsc, tests;
+  emulator suites when functions or rules change). A push to `main` deploys.
+- A push to `main` triggers CI: tests, then — only if they pass
+  (`needs: test`) — a deploy of Hosting and Firestore rules/indexes (see
+  `.github/workflows/SETUP.md`). Cloud Functions are still deployed manually.
+- Use a branch and a PR only when the owner asks for one.
 
 ### Commit Messages
 - Clear, descriptive commit messages
