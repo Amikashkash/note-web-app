@@ -4,6 +4,7 @@ import {
   canAppendTo,
   convertContent,
   EMPTY_RECIPE,
+  openTasksFirst,
   parseAccounting,
   parseChecklist,
   parseRecipe,
@@ -67,6 +68,23 @@ describe('parseChecklist', () => {
   it('drops an unknown repeat rule instead of passing it on', () => {
     const [item] = valueOf(parseChecklist('[{"id":"1","text":"x","repeat":"hourly"}]'));
     expect(item.repeat).toBeUndefined();
+  });
+});
+
+describe('openTasksFirst (display order of a checklist)', () => {
+  const task = (id: string, completed: boolean) => ({ id, text: id, completed });
+
+  it('shows open tasks first and done tasks last, each group in its stored order', () => {
+    const items = [task('a', false), task('b', true), task('c', false), task('d', true), task('e', false)];
+    expect(openTasksFirst(items).map((item) => item.id)).toEqual(['a', 'c', 'e', 'b', 'd']);
+  });
+
+  it('does not change the stored list, so an unchecked task returns to its place', () => {
+    const items = [task('a', false), task('b', true), task('c', false)];
+    openTasksFirst(items);
+    expect(items.map((item) => item.id)).toEqual(['a', 'b', 'c']);
+    const unchecked = items.map((item) => (item.id === 'b' ? { ...item, completed: false } : item));
+    expect(openTasksFirst(unchecked).map((item) => item.id)).toEqual(['a', 'b', 'c']);
   });
 });
 

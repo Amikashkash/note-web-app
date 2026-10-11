@@ -89,6 +89,16 @@ export const parseChecklist = (value: string): ParseResult<ChecklistItem[]> =>
     repeat: REPEAT_RULES.has(asText(item.repeat)) ? (item.repeat as RepeatRule) : undefined,
   }));
 
+/**
+ * סדר התצוגה של רשימת משימות: הפתוחות קודם, והמסומנות כבוצעו בסוף -
+ * כל קבוצה בסדר השמור שלה. תצוגה בלבד: התוכן השמור לא משתנה, ולכן
+ * משימה שמבטלים את הסימון שלה חוזרת למקומה, ואין כתיבה נוספת.
+ */
+export const openTasksFirst = <T extends { completed: boolean }>(items: readonly T[]): T[] => [
+  ...items.filter((item) => !item.completed),
+  ...items.filter((item) => item.completed),
+];
+
 // שדה `category` של רשימות ישנות פשוט לא נקרא - הסיווג הידני הוסר מהתבנית
 export const parseShopping = (value: string): ParseResult<ShoppingItem[]> =>
   mapRows(value, (item, index) => ({

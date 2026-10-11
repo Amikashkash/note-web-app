@@ -20,7 +20,7 @@ import {
 } from './dueDate';
 
 import type { ChecklistItem, RepeatRule } from '@/types/template';
-import { parseChecklist } from '@/utils/templateContent';
+import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { ChecklistItem, RepeatRule };
@@ -114,6 +114,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   // פענוח שנכשל אינו "רשימה ריקה" - ראה `templateContent.ts`
   const parsed = useMemo(() => parseChecklist(value), [value]);
   const items = useMemo<ChecklistItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
+  // משימות שבוצעו יורדות לסוף הרשימה. תצוגה בלבד - העריכות עובדות לפי מזהה על `items`
+  const shownItems = useMemo(() => openTasksFirst(items), [items]);
 
   // רץ אחרי כל רינדור, כי אי אפשר לדעת מראש מתי שדה המשימה החדשה יצורף ל-DOM
   useEffect(() => {
@@ -235,7 +237,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             אין משימות עדיין
           </div>
         ) : (
-          items.map((item) => {
+          shownItems.map((item) => {
             const dateStatus = getDateStatus(item.dueDate, item.dueTime);
             const dueLabel = formatDueLabel(item.dueDate, item.dueTime);
 
