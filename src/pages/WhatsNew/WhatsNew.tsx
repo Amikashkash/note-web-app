@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.28.1',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'ברשימת משימות, משימה שסומנה כבוצעה יורדת לסוף הרשימה במקום להישאר באמצע. ביטול הסימון מחזיר אותה למקומה',
+      },
+    ],
+  },
+  {
     version: '1.28.0',
     date: 'ספטמבר 2026',
     changes: [
