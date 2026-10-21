@@ -9,7 +9,24 @@
  */
 
 import React, { useMemo, useEffect, useRef } from 'react';
-import { CalendarDays, Clock, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
+import { CalendarDays, Clock, GripVertical, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 import {
@@ -21,6 +38,7 @@ import {
 
 import type { ChecklistItem, RepeatRule } from '@/types/template';
 import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
+import { moveTask } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { ChecklistItem, RepeatRule };
@@ -98,6 +116,66 @@ const DuePicker: React.FC<DuePickerProps> = ({
   </div>
 );
 
+interface SortableRowProps {
+  id: string;
+  disabled: boolean;
+  className: string;
+  /** תוכן השורה. מקבל את ידית הגרירה, כדי למקם אותה בשורה הראשונה */
+  children: (handle: React.ReactNode) => React.ReactNode;
+}
+
+/**
+ * שורת משימה שאפשר לגרור. רק הידית מתחילה גרירה, כך שהקלדה בשדה, סימון
+ * וגלילה בנייד ממשיכים לעבוד כרגיל. `touch-none` על הידית: בלי זה הדפדפן
+ * בנייד גולל את הדף במקום לגרור.
+ */
+const SortableRow: React.FC<SortableRowProps> = ({ id, disabled, className, children }) => {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id, disabled });
+
+  const handle = disabled ? null : (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex-shrink-0 -ms-1 p-1 touch-none cursor-grab active:cursor-grabbing text-ink-3-light dark:text-ink-3-dark hover:text-ink-2-light dark:hover:text-ink-2-dark"
+      title="גרור לשינוי הסדר"
+      aria-label="גרור לשינוי הסדר"
+    >
+      <GripVertical size={18} strokeWidth={1.75} />
+    </button>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        position: 'relative',
+        zIndex: isDragging ? 10 : undefined,
+      }}
+      className={`${className}${isDragging ? ' shadow-lg' : ''}`}
+    >
+      {children(handle)}
+    </div>
+  );
+};
+
+/** הודעות לקורא מסך, בעברית (ברירת המחדל של הספרייה באנגלית) */
+const DRAG_ACCESSIBILITY = {
+  screenReaderInstructions: {
+    draggable: 'כדי להזיז משימה: רווח כדי להרים, חיצים כדי להזיז, רווח כדי להניח, Escape כדי לבטל.',
+  },
+  announcements: {
+    onDragStart: () => 'המשימה הורמה',
+    onDragOver: () => 'המשימה הוזזה',
+    onDragEnd: () => 'המשימה הונחה',
+    onDragCancel: () => 'ההזזה בוטלה',
+  },
+};
+
 export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   value,
   onChange,
@@ -116,6 +194,14 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const items = useMemo<ChecklistItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
   // משימות שבוצעו יורדות לסוף הרשימה. תצוגה בלבד - העריכות עובדות לפי מזהה על `items`
   const shownItems = useMemo(() => openTasksFirst(items), [items]);
+  const openItems = shownItems.filter((item) => !item.completed);
+  const doneItems = shownItems.filter((item) => item.completed);
+
+  const sensors = useSensors(
+    // מרחק קטן לפני שהגרירה מתחילה: לחיצה רגילה על הידית לא מזיזה כלום
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   // רץ אחרי כל רינדור, כי אי אפשר לדעת מראש מתי שדה המשימה החדשה יצורף ל-DOM
   useEffect(() => {
@@ -200,9 +286,184 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     commit(items.filter((item) => item.id !== id));
   };
 
+  /** גרירה הסתיימה: רק בתוך אותה קבוצה (פתוחות / בוצעו), ראו `moveTask` */
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const moved = moveTask(items, String(active.id), String(over.id));
+    if (moved) commit(moved);
+  };
+
   const completedCount = items.filter((item) => item.completed).length;
   const totalCount = items.length;
   const completedPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+  /** שורת משימה אחת */
+  const renderItem = (item: ChecklistItem) => {
+    const dateStatus = getDateStatus(item.dueDate, item.dueTime);
+    const dueLabel = formatDueLabel(item.dueDate, item.dueTime);
+
+    const borderColor = item.completed
+      ? 'border-success/30'
+      : dateStatus
+      ? DATE_STATUS_BORDER_CLASS[dateStatus]
+      : 'border-hairline-light dark:border-hairline-dark';
+
+    const dateColor = item.dueDate && dateStatus
+      ? DATE_STATUS_TEXT_CLASS[dateStatus]
+      : 'text-ink-3-light dark:text-ink-3-dark';
+
+    return (
+      <SortableRow
+        key={item.id}
+        id={item.id}
+        disabled={readOnly}
+        className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-colors ${
+          item.completed
+            ? 'bg-success/10 ' + borderColor
+            : 'bg-surface-light dark:bg-surface-dark ' +
+              borderColor +
+              ' hover:border-ink-3-light dark:hover:border-ink-3-dark'
+        }`}
+      >
+        {(handle) => (
+          <>
+            <div className="flex items-center gap-3">
+              {handle}
+
+              {/* Checkbox */}
+              <button
+                type="button"
+                onClick={() => handleToggleItem(item.id, item.completed)}
+                className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                  item.completed
+                    ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'
+                    : 'bg-surface-light dark:bg-raised-dark border-hairline-light dark:border-hairline-dark hover:border-success dark:hover:border-success-dark'
+                }`}
+              >
+                {item.completed && <span className="text-white text-sm">✓</span>}
+              </button>
+
+              {/* טקסט המשימה */}
+              <div className="flex-1">
+                {readOnly ? (
+                  <span
+                    className={
+                      item.completed
+                        ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                        : 'text-ink-light dark:text-ink-dark'
+                    }
+                  >
+                    {item.text}
+                  </span>
+                ) : (
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[item.id] = el;
+                    }}
+                    type="text"
+                    value={item.text}
+                    onChange={(e) => handleUpdateText(item.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddItem();
+                      }
+                    }}
+                    placeholder="הזן משימה..."
+                    className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
+                      item.completed
+                        ? 'line-through text-ink-3-light dark:text-ink-3-dark'
+                        : 'text-ink-light dark:text-ink-dark'
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* תאריך */}
+              {readOnly
+                ? item.dueDate && (
+                    <span className={`flex-shrink-0 text-sm ${dateColor}`} title={dueLabel}>
+                      📅
+                    </span>
+                  )
+                : (
+                  <DuePicker
+                    inputId={`date-${item.id}`}
+                    type="date"
+                    value={item.dueDate || ''}
+                    Icon={CalendarDays}
+                    colorClass={dateColor}
+                    title={dueLabel}
+                    onChange={(next) => handleUpdateDueDate(item.id, next)}
+                    onClear={() => handleClearDue(item.id)}
+                  />
+                )}
+
+              {/* שעה - רלוונטית רק כשיש תאריך, והיא זו שמפעילה תזכורת */}
+              {!readOnly && item.dueDate && (
+                <DuePicker
+                  inputId={`time-${item.id}`}
+                  type="time"
+                  value={item.dueTime || ''}
+                  Icon={Clock}
+                  colorClass={item.dueTime ? 'text-brand-text' : 'text-ink-3-light dark:text-ink-3-dark'}
+                  title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
+                  onChange={(next) => handleUpdateDueTime(item.id, next)}
+                  // הסרת השעה מסירה גם את החזרה: בלי שעה אין תזכורת,
+                  // וכלל חזרה שנשאר היה חוזר בשקט אם תוסיף שעה שוב
+                  onClear={() =>
+                    updateItem(item.id, { dueTime: undefined, repeat: undefined })
+                  }
+                />
+              )}
+
+              {/* כפתור מחיקה */}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="flex-shrink-0 text-danger dark:text-danger-dark hover:opacity-80 text-lg"
+                  title="מחק משימה"
+                >
+                  <Trash2 size={18} strokeWidth={1.75} />
+                </button>
+              )}
+            </div>
+
+            {/* חזרה תקופתית - שורה שנייה, ורק כשיש תאריך ושעה.
+                בלי שעה אין תזכורת שתחזור, ודחיסת בורר רביעי לשורה
+                הראשונה הייתה מוציאה אותה מהמסך בנייד. */}
+            {!readOnly && item.dueDate && item.dueTime && (
+              <div className="flex items-center gap-2 ps-[4.5rem]">
+                <Repeat
+                  size={14}
+                  strokeWidth={1.75}
+                  className={
+                    item.repeat
+                      ? 'text-brand-text dark:text-brand-text-dark flex-shrink-0'
+                      : 'text-ink-3-light dark:text-ink-3-dark flex-shrink-0'
+                  }
+                />
+                <select
+                  value={item.repeat || ''}
+                  onChange={(e) => handleUpdateRepeat(item.id, e.target.value)}
+                  className="text-caption bg-transparent text-ink-2-light dark:text-ink-2-dark border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded cursor-pointer"
+                  title="חזרה תקופתית"
+                >
+                  <option value="">פעם אחת</option>
+                  {(Object.keys(REPEAT_LABELS) as RepeatRule[]).map((rule) => (
+                    <option key={rule} value={rule}>
+                      {REPEAT_LABELS[rule]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>
+        )}
+      </SortableRow>
+    );
+  };
 
   if (!parsed.ok) {
     return (
@@ -237,164 +498,21 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             אין משימות עדיין
           </div>
         ) : (
-          shownItems.map((item) => {
-            const dateStatus = getDateStatus(item.dueDate, item.dueTime);
-            const dueLabel = formatDueLabel(item.dueDate, item.dueTime);
-
-            const borderColor = item.completed
-              ? 'border-success/30'
-              : dateStatus
-              ? DATE_STATUS_BORDER_CLASS[dateStatus]
-              : 'border-hairline-light dark:border-hairline-dark';
-
-            const dateColor = item.dueDate && dateStatus
-              ? DATE_STATUS_TEXT_CLASS[dateStatus]
-              : 'text-ink-3-light dark:text-ink-3-dark';
-
-            return (
-              <div
-                key={item.id}
-                className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-all ${
-                  item.completed
-                    ? 'bg-success/10 ' + borderColor
-                    : 'bg-surface-light dark:bg-surface-dark ' +
-                      borderColor +
-                      ' hover:border-ink-3-light dark:hover:border-ink-3-dark'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Checkbox */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleItem(item.id, item.completed)}
-                    className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                      item.completed
-                        ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'
-                        : 'bg-surface-light dark:bg-raised-dark border-hairline-light dark:border-hairline-dark hover:border-success dark:hover:border-success-dark'
-                    }`}
-                  >
-                    {item.completed && <span className="text-white text-sm">✓</span>}
-                  </button>
-
-                  {/* טקסט המשימה */}
-                  <div className="flex-1">
-                    {readOnly ? (
-                      <span
-                        className={
-                          item.completed
-                            ? 'line-through text-ink-3-light dark:text-ink-3-dark'
-                            : 'text-ink-light dark:text-ink-dark'
-                        }
-                      >
-                        {item.text}
-                      </span>
-                    ) : (
-                      <input
-                        ref={(el) => {
-                          inputRefs.current[item.id] = el;
-                        }}
-                        type="text"
-                        value={item.text}
-                        onChange={(e) => handleUpdateText(item.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddItem();
-                          }
-                        }}
-                        placeholder="הזן משימה..."
-                        className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
-                          item.completed
-                            ? 'line-through text-ink-3-light dark:text-ink-3-dark'
-                            : 'text-ink-light dark:text-ink-dark'
-                        }`}
-                      />
-                    )}
-                  </div>
-
-                  {/* תאריך */}
-                  {readOnly
-                    ? item.dueDate && (
-                        <span className={`flex-shrink-0 text-sm ${dateColor}`} title={dueLabel}>
-                          📅
-                        </span>
-                      )
-                    : (
-                      <DuePicker
-                        inputId={`date-${item.id}`}
-                        type="date"
-                        value={item.dueDate || ''}
-                        Icon={CalendarDays}
-                        colorClass={dateColor}
-                        title={dueLabel}
-                        onChange={(next) => handleUpdateDueDate(item.id, next)}
-                        onClear={() => handleClearDue(item.id)}
-                      />
-                    )}
-
-                  {/* שעה - רלוונטית רק כשיש תאריך, והיא זו שמפעילה תזכורת */}
-                  {!readOnly && item.dueDate && (
-                    <DuePicker
-                      inputId={`time-${item.id}`}
-                      type="time"
-                      value={item.dueTime || ''}
-                      Icon={Clock}
-                      colorClass={item.dueTime ? 'text-brand-text' : 'text-ink-3-light dark:text-ink-3-dark'}
-                      title={item.dueTime ? `שעה: ${item.dueTime}` : 'הוסף שעה'}
-                      onChange={(next) => handleUpdateDueTime(item.id, next)}
-                      // הסרת השעה מסירה גם את החזרה: בלי שעה אין תזכורת,
-                      // וכלל חזרה שנשאר היה חוזר בשקט אם תוסיף שעה שוב
-                      onClear={() =>
-                        updateItem(item.id, { dueTime: undefined, repeat: undefined })
-                      }
-                    />
-                  )}
-
-                  {/* כפתור מחיקה */}
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="flex-shrink-0 text-danger dark:text-danger-dark hover:opacity-80 text-lg"
-                      title="מחק משימה"
-                    >
-                      <Trash2 size={18} strokeWidth={1.75} />
-                    </button>
-                  )}
-                </div>
-
-                {/* חזרה תקופתית - שורה שנייה, ורק כשיש תאריך ושעה.
-                    בלי שעה אין תזכורת שתחזור, ודחיסת בורר רביעי לשורה
-                    הראשונה הייתה מוציאה אותה מהמסך בנייד. */}
-                {!readOnly && item.dueDate && item.dueTime && (
-                  <div className="flex items-center gap-2 ps-9">
-                    <Repeat
-                      size={14}
-                      strokeWidth={1.75}
-                      className={
-                        item.repeat
-                          ? 'text-brand-text dark:text-brand-text-dark flex-shrink-0'
-                          : 'text-ink-3-light dark:text-ink-3-dark flex-shrink-0'
-                      }
-                    />
-                    <select
-                      value={item.repeat || ''}
-                      onChange={(e) => handleUpdateRepeat(item.id, e.target.value)}
-                      className="text-caption bg-transparent text-ink-2-light dark:text-ink-2-dark border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded cursor-pointer"
-                      title="חזרה תקופתית"
-                    >
-                      <option value="">פעם אחת</option>
-                      {(Object.keys(REPEAT_LABELS) as RepeatRule[]).map((rule) => (
-                        <option key={rule} value={rule}>
-                          {REPEAT_LABELS[rule]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            );
-          })
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+            accessibility={DRAG_ACCESSIBILITY}
+          >
+            {/* שתי קבוצות נפרדות: גוררים בתוך הפתוחות או בתוך אלה שבוצעו */}
+            <SortableContext items={openItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+              {openItems.map(renderItem)}
+            </SortableContext>
+            <SortableContext items={doneItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+              {doneItems.map(renderItem)}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
