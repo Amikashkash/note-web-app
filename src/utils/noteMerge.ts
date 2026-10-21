@@ -4,7 +4,9 @@
  *
  * - **תבניות רשימה** (משימות, קניות, תכנית עבודה, חשבונאות): לפי `id` של
  *   כל פריט. שינויים בפריטים שונים מתמזגים. אותו פריט שונה בשני הצדדים
- *   באופן שונה, או נערך בצד אחד ונמחק בשני - התנגשות.
+ *   באופן שונה, או נערך בצד אחד ונמחק בשני - התנגשות. הסדר: של השרת,
+ *   אלא אם רק המשתמש שינה אותו (גרירה) - אז הסדר שלו. שני הצדדים שינו
+ *   סדר - של השרת: סדר הוא לא תוכן, ולא שווה התנגשות.
  * - **טקסט:** רק מקרה אחד בטוח: השרת כבר מכיל את כל מה שנכתב מקומית
  *   (למשל הכתיבה שלנו אושרה ו-Claude הוסיף בסוף). כל השאר - התנגשות.
  *   אין מיזוג טקסט אוטומטי (החלטה ב-review §11.7ב).
@@ -92,7 +94,27 @@ const mergeRows = (baseContent: string, localContent: string, remoteContent: str
     merged.splice(at, 0, resolved);
   }
 
-  return JSON.stringify(merged);
+  return JSON.stringify(keepLocalOrder(base, local, remote, merged));
+};
+
+/**
+ * אם רק המשתמש שינה את סדר הפריטים (גרירה), הסדר שלו נשמר: הפריטים
+ * שקיימים בשלוש הגרסאות מסודרים כמו אצלו, במקומות שלהם ברשימה הממוזגת.
+ * פריטים שנוספו בצד אחד נשארים איפה שהמיזוג שם אותם.
+ */
+const keepLocalOrder = (base: Row[], local: Row[], remote: Row[], merged: Row[]): Row[] => {
+  const idsOf = (rows: Row[]) => rows.map((row) => row.id as string);
+  const inAll = new Set(
+    idsOf(base).filter((id) => idsOf(local).includes(id) && idsOf(remote).includes(id))
+  );
+  const orderOf = (rows: Row[]) => idsOf(rows).filter((id) => inAll.has(id) && merged.some((row) => row.id === id));
+  const [baseOrder, localOrder, remoteOrder] = [orderOf(base), orderOf(local), orderOf(remote)];
+  const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
+  if (sameOrder(localOrder, baseOrder) || !sameOrder(remoteOrder, baseOrder)) return merged;
+
+  const byId = new Map(merged.map((row) => [row.id as string, row]));
+  let next = 0;
+  return merged.map((row) => (localOrder.includes(row.id as string) ? (byId.get(localOrder[next++]) as Row) : row));
 };
 
 export interface NoteText {

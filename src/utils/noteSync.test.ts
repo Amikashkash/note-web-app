@@ -140,6 +140,40 @@ describe('both edited different items', () => {
     ).toBeNull();
   });
 
+  const order = (merged: { content: string } | null) => JSON.parse(merged!.content).map((row: { id: string }) => row.id);
+  const abc = checklist([{ id: 'a', text: 'א' }, { id: 'b', text: 'ב' }, { id: 'c', text: 'ג' }]);
+
+  it('keeps the order the user dragged, while the other side changed an item', () => {
+    const merged = mergeNote(
+      { title: 't', content: abc },
+      { title: 't', content: checklist([{ id: 'c', text: 'ג' }, { id: 'a', text: 'א' }, { id: 'b', text: 'ב' }]) },
+      { title: 't', content: checklist([{ id: 'a', text: 'א', completed: true }, { id: 'b', text: 'ב' }, { id: 'c', text: 'ג' }]) },
+      'checklist'
+    );
+    expect(order(merged)).toEqual(['c', 'a', 'b']);
+    expect(JSON.parse(merged!.content)[1]).toMatchObject({ id: 'a', completed: true });
+  });
+
+  it('keeps the dragged order when the other side added an item', () => {
+    const merged = mergeNote(
+      { title: 't', content: abc },
+      { title: 't', content: checklist([{ id: 'b', text: 'ב' }, { id: 'a', text: 'א' }, { id: 'c', text: 'ג' }]) },
+      { title: 't', content: checklist([{ id: 'a', text: 'א' }, { id: 'b', text: 'ב' }, { id: 'c', text: 'ג' }, { id: 'n', text: 'חדש' }]) },
+      'checklist'
+    );
+    expect(order(merged)).toEqual(['b', 'a', 'c', 'n']);
+  });
+
+  it('both sides reordered: the server order wins (order is not content, no conflict)', () => {
+    const merged = mergeNote(
+      { title: 't', content: abc },
+      { title: 't', content: checklist([{ id: 'c', text: 'ג' }, { id: 'a', text: 'א' }, { id: 'b', text: 'ב' }]) },
+      { title: 't', content: checklist([{ id: 'b', text: 'ב' }, { id: 'c', text: 'ג' }, { id: 'a', text: 'א' }]) },
+      'checklist'
+    );
+    expect(order(merged)).toEqual(['b', 'c', 'a']);
+  });
+
   it('does not merge items without stable ids', () => {
     const noIds = JSON.stringify([{ text: 'חלב', completed: false }]);
     expect(
