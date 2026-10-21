@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.29.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'ברשימת משימות אפשר לשנות את סדר המשימות בגרירה: לוחצים על הידית (⋮⋮) בתחילת השורה וגוררים - גם בטלפון. משימות פתוחות זזות בין הפתוחות, ומשימות שבוצעו בין אלה שבוצעו',
+      },
+    ],
+  },
+  {
     version: '1.28.1',
     date: 'אוקטובר 2026',
     changes: [
