@@ -35,12 +35,26 @@ export const moveTask = <T extends { id: string; completed: boolean }>(
 
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, low: 2 };
 
-/**
- * סדר לפי עדיפות: דחופות, רגילות, נמוכות - ובתוך כל רמה הסדר השמור.
- * תצוגה בלבד, כשהמשתמש מפעיל את המיון. הסדר הידני לא משתנה.
- */
+/** סדר לפי עדיפות: דחופות, רגילות, נמוכות - ובתוך כל רמה הסדר הנוכחי */
 export const byPriority = <T extends { priority?: string }>(items: readonly T[]): T[] =>
   items
     .map((item, index) => ({ item, index }))
     .sort((a, b) => (PRIORITY_RANK[a.item.priority ?? ''] ?? 1) - (PRIORITY_RANK[b.item.priority ?? ''] ?? 1) || a.index - b.index)
     .map(({ item }) => item);
+
+/**
+ * "מיין לפי עדיפות": פעולה חד-פעמית שנשמרת, כמו גרירה - לא מצב תצוגה.
+ * כל קבוצה (פתוחות / בוצעו) ממוינת **במקומות שלה**, כמו ב-`moveTask`,
+ * כך שמשימה שמבטלים את הסימון שלה עדיין חוזרת למקום סביר.
+ * `null` כשהרשימה כבר ממוינת - אין מה לשמור.
+ */
+export const sortTasksByPriority = <T extends { id: string; completed: boolean; priority?: string }>(
+  items: readonly T[]
+): T[] | null => {
+  const open = byPriority(items.filter((item) => !item.completed));
+  const done = byPriority(items.filter((item) => item.completed));
+  let nextOpen = 0;
+  let nextDone = 0;
+  const sorted = items.map((item) => (item.completed ? done[nextDone++] : open[nextOpen++]));
+  return sorted.every((item, index) => item === items[index]) ? null : sorted;
+};

@@ -16,6 +16,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.31.1',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          '"מיין לפי עדיפות" מסדר את המשימות פעם אחת ושומר את הסדר, כמו גרירה: דחופות, רגילות, נמוכות - והסדר שלך בתוך כל רמה. אחר כך אפשר לגרור כרגיל, ולמיין שוב בלחיצה',
+      },
+      {
+        type: 'improvement',
+        description: 'אפשר לשנות עדיפות של משימה גם בלי להיכנס לעריכה, כמו סימון כבוצע',
+      },
+    ],
+  },
+  {
     version: '1.31.0',
     date: 'אוקטובר 2026',
     changes: [

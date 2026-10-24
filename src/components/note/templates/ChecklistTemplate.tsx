@@ -49,7 +49,7 @@ import {
 
 import type { ChecklistItem, RepeatRule, TaskPriority } from '@/types/template';
 import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
-import { byPriority, moveTask } from '@/utils/checklistOrder';
+import { moveTask, sortTasksByPriority } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { ChecklistItem, RepeatRule };
@@ -230,19 +230,17 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   // המשימות שבוצעו מקופלות לשורה אחת "בוצעו (N)". תצוגה בלבד: לא נשמר ולא
   // משנה את הפתק, וכל פתיחה של הפתק מתחילה מקופלת
   const [showDone, setShowDone] = useState(false);
-  // מיון לפי עדיפות וסינון לפי רמה - תצוגה בלבד, כמו "בוצעו"
-  const [sortByPriority, setSortByPriority] = useState(false);
+  // סינון לפי רמה - תצוגה בלבד, כמו "בוצעו". (המיון לפי עדיפות הוא פעולה שנשמרת)
   const [levelFilter, setLevelFilter] = useState<PriorityLevel | null>(null);
   const [priorityMenuFor, setPriorityMenuFor] = useState<string | null>(null);
 
-  // הכלים של העדיפות מופיעים רק כשלמשימה כלשהי יש עדיפות. בלעדיהם - בלי מיון ובלי סינון
+  // הכלים של העדיפות מופיעים רק כשלמשימה כלשהי יש עדיפות. בלעדיהם - בלי סינון
   const hasPriorities = items.some((item) => item.priority !== undefined);
-  const sorting = hasPriorities && sortByPriority;
   const filter = hasPriorities ? levelFilter : null;
-  const shownItems = useMemo(() => {
-    const visible = filter ? items.filter((item) => levelOf(item) === filter) : items;
-    return openTasksFirst(sorting ? byPriority(visible) : visible);
-  }, [items, filter, sorting]);
+  const shownItems = useMemo(
+    () => openTasksFirst(filter ? items.filter((item) => levelOf(item) === filter) : items),
+    [items, filter]
+  );
   const openItems = shownItems.filter((item) => !item.completed);
   const doneItems = shownItems.filter((item) => item.completed);
 
@@ -333,9 +331,19 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     updateItem(id, { repeat: repeat ? (repeat as RepeatRule) : undefined });
   };
 
+  /**
+   * עובד גם בלי מצב עריכה, כמו הסימון כבוצע: אותו `onChange`, ולכן אותה
+   * הגנה מדריסה (`useNoteSync` - מיזוג, ובזמן התנגשות השינוי לא נשלח).
+   */
   const handleSetPriority = (id: string, level: PriorityLevel) => {
     setPriorityMenuFor(null);
     updateItem(id, { priority: level === 'normal' ? undefined : level });
+  };
+
+  /** סידור חד-פעמי לפי עדיפות, שנשמר כמו גרירה. אחר כך הרשימה לא נשמרת ממוינת */
+  const handleSortByPriority = () => {
+    const sorted = sortTasksByPriority(items);
+    if (sorted) commit(sorted);
   };
 
   const handleDeleteItem = (id: string) => {
@@ -372,8 +380,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       <SortableRow
         key={item.id}
         id={item.id}
-        // במיון לפי עדיפות הסדר על המסך הוא לא הסדר השמור, וגרירה הייתה מבלבלת
-        disabled={readOnly || sorting}
+        disabled={readOnly}
         className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-colors ${
           item.completed
             ? 'bg-success/10 ' + borderColor
@@ -474,53 +481,45 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                 />
               )}
 
-              {/* עדיפות: דגל בצבע הרמה, ותפריט קצר לבחירה */}
-              {readOnly ? (
-                item.priority && (
-                  <span className="flex-shrink-0" title={PRIORITY_META[item.priority].label}>
-                    <PriorityFlag level={item.priority} />
-                  </span>
-                )
-              ) : (
-                <div className="relative flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setPriorityMenuFor((open) => (open === item.id ? null : item.id))}
-                    aria-haspopup="menu"
-                    aria-expanded={priorityMenuFor === item.id}
-                    title={`עדיפות: ${PRIORITY_META[levelOf(item)].label}`}
-                    className="flex items-center"
-                  >
-                    <PriorityFlag level={levelOf(item)} />
-                  </button>
-                  {priorityMenuFor === item.id && (
-                    <>
-                      {/* לחיצה מחוץ לתפריט סוגרת אותו */}
-                      <div className="fixed inset-0 z-30" onClick={() => setPriorityMenuFor(null)} />
-                      <div
-                        role="menu"
-                        className="absolute end-0 top-full mt-1 z-40 min-w-[7rem] py-1 rounded-lg shadow-lg bg-surface-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark"
-                      >
-                        {PRIORITY_LEVELS.map((level) => (
-                          <button
-                            key={level}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={levelOf(item) === level}
-                            onClick={() => handleSetPriority(item.id, level)}
-                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-surface-dark ${
-                              levelOf(item) === level ? 'font-semibold' : ''
-                            }`}
-                          >
-                            <PriorityFlag level={level} size={16} />
-                            {PRIORITY_META[level].label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              {/* עדיפות: דגל בצבע הרמה, ותפריט קצר לבחירה. גם בצפייה, כמו הסימון */}
+              <div className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPriorityMenuFor((open) => (open === item.id ? null : item.id))}
+                  aria-haspopup="menu"
+                  aria-expanded={priorityMenuFor === item.id}
+                  title={`עדיפות: ${PRIORITY_META[levelOf(item)].label}`}
+                  className="flex items-center"
+                >
+                  <PriorityFlag level={levelOf(item)} />
+                </button>
+                {priorityMenuFor === item.id && (
+                  <>
+                    {/* לחיצה מחוץ לתפריט סוגרת אותו */}
+                    <div className="fixed inset-0 z-30" onClick={() => setPriorityMenuFor(null)} />
+                    <div
+                      role="menu"
+                      className="absolute end-0 top-full mt-1 z-40 min-w-[7rem] py-1 rounded-lg shadow-lg bg-surface-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark"
+                    >
+                      {PRIORITY_LEVELS.map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={levelOf(item) === level}
+                          onClick={() => handleSetPriority(item.id, level)}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-surface-dark ${
+                            levelOf(item) === level ? 'font-semibold' : ''
+                          }`}
+                        >
+                          <PriorityFlag level={level} size={16} />
+                          {PRIORITY_META[level].label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* כפתור מחיקה */}
               {!readOnly && (
@@ -601,17 +600,12 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setSortByPriority((on) => !on)}
-            aria-pressed={sorting}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-caption border transition-colors ${
-              sorting
-                ? 'bg-brand-soft dark:bg-brand-soft-dark border-brand text-brand-text dark:text-brand-text-dark'
-                : 'border-hairline-light dark:border-hairline-dark text-ink-2-light dark:text-ink-2-dark'
-            }`}
-            title={sorting ? 'חזרה לסדר שלך' : 'מיון לפי עדיפות'}
+            onClick={handleSortByPriority}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-caption border border-hairline-light dark:border-hairline-dark text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+            title="מסדר את המשימות לפי עדיפות ושומר את הסדר. אחר כך אפשר לגרור כרגיל"
           >
             <ArrowDownWideNarrow size={14} strokeWidth={1.75} />
-            לפי עדיפות
+            מיין לפי עדיפות
           </button>
           <span className="w-px h-4 bg-hairline-light dark:bg-hairline-dark" />
           {[null, ...PRIORITY_LEVELS].map((level) => (

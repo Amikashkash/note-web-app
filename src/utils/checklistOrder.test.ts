@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byPriority, moveTask } from './checklistOrder';
+import { byPriority, moveTask, sortTasksByPriority } from './checklistOrder';
 import { openTasksFirst } from './templateContent';
 
 const task = (id: string, completed = false) => ({ id, text: id, completed });
@@ -45,9 +45,35 @@ describe('byPriority (the "by priority" view)', () => {
     expect(ids(byPriority(items))).toEqual(['u1', 'u2', 'n1', 'n2', 'l1', 'l2']);
   });
 
-  it('does not change the stored list', () => {
+  it('does not change the list it is given', () => {
     const items = [p('l', 'low'), p('u', 'urgent')];
     byPriority(items);
     expect(ids(items)).toEqual(['l', 'u']);
+  });
+});
+
+describe('sortTasksByPriority (the one-time "sort by priority" that is saved)', () => {
+  const p = (id: string, priority?: 'urgent' | 'low', completed = false) => ({
+    ...task(id, completed),
+    ...(priority && { priority }),
+  });
+
+  it('sorts the open tasks into their own places and leaves done tasks where they are', () => {
+    const items = [p('n1'), p('x', 'urgent', true), p('l1', 'low'), p('u1', 'urgent'), p('n2')];
+    expect(ids(sortTasksByPriority(items))).toEqual(['u1', 'x', 'n1', 'n2', 'l1']);
+  });
+
+  it('sorts done tasks among themselves the same way', () => {
+    const items = [p('d1', undefined, true), p('a'), p('d2', 'urgent', true)];
+    expect(ids(sortTasksByPriority(items))).toEqual(['d2', 'a', 'd1']);
+  });
+
+  it('returns null when the list is already sorted, so nothing is saved', () => {
+    expect(sortTasksByPriority([p('u', 'urgent'), p('n'), p('l', 'low')])).toBeNull();
+  });
+
+  it('a manual move after sorting is kept: the list is not kept sorted', () => {
+    const sorted = sortTasksByPriority([p('n'), p('u', 'urgent')])!;
+    expect(ids(moveTask(sorted, 'n', 'u'))).toEqual(['n', 'u']);
   });
 });
