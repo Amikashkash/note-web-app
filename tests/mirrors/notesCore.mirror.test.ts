@@ -70,6 +70,7 @@ const SAMPLES: Record<string, string> = {
     { id: 'c1', text: 'לקנות חלב', completed: false, dueDate: '2026-10-01', dueTime: '09:00', repeat: 'weekly' },
     { id: 'c2', text: 'שורה\nשבורה', completed: true, priority: 'urgent' },
     { id: 'c3', text: 'נמוכה', completed: false, priority: 'low' },
+    { id: 'c4', text: 'שכר דירה', completed: false, dueDate: '2026-02-28', dueTime: '09:00', repeat: 'monthly', repeatBase: '2026-01-31' },
     { text: 'בלי מזהה', completed: 'yes', repeat: 'hourly', priority: 3 },
   ]),
   shopping: json([

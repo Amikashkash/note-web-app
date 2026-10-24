@@ -296,6 +296,16 @@ evict idle workers within seconds and every pending timer died with them.
   review): two schedulers running at once can double-send. Never have two
   deployed at the same time.
 
+**Recurring tasks** — when a task with `repeat` is marked done, it comes back
+as not done with its next due date. This logic exists **only** in
+`functions/src/recurringTasks.ts`, run by `onNoteWritten`: every writer (the
+app on any device and version, shared users, MCP, a future notification
+action) just writes `completed: true`. Never add a second implementation in
+the app. MCP only uses `nextDueAfterDone` to tell Claude what will happen.
+The reset write keeps `updatedBy` (no extra version) and bumps `revision`;
+reminders are synced by the trigger run on that write, not the first one.
+`repeatBase` holds the original day of a clamped monthly/yearly series.
+
 **Cloud Functions deploy** — manual, from the owner's machine
 (`firebase deploy --only functions:<name>`), with Node 22. CI only builds and
 tests them. When a change needs both a function and new rules, the order

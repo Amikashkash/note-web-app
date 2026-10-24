@@ -155,6 +155,8 @@ const applyItemChange = (
   }
   if (change.repeat === null) delete after.repeat;
   else if (change.repeat !== undefined) after.repeat = change.repeat;
+  // תאריך שנקבע ביד, או סדרה שהופסקה: הבסיס של "כל חודש ב-31" (`recurringTasks.ts`) כבר לא תקף
+  if (change.dueDate !== undefined || after.repeat === undefined) delete after.repeatBase;
   if (change.priority !== undefined) {
     const priority = storedPriority(change.priority);
     if (priority === undefined) delete after.priority;

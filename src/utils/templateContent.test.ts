@@ -79,6 +79,13 @@ describe('parseChecklist', () => {
     expect(JSON.parse(JSON.stringify(items))[0].priority).toBe('urgent');
   });
 
+  it('keeps repeatBase (set by the server for a clamped monthly task), so saving in the app keeps it', () => {
+    const [item] = valueOf(
+      parseChecklist('[{"id":"1","text":"x","dueDate":"2026-02-28","dueTime":"09:00","repeat":"monthly","repeatBase":"2026-01-31"}]')
+    );
+    expect(JSON.parse(JSON.stringify(item)).repeatBase).toBe('2026-01-31');
+  });
+
   it('reads "normal" and unknown priorities as no priority', () => {
     const items = valueOf(parseChecklist('[{"text":"a","priority":"normal"},{"text":"b","priority":3}]'));
     expect(items.map((item) => item.priority)).toEqual([undefined, undefined]);

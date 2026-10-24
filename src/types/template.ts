@@ -38,6 +38,12 @@ export interface ChecklistItem {
   dueTime?: string; // שעת יעד בפורמט HH:MM
   repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
   priority?: TaskPriority;
+  /**
+   * תאריך הבסיס של סדרה חודשית/שנתית שהיום שלה התקצץ ("כל חודש ב-31" ב-28
+   * בפברואר). נקבע בשרת כשמשימה חוזרת מסומנת כבוצעה (`functions/src/recurringTasks.ts`);
+   * האפליקציה רק שומרת עליו, ומוחקת אותו כשהתאריך משתנה ביד.
+   */
+  repeatBase?: string;
 }
 
 /** פריט ברשימת קניות */

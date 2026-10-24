@@ -115,17 +115,17 @@ const startingIndex = (parts: DateParts, rule: RepeatRule, now: Date): number =>
 };
 
 /**
- * המועד הבא של התזכורת, המאוחר ממש מ-`now`.
+ * המופע הבא, המאוחר ממש מ-`now`: התאריך המקומי שלו (YYYY-MM-DD) והרגע.
  *
  * מחזיר `null` אם התאריך או השעה אינם בפורמט הצפוי, או אם לא נמצא מועד
  * בתוך תקרת הצעדים.
  */
-export const nextOccurrence = (
+export const nextOccurrenceDate = (
   dateStr: string,
   timeStr: string,
   rule: RepeatRule,
   now: Date = new Date()
-): Date | null => {
+): { date: string; at: Date } | null => {
   const parts = parseDateParts(dateStr);
   if (!parts) return null;
 
@@ -134,13 +134,37 @@ export const nextOccurrence = (
   let index = startingIndex(parts, rule, now);
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
-    const candidate = localDateTimeToDate(toDateString(occurrenceAt(parts, rule, index)), timeStr);
+    const date = toDateString(occurrenceAt(parts, rule, index));
+    const candidate = localDateTimeToDate(date, timeStr);
     if (!candidate) return null;
 
-    if (candidate.getTime() > now.getTime()) return candidate;
+    if (candidate.getTime() > now.getTime()) return { date, at: candidate };
 
     index += 1;
   }
 
   return null;
+};
+
+/** המועד הבא של התזכורת, המאוחר ממש מ-`now` */
+export const nextOccurrence = (
+  dateStr: string,
+  timeStr: string,
+  rule: RepeatRule,
+  now: Date = new Date()
+): Date | null => nextOccurrenceDate(dateStr, timeStr, rule, now)?.at ?? null;
+
+/**
+ * האם `dateStr` הוא אחד המופעים של הסדרה שמתחילה ב-`baseStr`. רק לחודשי
+ * ושנתי, שבהם יום חודש יכול להתקצץ (31 -> 28). משמש לבדוק ש-`repeatBase`
+ * שנשמר עדיין שייך לתאריך היעד: אם המשתמש שינה את התאריך ביד, הבסיס הישן
+ * כבר לא תקף.
+ */
+export const isClampedOccurrence = (baseStr: string, dateStr: string, rule: RepeatRule): boolean => {
+  const base = parseDateParts(baseStr);
+  const date = parseDateParts(dateStr);
+  if (!base || !date || (rule !== 'monthly' && rule !== 'yearly')) return false;
+  if (rule === 'yearly' && date.month !== base.month) return false;
+  if (toDateString(date) < toDateString(base)) return false;
+  return date.day === Math.min(base.day, daysInMonth(date.year, date.month));
 };

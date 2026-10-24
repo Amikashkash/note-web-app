@@ -43,6 +43,8 @@ export interface ChecklistItem {
   dueTime?: string; // שעת יעד בפורמט HH:MM
   repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
   priority?: TaskPriority;
+  /** בסיס של סדרה חודשית/שנתית שהתקצצה, ראו `functions/src/recurringTasks.ts` */
+  repeatBase?: string;
 }
 
 /** פריט ברשימת קניות */

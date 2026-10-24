@@ -14,6 +14,7 @@
 import { FieldValue, Timestamp, type DocumentData, type Firestore } from 'firebase-admin/firestore';
 import { localDateTimeToDate } from './timezone';
 import { isRepeatRule, nextOccurrence, type RepeatRule } from './recurrence';
+import { seriesBase } from './recurringTasks';
 
 /** אורך מקסימלי לגוף ההתראה - payload של FCM מוגבל ל-4KB */
 export const BODY_PREVIEW_LENGTH = 200;
@@ -82,12 +83,14 @@ const computeDesiredReminders = (
     if (!item.dueDate || !item.dueTime) return;
 
     const repeat = isRepeatRule(item.repeat) ? item.repeat : null;
+    // "כל חודש ב-31" שהתקצץ ל-28: הסדרה ממשיכה מהבסיס המקורי (`recurringTasks.ts`)
+    const baseDate = repeat ? (seriesBase(item as Record<string, unknown>) ?? item.dueDate) : item.dueDate;
 
     // תזכורת חוזרת מתגלגלת קדימה למועד הבא במקום להיפסל כשעברה.
     // המועד נגזר מהכלל, ולכן החישוב כאן זהה לזה שהמתזמן עושה אחרי
     // שליחה - שניהם מגיעים לאותה תוצאה ואין ביניהם מרוץ.
     const remindAt = repeat
-      ? nextOccurrence(item.dueDate, item.dueTime, repeat, new Date(now))
+      ? nextOccurrence(baseDate, item.dueTime, repeat, new Date(now))
       : localDateTimeToDate(item.dueDate, item.dueTime);
 
     if (!remindAt || remindAt.getTime() <= now) return;
@@ -103,7 +106,7 @@ const computeDesiredReminders = (
       itemText: (item.text || '').slice(0, BODY_PREVIEW_LENGTH),
       remindAt: Timestamp.fromDate(remindAt),
       repeat,
-      baseDate: item.dueDate,
+      baseDate,
       baseTime: item.dueTime,
     });
   });

@@ -107,6 +107,8 @@ function functionsImportBoundaries() {
     // המתזמן של התזכורות, שהוצא מ-index.ts (E5)
     'functions/src/dueReminders.ts',
     'functions/src/noteWritten.ts',
+    // איפוס משימות חוזרות - חלק מהטריגר, כמו התזכורות והגרסאות
+    'functions/src/recurringTasks.ts',
     'functions/src/reminders.ts',
     'functions/src/userLookup.ts',
     'functions/src/versions.ts',

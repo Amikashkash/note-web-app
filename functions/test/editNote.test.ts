@@ -86,6 +86,13 @@ describe('update_checklist_item', () => {
     expect(rowsOf(apply({ itemId: 'p', completed: true }, past))[0].completed).toBe(true);
   });
 
+  it('a new date, or stopping the repeat, drops repeatBase; other changes keep it', () => {
+    const clamped = [{ id: 'r', text: 'שכר דירה', completed: false, dueDate: '2026-11-30', dueTime: '09:00', repeat: 'monthly', repeatBase: '2026-10-31' }];
+    expect(rowsOf(apply({ itemId: 'r', dueDate: '2026-12-10' }, clamped))[0]).not.toHaveProperty('repeatBase');
+    expect(rowsOf(apply({ itemId: 'r', repeat: null }, clamped))[0]).not.toHaveProperty('repeatBase');
+    expect(rowsOf(apply({ itemId: 'r', text: 'שכירות' }, clamped))[0].repeatBase).toBe('2026-10-31');
+  });
+
   it('sets and clears a priority; normal and null both clear it', () => {
     const urgent = apply({ itemId: 'b', priority: 'urgent' }, list);
     expect(rowsOf(urgent)[1].priority).toBe('urgent');

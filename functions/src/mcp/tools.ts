@@ -25,6 +25,7 @@ import { TargetCategoryNotFoundError, type UserScope } from '../notesCore/store'
 import { EDIT_CONSENT_VERSION, ORGANIZE_CONSENT_VERSION, REWRITE_CONSENT_VERSION } from '../oauth/config';
 import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
+import { nextDueAfterDone } from '../recurringTasks';
 import { OUTPUT } from './config';
 import { PRIORITY_INPUTS } from './priority';
 import { buildNote, CREATE_LIMITS, describeReminder } from './createNote';
@@ -473,9 +474,20 @@ const itemChangeFields = {
     .describe(PRIORITY_TEXT + ' normal (or null) clears it.'),
 };
 
-/** מצב המשימה אחרי העדכון, בשורה אחת: בוצעה או לא, מועד ותזכורת */
-const itemState = (item: Record<string, unknown>): string => {
+/**
+ * מצב המשימה אחרי העדכון, בשורה אחת: בוצעה או לא, מועד ותזכורת. משימה
+ * חוזרת שסומנה כבוצעה תחזור תוך שניות עם המועד הבא - הטריגר מאפס אותה
+ * (`recurringTasks.ts`), וכאן רק אומרים ל-Claude מה יקרה, מאותה פונקציה.
+ */
+const itemState = (item: Record<string, unknown>, now: Date): string => {
   const when = [item.dueDate, item.dueTime].filter(Boolean).join(' ');
+  const next = item.completed === true ? nextDueAfterDone(item, now) : null;
+  if (next) {
+    return (
+      `done. It repeats ${String(item.repeat)}, so within a few seconds it comes back as not done, due ` +
+      `${next.dueDate} ${String(item.dueTime)} Israel time, and its reminder moves there.`
+    );
+  }
   const reminder =
     item.completed === true
       ? 'It is done, so it has no reminder.'
@@ -494,7 +506,7 @@ const updateChecklistItem = defineTool({
     'normal, low), or set, change or remove its due date, time and repeat. Identify the task by the item id that get_note shows next to it ("item id: ..."); call ' +
     'get_note first. Only change what the user asked for in this conversation. All dates and times are Israel local time ' +
     '(Asia/Jerusalem); a task with a date and a time gets a push reminder, and changing or clearing them moves or cancels ' +
-    'the reminder. It works on the user\'s own notes only, not on notes shared with them, not on notes marked read-only for ' +
+    'the reminder. Marking a repeating task done makes it come back as not done with its next due date. It works on the user\'s own notes only, not on notes shared with them, not on notes marked read-only for ' +
     'Claude, and not while the note is open in the app (then ask the user to close it). It cannot add or delete tasks.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -516,7 +528,7 @@ const updateChecklistItem = defineTool({
     const item = rows.find((row) => row.id === input.itemId) ?? {};
     return [
       `Updated the task "${String(item.text ?? '')}" [item id: ${input.itemId}] in "${result.note.title}" [id: ${noteId}].`,
-      `Now: ${itemState(item)}`,
+      `Now: ${itemState(item, at)}`,
       RECOVERABLE,
     ].join('\n');
   },
@@ -556,7 +568,7 @@ const updateChecklistItems = defineTool({
     const rows = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
     const lines = input.updates.map(({ itemId }) => {
       const item = rows.find((row) => row.id === itemId) ?? {};
-      return `- "${String(item.text ?? '')}" [item id: ${itemId}]: ${itemState(item)}`;
+      return `- "${String(item.text ?? '')}" [item id: ${itemId}]: ${itemState(item, at)}`;
     });
     return [
       `Updated ${input.updates.length} tasks in "${result.note.title}" [id: ${input.noteId}], as one change:`,

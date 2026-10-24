@@ -305,8 +305,9 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     updateItem(id, { text });
   };
 
+  /** תאריך שנקבע ביד הוא בסיס חדש לסדרה: `repeatBase` הישן כבר לא תקף */
   const handleUpdateDueDate = (id: string, dueDate: string) => {
-    updateItem(id, { dueDate: dueDate || undefined });
+    updateItem(id, { dueDate: dueDate || undefined, repeatBase: undefined });
   };
 
   const handleUpdateDueTime = (id: string, dueTime: string) => {
@@ -324,11 +325,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
    * משמעות, וחזרה בלי מועד בסיס אין לה ממה להתגלגל.
    */
   const handleClearDue = (id: string) => {
-    updateItem(id, { dueDate: undefined, dueTime: undefined, repeat: undefined });
+    updateItem(id, { dueDate: undefined, dueTime: undefined, repeat: undefined, repeatBase: undefined });
   };
 
   const handleUpdateRepeat = (id: string, repeat: string) => {
-    updateItem(id, { repeat: repeat ? (repeat as RepeatRule) : undefined });
+    updateItem(id, { repeat: repeat ? (repeat as RepeatRule) : undefined, repeatBase: undefined });
   };
 
   /**
@@ -476,7 +477,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                   // הסרת השעה מסירה גם את החזרה: בלי שעה אין תזכורת,
                   // וכלל חזרה שנשאר היה חוזר בשקט אם תוסיף שעה שוב
                   onClear={() =>
-                    updateItem(item.id, { dueTime: undefined, repeat: undefined })
+                    updateItem(item.id, { dueTime: undefined, repeat: undefined, repeatBase: undefined })
                   }
                 />
               )}

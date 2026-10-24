@@ -291,6 +291,25 @@ describe('update_checklist_item and reminders', () => {
     expect(await runTrigger(noteId, before)).toHaveLength(1);
   });
 
+  it('marking a repeating task done from MCP: Claude is told it comes back, and the trigger brings it back', async () => {
+    const noteId = await seed(
+      note(users.a, C.home, {
+        templateType: 'checklist',
+        content: JSON.stringify([{ ...items()[0], repeat: 'daily' }]),
+      })
+    );
+    const before = await stored(noteId);
+    const result = await call(clientA, 'update_checklist_item', { noteId, itemId: 'milk', completed: true });
+    expect(result.text).toContain(`comes back as not done, due ${israelDate(4)} 09:30`);
+
+    // הטריגר על הסימון כותב את האיפוס; הטריגר על האיפוס מסנכרן את התזכורת
+    const done = await stored(noteId);
+    await runTrigger(noteId, before);
+    expect(JSON.parse((await stored(noteId)).content)[0]).toMatchObject({ completed: false, dueDate: israelDate(4) });
+    const [reminder] = await runTrigger(noteId, done);
+    expect(reminder).toMatchObject({ itemId: 'milk', baseDate: israelDate(4), repeat: 'daily' });
+  });
+
   it('adding a time to a task without one creates a reminder', async () => {
     const noteId = await seedWithReminder();
     const before = await stored(noteId);

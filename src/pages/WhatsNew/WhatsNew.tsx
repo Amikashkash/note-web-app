@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.32.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'משימה חוזרת (כל יום / שבוע / חודש / שנה) שמסמנים כבוצעה חוזרת תוך שניות להיות פתוחה, עם תאריך היעד הבא, והתזכורת זזה איתה. כך גם כש-Claude מסמן אותה',
+      },
+      {
+        type: 'improvement',
+        description:
+          'סימון מוקדם מקדם למועד שאחרי, וסימון באיחור קופץ למועד הבא שעוד לפנינו. "כל חודש ב-31" חוזר ל-31 גם אחרי חודש קצר',
+      },
+    ],
+  },
+  {
     version: '1.31.1',
     date: 'אוקטובר 2026',
     changes: [

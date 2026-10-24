@@ -79,6 +79,8 @@ export const parseChecklist = (value: string): ParseResult<ChecklistItem[]> =>
     dueTime: asText(item.dueTime) || undefined,
     repeat: REPEAT_RULES.has(asText(item.repeat)) ? (item.repeat as RepeatRule) : undefined,
     priority: PRIORITIES.has(asText(item.priority)) ? (item.priority as TaskPriority) : undefined,
+    // הבסיס של "כל חודש ב-31" שהתקצץ - נקבע בשרת (`functions/src/recurringTasks.ts`)
+    repeatBase: asText(item.repeatBase) || undefined,
   }));
 
 /**
