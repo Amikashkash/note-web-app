@@ -29,11 +29,13 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
   type Firestore,
 } from 'firebase/firestore';
 import {
@@ -76,6 +78,12 @@ const baseNote = {
   isArchived: false,
   updatedBy: OWNER,
 };
+
+/**
+ * מה שהאפליקציה שולחת עם כל כתיבה של תוכן (`updateNote`, מאז v1.26.0).
+ * בלעדיו כתיבה של `title`/`content`/`templateType` נדחית (revision, שלב 2).
+ */
+const BUMP = { revision: increment(1) };
 
 const baseCategory = {
   name: 'בית',
@@ -132,14 +140,16 @@ describe('notes', () => {
   it('owner reads, updates and deletes their note', async () => {
     const db = as(OWNER);
     await assertSucceeds(getDoc(doc(db, 'notes/note-1')));
-    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { title: 'חדש', updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { title: 'חדש', ...BUMP, updatedBy: OWNER }));
     await assertSucceeds(deleteDoc(doc(db, 'notes/note-1')));
   });
 
   it('a user the note is shared with can read it and edit content', async () => {
     const db = as(SHARED);
     await assertSucceeds(getDoc(doc(db, 'notes/note-1')));
-    await assertSucceeds(updateDoc(doc(db, 'notes/note-1'), { content: '[{"id":"1"}]', title: 'x', updatedBy: SHARED }));
+    await assertSucceeds(
+      updateDoc(doc(db, 'notes/note-1'), { content: '[{"id":"1"}]', title: 'x', ...BUMP, updatedBy: SHARED })
+    );
   });
 
   it('a stranger cannot read or update, and an anonymous user cannot read', async () => {
@@ -184,74 +194,58 @@ describe('notes', () => {
 });
 
 // ---------------------------------------------------------------------------
-// updatedBy - שלב 1: אם נכתב, חייב להיות המשתמש המחובר
+// updatedBy - שלב 2 (B6b, סבב 1 בשיפורים): חובה בכל כתיבה, ותמיד המשתמש המחובר.
+// (היו כאן "חורים ידועים" של שלב 1 - כולם התהפכו לבדיקות שנכשלות.)
 // ---------------------------------------------------------------------------
 
-describe('notes: updatedBy, phase 1 (optional, but never someone else)', () => {
-  it('create: absent is allowed, present and correct is allowed, present and wrong is denied', async () => {
+describe('notes: updatedBy, phase 2 (required, and always the signed-in user)', () => {
+  it('create: required and correct; absent or foreign is denied', async () => {
     const { updatedBy: _omitted, ...withoutWriter } = baseNote;
-    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-absent'), withoutWriter));
+    await assertFails(setDoc(doc(as(OWNER), 'notes/n-absent'), withoutWriter));
     await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-correct'), baseNote));
     await assertFails(setDoc(doc(as(OWNER), 'notes/n-wrong'), { ...baseNote, updatedBy: SHARED }));
   });
 
-  it('update: absent is allowed (an old client keeps saving)', async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'from an old client' }));
-  });
-
   it('update: present and correct is allowed', async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: SHARED }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', ...BUMP, updatedBy: SHARED }));
   });
 
-  it("update: present and wrong is denied - a shared user cannot write a third user's name", async () => {
-    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: STRANGER }));
+  it("an old client's write without updatedBy, over someone else's name, is denied", async () => {
+    // note-1 נכתב אחרון ע"י הבעלים. השותף בלי השדה היה משאיר עליו את שם הבעלים
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', ...BUMP }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { isPinned: true }));
   });
 
-  it('update: after a shared user wrote, the owner cannot put the shared user back by hand', async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { title: 'theirs', updatedBy: SHARED }));
-    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', updatedBy: STRANGER }));
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', updatedBy: OWNER }));
+  it("a shared user cannot write a third user's name, or re-send the owner's", async () => {
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', ...BUMP, updatedBy: STRANGER }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', ...BUMP, updatedBy: OWNER }));
   });
 
-  it('update: a legacy note without updatedBy accepts the correct value, not a foreign one', async () => {
+  it('after a shared user wrote, the owner cannot put the shared user back by hand', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { title: 'theirs', ...BUMP, updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', ...BUMP, updatedBy: STRANGER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'mine', ...BUMP, updatedBy: OWNER }));
+  });
+
+  it('after Claude wrote (mcp:...), an app write must carry the user again', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/by-claude'), { ...baseNote, updatedBy: 'mcp:client:1234abcd' });
+    });
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/by-claude'), { isPinned: true }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/by-claude'), { isPinned: true, updatedBy: OWNER }));
+  });
+
+  it('a legacy note without updatedBy is edited only with the correct value', async () => {
     await env.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'notes/legacy-2'), { title: 'ישן', userId: OWNER });
     });
-    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', updatedBy: SHARED }));
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', updatedBy: OWNER }));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// updatedBy - שלב 2 (צעד B6b): שדה חובה. ההתנהגות הנוכחית, שתתהפך.
-//
-// כל אחת מהבדיקות כאן מתעדת מה שלב 1 עדיין מתיר. כשהכלל של שלב 2 ייכנס
-// הן ייכשלו - וזה הסימן להפוך אותן ל-assertFails.
-// ---------------------------------------------------------------------------
-
-/** "שלב 2": ההתנהגות של שלב 1, שאמורה להשתנות כש-updatedBy יהפוך לחובה */
-const phase2 = (name: string, fn: () => Promise<unknown>) =>
-  knownHole('B6b (updatedBy required)', name, fn);
-
-describe('notes: updatedBy, phase 2 (expected to flip)', () => {
-  phase2('a note can be created without updatedBy', async () => {
-    const { updatedBy: _omitted, ...withoutWriter } = baseNote;
-    await assertSucceeds(setDoc(doc(as(OWNER), 'notes/n-phase2'), withoutWriter));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', ...BUMP }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', ...BUMP, updatedBy: SHARED }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-2'), { title: 'x', ...BUMP, updatedBy: OWNER }));
   });
 
-  phase2("a shared user's change without updatedBy keeps the owner's name on it", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x' }));
-  });
-
-  phase2("a shared user re-sending the owner's current name is indistinguishable from omitting it", async () => {
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/note-1'), { content: 'x', updatedBy: OWNER }));
-  });
-
-  phase2('a legacy note can be edited without ever setting updatedBy', async () => {
-    await env.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'notes/legacy-3'), { title: 'ישן', userId: OWNER });
-    });
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/legacy-3'), { title: 'x' }));
+  it('the one case rules cannot see: omitting it on a note you wrote last passes, and changes nothing', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/note-1'), { isPinned: true }));
   });
 });
 
@@ -572,7 +566,9 @@ describe('notesCore permissions are a subset of the rules', () => {
   it.each(cases)('%s by the %s is allowed by the rules too', async (field, access) => {
     const uid = users[access];
     const patch = sanitizeNotePatch({ [field]: SAMPLE[field] }, access);
-    await assertSucceeds(updateDoc(doc(as(uid), 'notes/note-1'), { ...patch, updatedBy: uid }));
+    // כמו האפליקציה (ו-MCP, שמעלה revision בכל עריכה): שדה תוכן מעלה את המונה
+    const content = ['title', 'content', 'templateType'].includes(field);
+    await assertSucceeds(updateDoc(doc(as(uid), 'notes/note-1'), { ...patch, ...(content && BUMP), updatedBy: uid }));
   });
 });
 
@@ -606,20 +602,38 @@ describe('read-only for Claude (isReadOnly)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// revision (C-1), שלב 1: לא חובה, אבל אם נשלח - בדיוק הקודם + 1
+// revision (C-1), שלב 2 (סבב 1 בשיפורים): חובה על כתיבת תוכן - בדיוק הקודם + 1.
+// כתיבות אחרות לא חייבות, אבל אם נגעו בו - אותו כלל.
 // ---------------------------------------------------------------------------
 
-describe('revision (C-1, phase 1)', () => {
+describe('revision (C-1, phase 2: required on content writes)', () => {
   const seedRevision = (revision: number | null) =>
     env.withSecurityRulesDisabled(async (context) => {
       const data = revision === null ? baseNote : { ...baseNote, revision };
       await setDoc(doc(context.firestore(), 'notes/rev-1'), data);
     });
 
-  it('an old client that does not send revision keeps working', async () => {
+  it.each([
+    ['content', { content: 'ישן' }],
+    ['title', { title: 'ישן' }],
+    ['templateType', { templateType: 'plain' }],
+  ])('an old client changing %s without revision is rejected, instead of overwriting', async (_field, change) => {
     await seedRevision(4);
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { content: 'ישן', updatedBy: OWNER }));
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/rev-1'), { content: 'ישן', updatedBy: SHARED }));
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/rev-1'), { ...change, updatedBy: OWNER }));
+    await assertFails(updateDoc(doc(as(SHARED), 'notes/rev-1'), { ...change, updatedBy: SHARED }));
+  });
+
+  it('a write that does not change content does not need revision', async () => {
+    await seedRevision(4);
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { isPinned: true, order: 3, tags: ['x'], updatedBy: OWNER }));
+    // אותו ערך כמו בשרת אינו שינוי
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { content: baseNote.content, updatedBy: OWNER }));
+  });
+
+  it('a content write on a note from before the field counts from 0', async () => {
+    await seedRevision(null);
+    await assertFails(updateDoc(doc(as(OWNER), 'notes/rev-1'), { title: 'x', revision: 2, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/rev-1'), { title: 'x', revision: 1, updatedBy: OWNER }));
   });
 
   /** שמירה של העורך: revision מפורש ו-saveId חדש, כמו `saveNoteText` */
@@ -662,6 +676,103 @@ describe('revision (C-1, phase 1)', () => {
   it('a note is created at revision 0 (or without it), never higher', async () => {
     await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-rev'), { ...baseNote, sharedWith: [], revision: 0 }));
     await assertFails(setDoc(doc(as(OWNER), 'notes/new-rev-2'), { ...baseNote, sharedWith: [], revision: 7 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// כל סוג כתיבה שהאפליקציה (v1.32.0) עושה לפתק - חייב לעבור את שלב 2.
+// ה-payloads מועתקים מ-`src/services/api/notes.ts` ו-`categories.ts`. כתיבה
+// חדשה באפליקציה צריכה שורה כאן.
+// ---------------------------------------------------------------------------
+
+describe('every kind of note write the app makes passes phase 2', () => {
+  const NOTE = 'notes/app-1';
+  const stamp = (uid: string) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      // נכתב אחרון ע"י הבעלים, revision 4 - כמו פתק אמיתי שנערך כבר
+      await setDoc(doc(context.firestore(), NOTE), { ...baseNote, revision: 4, content: '[{"id":"1","text":"א","completed":false}]' });
+    });
+  });
+
+  const cases: [string, string, (db: Firestore) => Promise<unknown>][] = [
+    // createNote (וגם "שמור את שלי כפתק חדש" בהתנגשות)
+    ['createNote', OWNER, (db) =>
+      setDoc(doc(db, 'notes/app-new'), {
+        ...baseNote, sharedWith: [], revision: 0, isArchived: false, createdAt: serverTimestamp(), ...stamp(OWNER),
+      })],
+    // useNoteEditor.saveNote -> updateNote עם שדות תוכן: increment(1)
+    ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
+      'updateNote (form save)', uid, (db) =>
+        updateDoc(doc(db, NOTE), {
+          title: 'כותרת', content: '[]', templateType: 'checklist', tags: ['t'], color: '#fff', revision: increment(1), ...stamp(uid),
+        }),
+    ]),
+    // saveNoteText - העורך הפתוח: revision מפורש + saveId. גם החלפת תבנית ("המר לטקסט")
+    ...[OWNER, SHARED].flatMap((uid): [string, string, (db: Firestore) => Promise<unknown>][] => [
+      ['saveNoteText (content)', uid, (db) =>
+        updateDoc(doc(db, NOTE), { content: '[{"id":"1","text":"א","completed":true}]', revision: 5, saveId: 's1', ...stamp(uid) })],
+      ['saveNoteText (title)', uid, (db) => updateDoc(doc(db, NOTE), { title: 'חדש', revision: 5, saveId: 's2', ...stamp(uid) })],
+      ['saveNoteText (convert to text)', uid, (db) =>
+        updateDoc(doc(db, NOTE), { templateType: 'plain', revision: 5, saveId: 's3', ...stamp(uid) })],
+    ]),
+    // appendToNote - "הוסף לפתק" מדף השיתוף, ב-transaction
+    ['appendToNote', OWNER, (db) =>
+      runTransaction(db, async (tx) => {
+        const snapshot = await tx.get(doc(db, NOTE));
+        tx.update(doc(db, NOTE), { content: '[]', revision: (snapshot.get('revision') as number) + 1, ...stamp(OWNER) });
+      })],
+    // restoreNoteVersion
+    ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
+      'restoreNoteVersion', uid, (db) =>
+        updateDoc(doc(db, NOTE), {
+          title: 'ישן', content: '[]', templateType: 'checklist', tags: [], color: null,
+          restoredFrom: 'v1', restoredAt: serverTimestamp(), revision: increment(1), ...stamp(uid),
+        }),
+    ]),
+    // updateNote בלי שדות תוכן: בלי revision
+    ['move to category', OWNER, (db) => updateDoc(doc(db, NOTE), { categoryId: 'cat-2', ...stamp(OWNER) })],
+    ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
+      'togglePinNote', uid, (db) => updateDoc(doc(db, NOTE), { isPinned: true, ...stamp(uid) }),
+    ]),
+    ['setNoteSensitive', OWNER, (db) => updateDoc(doc(db, NOTE), { isSensitive: true, ...stamp(OWNER) })],
+    ['setNoteReadOnly', OWNER, (db) => updateDoc(doc(db, NOTE), { isReadOnly: true, ...stamp(OWNER) })],
+    ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
+      'reorderNotes (batch)', uid, (db) => {
+        const batch = writeBatch(db);
+        batch.update(doc(db, NOTE), { order: 2, ...stamp(uid) });
+        return batch.commit();
+      },
+    ]),
+    ['archiveNote', OWNER, (db) => updateDoc(doc(db, NOTE), { isArchived: true, archivedAt: serverTimestamp(), ...stamp(OWNER) })],
+    ['restoreNote', OWNER, (db) => updateDoc(doc(db, NOTE), { isArchived: false, archivedAt: null, ...stamp(OWNER) })],
+    ['shareNoteWithUser', OWNER, (db) => updateDoc(doc(db, NOTE), { sharedWith: arrayUnion(STRANGER), ...stamp(OWNER) })],
+    ['unshareNoteWithUser', OWNER, (db) => updateDoc(doc(db, NOTE), { sharedWith: arrayRemove(SHARED), ...stamp(OWNER) })],
+    ['leaveSharedNote', SHARED, (db) => updateDoc(doc(db, NOTE), { sharedWith: arrayRemove(SHARED), ...stamp(SHARED) })],
+    // categories.ts: שיתוף קטגוריה, ויציאה ממנה - batch על הפתקים שבה
+    ['share a category (notes batch)', OWNER, (db) => {
+      const batch = writeBatch(db);
+      batch.update(doc(db, NOTE), { sharedWith: arrayUnion(STRANGER), updatedBy: OWNER, updatedAt: serverTimestamp() });
+      return batch.commit();
+    }],
+    ['leaveSharedCategory (notes batch)', SHARED, (db) => {
+      const batch = writeBatch(db);
+      batch.update(doc(db, NOTE), { sharedWith: arrayRemove(SHARED), updatedBy: SHARED, updatedAt: serverTimestamp() });
+      return batch.commit();
+    }],
+    ['permanentlyDeleteNote', OWNER, (db) => deleteDoc(doc(db, NOTE))],
+  ];
+
+  it.each(cases)('%s by %s', async (_name, uid, write) => {
+    await assertSucceeds(write(as(uid)));
+  });
+
+  it('a sequence on one note: the owner and a shared user alternate, every write passes', async () => {
+    await assertSucceeds(updateDoc(doc(as(SHARED), NOTE), { content: '[]', revision: 5, saveId: 'a', ...stamp(SHARED) }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), NOTE), { isPinned: true, ...stamp(OWNER) }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), NOTE), { title: 'x', revision: 6, saveId: 'b', ...stamp(OWNER) }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), NOTE), { title: 'y', revision: increment(1), ...stamp(SHARED) }));
   });
 });
 
@@ -732,8 +843,8 @@ describe('created by Claude (createdVia)', () => {
 
   it('a note Claude created is edited normally in the app', async () => {
     await seedMcpNote();
-    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/mcp-1'), { title: 'ערוך', updatedBy: OWNER }));
-    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/mcp-1'), { content: '[]', updatedBy: SHARED }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'notes/mcp-1'), { title: 'ערוך', ...BUMP, updatedBy: OWNER }));
+    await assertSucceeds(updateDoc(doc(as(SHARED), 'notes/mcp-1'), { content: '[{"id":"1"}]', ...BUMP, updatedBy: SHARED }));
   });
 });
 
@@ -856,7 +967,7 @@ describe('known holes (current behavior, expected to change)', () => {
 
   knownHole('R-1', 'there is no size or schema validation on notes', async () => {
     await assertSucceeds(
-      updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'x'.repeat(5000), unexpectedField: true, updatedBy: OWNER })
+      updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'x'.repeat(5000), unexpectedField: true, ...BUMP, updatedBy: OWNER })
     );
   });
 });

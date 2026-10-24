@@ -230,7 +230,11 @@ users and writes junk fields into the document.
 **Writer stamp** — every note write goes through `writeStamp()` in
 `src/services/api/notes.ts`, which adds `updatedBy` (the signed-in uid) and
 `updatedAt`. The rules reject a foreign `updatedBy`; version history
-attributes changes by it. (Phase 2, making it mandatory, is step B6b.)
+attributes changes by it. Since round 1 (B6b) it is mandatory on every write.
+A write that changes `title`, `content` or `templateType` must also set
+`revision` to exactly previous + 1 (`updateNote` does it with `increment(1)`,
+the open editor explicitly). A new kind of note write needs a row in the
+rules test "every kind of note write the app makes passes phase 2".
 
 **Array fields** — `sharedWith` is only ever modified with `arrayUnion` /
 `arrayRemove`. Read-modify-write loses concurrent shares. A recipient may

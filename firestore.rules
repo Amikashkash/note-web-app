@@ -73,20 +73,16 @@ service cloud.firestore {
 
       // `updatedBy` - מי כתב אחרון. היסטוריית הגרסאות מייחסת שינויים לפיו.
       //
-      // שלב 1 (עכשיו): אם הכתיבה קובעת את השדה, הוא חייב להיות המשתמש
-      // המחובר - אי אפשר לרשום שינוי בשם של מישהו אחר. כתיבה שלא נוגעת בו
-      // מותרת כמו קודם, כדי שלקוח ישן (PWA שעוד לא התרענן) ימשיך לשמור
-      // בלי לאבד טקסט. המחיר: כתיבה כזו משאירה את שם הכותב הקודם.
+      // שלב 2 (B6b, סבב 1 בשיפורים - כל האפליקציה כותבת אותו מאז v1.21.0):
+      // חובה בכל כתיבה, ותמיד המשתמש המחובר. כך אי אפשר לרשום שינוי בשם של
+      // מישהו אחר, ולקוח ישן מלפני השדה לא יכול לכתוב מעל כותב אחר.
       //
-      // שלב 2 (צעד B6b בסקירה, אחרי שכל המכשירים על v1.21.0 ומעלה): השדה
-      // חובה בכל כתיבה, ו-`writerStampPhase1` מוחלף בבדיקה ישירה. הבדיקות
-      // של שלב 2 כבר כתובות ב-`tests/rules` ומסומנות כצפויות להתהפך.
-      //
-      // אם הכתיבה לא משנה את השדה, rules לא יכולים לדעת אם הוא נשלח עם
-      // הערך הקיים או לא נשלח בכלל - שני המקרים נראים זהים.
-      function writerStampPhase1() {
-        return request.resource.data.get('updatedBy', null) == request.auth.uid
-          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']);
+      // rules רואים רק את התוצאה: כתיבה שלא שולחת את השדה לפתק שהכותב
+      // עצמו כתב בו אחרון נראית זהה לכתיבה ששולחת אותו, ועוברת. זה לא מזיק -
+      // הייחוס ממילא שלו. (שלב 1 התיר להשמיט את השדה בכל מקרה.)
+      // השרת (MCP, הטריגר) כותב דרך Admin SDK ועוקף את הכללים האלה.
+      function writerStamp() {
+        return request.resource.data.get('updatedBy', null) == request.auth.uid;
       }
 
       // `createdVia` ("נוצר ע"י Claude") נכתב רק ע"י השרת (Admin SDK).
@@ -95,9 +91,9 @@ service cloud.firestore {
         return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdVia']);
       }
 
-      // `revision` (C-1), שלב 1 - כמו `updatedBy`: כתיבה שלא נוגעת בשדה
-      // (לקוח ישן, הצמדה, דגלים) עוברת כמו קודם. כתיבה שקובעת אותו חייבת
-      // לקבוע בדיוק `הקודם + 1`. העורך הפתוח שולח `בסיס + 1` מפורש, ולכן
+      // `revision` (C-1). כתיבה שקובעת אותו חייבת לקבוע בדיוק `הקודם + 1`
+      // (בשלב 1, עד סבב 1 בשיפורים, כתיבה שלא נגעה בו עברה תמיד - גם של
+      // תוכן). העורך הפתוח שולח `בסיס + 1` מפורש, ולכן
       // אם מישהו אחר כתב בינתיים - הכתיבה נדחית (גם כשהמתינה offline)
       // במקום לדרוס. `increment(1)` תמיד עובר: ה-rule רואה את התוצאה.
       // מסמך ישן בלי השדה = 0.
@@ -106,24 +102,34 @@ service cloud.firestore {
       // `revision` ששווה במקרה לערך הנוכחי (בסיס 3 → 4, כשבשרת כבר 4) לא
       // "משנה" את השדה, ונראית כמו לקוח ישן. `saveId` תמיד משתנה, ולכן
       // שמירה של העורך תמיד נבדקת.
-      function revisionPhase1() {
-        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['revision', 'saveId'])
-          || request.resource.data.get('revision', 0) == resource.data.get('revision', 0) + 1;
+      //
+      // שלב 2 (סבב 1 בשיפורים - האפליקציה שולחת אותו מאז v1.26.0): כתיבה
+      // שמשנה **תוכן** (`title`, `content`, `templateType`) חייבת לקבוע
+      // בדיוק `הקודם + 1`. לקוח ישן מלפני C-1, שהיה דורס בשקט שינוי חדש
+      // יותר, נדחה. כתיבות אחרות (הצמדה, סדר, דגלים, ארכוב, שיתוף) לא
+      // מעלות את המונה וגם לא חייבות - אבל אם נגעו בו, אותו כלל של שלב 1.
+      function contentChanged() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'content', 'templateType']);
+      }
+
+      function revisionChecked() {
+        return request.resource.data.get('revision', 0) == resource.data.get('revision', 0) + 1
+          || (!contentChanged()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['revision', 'saveId']));
       }
 
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
         && !('createdVia' in request.resource.data)
         && request.resource.data.get('revision', 0) == 0
-        && (!('updatedBy' in request.resource.data)
-          || request.resource.data.updatedBy == request.auth.uid);
+        && request.resource.data.get('updatedBy', null) == request.auth.uid;
 
       // שותף לא משנה `isSensitive` ולא `categoryId` (§12.2): העברה של פתק
       // מקטגוריה רגישה לקטגוריה שלו הייתה מבטלת את הרגישות בפועל, וגם
       // "מעלימה" את הפתק מהבעלים (SH-2).
       // `isReadOnly` (קריאה בלבד ל-Claude) - רק הבעלים, כמו `isSensitive`.
-      allow update: if writerStampPhase1()
-        && revisionPhase1()
+      allow update: if writerStamp()
+        && revisionChecked()
         && createdViaUnchanged()
         && (isOwner(resource.data.userId)
           || (isSharedWithMe(resource.data) && ownershipUnchanged()
