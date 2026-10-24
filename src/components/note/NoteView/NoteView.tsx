@@ -80,8 +80,10 @@ export const NoteView: React.FC<NoteViewProps> = ({
     setIsEditMode(false);
   }
 
-  // בזמן התנגשות אין עריכה: העורך מציג את הטקסט של המשתמש, קפוא, עד שיבחר
-  const editing = isEditMode && !conflict;
+  // בזמן התנגשות אין עריכה: העורך מציג את הטקסט של המשתמש, קפוא, עד שיבחר.
+  // כך גם כשהגרסה ישנה מדי לשמור (`minClientVersion`) - הטקסט נשאר גלוי ואפשר להעתיק
+  const frozen = Boolean(conflict) || editor.writesBlocked;
+  const editing = isEditMode && !frozen;
 
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
@@ -238,7 +240,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <AccountingTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={Boolean(conflict)}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
@@ -256,7 +258,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <RecipeTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={Boolean(conflict)}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
@@ -265,7 +267,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <ShoppingTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={Boolean(conflict)}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
@@ -316,6 +318,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
               type="text"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
+              readOnly={editor.writesBlocked}
               maxLength={LENGTH_LIMITS.NOTE_TITLE}
               className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-2 border-none focus:ring-2 focus:ring-brand/40 dark:focus:ring-brand-dark/40 rounded px-2 dark:bg-surface-dark"
               placeholder="כותרת הפתק..."

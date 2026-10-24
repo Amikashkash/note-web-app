@@ -26,6 +26,7 @@ import { Note, NoteInput } from '@/types/note';
 import type { NoteVersion } from '@/types/version';
 import { byPinnedThenOrder, toNote } from './mappers';
 import { findUserIdByEmail } from './users';
+import { assertWritesAllowed } from './writeGate';
 import { logger } from '@/utils/logger';
 import { wrapError } from '@/utils/errors';
 import { appendSnippet, type AppendResult, type SharedSnippet } from '@/utils/templateContent';
@@ -61,11 +62,15 @@ const IMMUTABLE_FIELDS: readonly string[] = [
  * (בטריגר בענן) נשענת עליו כדי לדעת מי שינה, ולפתוח גרסה כשהכותב מתחלף.
  */
 const writeStamp = () => {
+  // גרסה ישנה מדי (`minClientVersion`) לא כותבת בכלל - גם לא פתק חדש
+  assertWritesAllowed();
   const uid = auth.currentUser?.uid;
   if (!uid) {
     throw new Error('משתמש לא מחובר');
   }
-  return { updatedBy: uid, updatedAt: serverTimestamp() };
+  // `clientVersion`: הכנה לאכיפה בשרת - rules שידחו כתיבה של גרסה ישנה
+  // גם כשהיא חיכתה offline ולא ראתה את המינימום (ראו thinking/round2-plan.md)
+  return { updatedBy: uid, updatedAt: serverTimestamp(), clientVersion: __APP_VERSION__ };
 };
 
 const stripImmutableFields = (updates: Partial<NoteInput>): Record<string, unknown> =>
@@ -258,6 +263,7 @@ export const restoreNoteVersion = async (noteId: string, version: NoteVersion): 
  */
 export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
   try {
+    assertWritesAllowed();
     await deleteDoc(noteRef(noteId));
   } catch (error) {
     logger.error('Error deleting note:', error);

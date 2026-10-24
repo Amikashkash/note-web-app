@@ -43,19 +43,16 @@ numbers for changes no user could observe.)
 ## Git Workflow
 
 ### Commits and Pushes
-- Work directly on `main` and push to it. (Branches and PRs that the owner
-  merged were used while the MCP server was built; that is over.)
+- Work on a `claude/<topic>` branch and open a PR. **Never merge it** - the
+  owner reviews and merges. (Round 1 of improvements, October 2026, was the
+  one exception: main-only by the owner's decision.)
 - Each logical step is its own commit.
 - Before every push, run the relevant suites locally (lint, tsc, tests;
-  emulator suites when functions or rules change). A push to `main` deploys.
-- A push to `main` triggers CI: tests, then — only if they pass
-  (`needs: test`) — a deploy of Hosting and Firestore rules/indexes (see
-  `.github/workflows/SETUP.md`). Cloud Functions are still deployed manually.
-- Use a branch and a PR only when the owner asks for one.
-- **Round 1 of improvements (October 2026) is main-only, by the owner's
-  decision:** no branches, no PRs. Each step is one commit pushed to `main`,
-  then stop and report before starting the next. **From round 2 on, work goes
-  through branches and PRs again.**
+  emulator suites when functions or rules change).
+- A push to `main` (that is, the owner's merge) triggers CI: tests, then —
+  only if they pass (`needs: test`) — a deploy of Hosting and Firestore
+  rules/indexes (see `.github/workflows/SETUP.md`). Cloud Functions are still
+  deployed manually. A PR runs the tests only.
 
 ### Commit Messages
 - Clear, descriptive commit messages
@@ -245,6 +242,25 @@ Parsers return `{ ok: false }` rather than an empty value, and templates
 initialize only `''`. Converting between templates goes through
 `convertContent`; appending shared content through `appendSnippet`.
 
+**Minimum client version (D4a)** — `config/app.minClientVersion` (a string
+like `"1.40.0"`, set by the owner in the Firebase console; no client can write
+it) makes every older version stop writing. Read on start (live listener), on
+returning to the app and when the connection comes back
+(`hooks/useMinClientVersion.ts`). Blocked: every note write (`writeStamp` calls
+`assertWritesAllowed`, `services/api/writeGate.ts`), category writes, product
+learning. Not blocked: presence, FCM tokens, user profile. The open editor
+stops sending and becomes read-only; unsaved text is kept in
+`appVersionStore.unsaved`, shown for copying, stashed in localStorage on
+"refresh" and shown again by the new version. A missing or unreadable value
+never blocks. Raise it **before** shipping a format an older version would
+overwrite, and only after the version that understands the format is out.
+- **Offline:** the check is client-side. A device that never read the new
+  value (offline since before it was set) keeps writing locally, and those
+  queued writes go out on reconnect, before the listener delivers the value.
+  Edits made after that are blocked. Closing that gap needs rules that check
+  `clientVersion` (written by `writeStamp` since v1.33.0) - see
+  `thinking/round2-plan.md`.
+
 **New fields on items** — the app's parsers keep only the fields they know,
 so a save from the app drops anything else. A new field (for example
 `priority` on checklist items, v1.31.0) must be parsed by the app, and that
@@ -331,7 +347,7 @@ minor versions and has been removed rather than updated again.
 
 ## Quick Checklist for Each Change
 
-- [ ] Make code changes on `main` (round 1) or on a `claude/<topic>` branch (round 2 on)
+- [ ] Make code changes on a `claude/<topic>` branch
 - [ ] Run the checks and test suites listed above
 - [ ] If the app changed: increment the version and add a WhatsNew entry
 - [ ] Commit each logical step separately, with the version in the message

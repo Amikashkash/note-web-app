@@ -25,6 +25,8 @@ import { toCategory } from './mappers';
 import { findUserIdByEmail } from './users';
 import { logger } from '@/utils/logger';
 import { wrapError } from '@/utils/errors';
+import { assertWritesAllowed } from './writeGate';
+
 
 const CATEGORIES_COLLECTION = 'categories';
 const NOTES_COLLECTION = 'notes';
@@ -45,6 +47,7 @@ export const createCategory = async (
   flags: CategoryFlags = {}
 ): Promise<string> => {
   try {
+    assertWritesAllowed();
     const docRef = await addDoc(categoriesRef(), {
       ...getDefaultCategory(userId, name),
       ...(color && { color }),
@@ -70,6 +73,7 @@ export const updateCategory = async (
   try {
     // `sharedWith` מתעדכן רק דרך פונקציות השיתוף הייעודיות, שמשתמשות
     // בפעולות מערך אטומיות. עדכון ישיר שלו כאן היה דורס שיתופים מקבילים.
+    assertWritesAllowed();
     const { sharedWith: _ignored, ...safeUpdates } = updates;
 
     await updateDoc(categoryRef(categoryId), {
@@ -87,6 +91,7 @@ export const updateCategory = async (
  */
 export const deleteCategory = async (categoryId: string): Promise<void> => {
   try {
+    assertWritesAllowed();
     await deleteDoc(categoryRef(categoryId));
   } catch (error) {
     logger.error('Error deleting category:', error);
@@ -193,6 +198,7 @@ const applySharingToCategoryTree = async (
    * הסינון גם נכון לגופו: אפשר לשתף רק פתקים שבבעלותך. פתק של מישהו
    * אחר שיושב בקטגוריה משותפת אינו שלך לחלוק הלאה.
    */
+  assertWritesAllowed();
   const notesSnapshot = await getDocs(
     query(
       collection(db, NOTES_COLLECTION),
@@ -234,6 +240,7 @@ export const leaveSharedCategory = async (categoryId: string): Promise<void> => 
   }
 
   try {
+    assertWritesAllowed();
     const sharedNotes = await getDocs(
       query(
         collection(db, NOTES_COLLECTION),

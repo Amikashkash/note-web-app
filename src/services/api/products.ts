@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
 import { logger } from '@/utils/logger';
+import { writesBlocked } from '@/store/appVersionStore';
 import { normalizeProductName, type RememberedProduct } from './productMatching';
 
 export type { RememberedProduct };
@@ -41,7 +42,8 @@ const toProductId = (normalized: string): string => encodeURIComponent(normalize
  */
 export const recordProductUse = async (userId: string, name: string): Promise<void> => {
   const normalized = normalizeProductName(name);
-  if (normalized.length < MIN_NAME_LENGTH) return;
+  // גרסה ישנה מדי (`minClientVersion`) לא כותבת. כאן בשקט - זו למידה, לא תוכן
+  if (normalized.length < MIN_NAME_LENGTH || writesBlocked()) return;
 
   try {
     await setDoc(
