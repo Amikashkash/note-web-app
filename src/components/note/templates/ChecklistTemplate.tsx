@@ -8,7 +8,7 @@
  * פעולה חייבת להסתכם בקריאה אחת ל-`updateItem`.
  */
 
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -26,7 +26,7 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
-import { CalendarDays, Clock, GripVertical, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ChevronDown, Clock, GripVertical, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 import {
@@ -196,6 +196,9 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const shownItems = useMemo(() => openTasksFirst(items), [items]);
   const openItems = shownItems.filter((item) => !item.completed);
   const doneItems = shownItems.filter((item) => item.completed);
+  // המשימות שבוצעו מקופלות לשורה אחת "בוצעו (N)". תצוגה בלבד: לא נשמר ולא
+  // משנה את הפתק, וכל פתיחה של הפתק מתחילה מקופלת
+  const [showDone, setShowDone] = useState(false);
 
   const sensors = useSensors(
     // מרחק קטן לפני שהגרירה מתחילה: לחיצה רגילה על הידית לא מזיזה כלום
@@ -509,9 +512,26 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             <SortableContext items={openItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
               {openItems.map(renderItem)}
             </SortableContext>
-            <SortableContext items={doneItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-              {doneItems.map(renderItem)}
-            </SortableContext>
+            {doneItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDone((open) => !open)}
+                aria-expanded={showDone}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+              >
+                <ChevronDown
+                  size={18}
+                  strokeWidth={1.75}
+                  className={`flex-shrink-0 transition-transform ${showDone ? '' : 'rotate-90'}`}
+                />
+                בוצעו ({doneItems.length})
+              </button>
+            )}
+            {showDone && (
+              <SortableContext items={doneItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+                {doneItems.map(renderItem)}
+              </SortableContext>
+            )}
           </DndContext>
         )}
       </div>

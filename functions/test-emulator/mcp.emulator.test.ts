@@ -464,8 +464,14 @@ describe('get_note', () => {
     expect(isError).toBe(false);
     expect(output).toContain(`Title: ${PRIVATE.title}`);
     expect(output).toContain('Category: בית');
+    expect(output).toContain(`- [ ] ${PRIVATE.item}  (item id: i1)\n--- end of note content ---\n1 done task hidden.`);
+    expect(output).not.toContain('לחם');
+  });
+
+  it('includeDone: true lists the done tasks too', async () => {
+    const { text: output } = await call(clientA, 'get_note', { noteId: N.shopping, includeDone: true });
     expect(output).toContain(`- [ ] ${PRIVATE.item}  (item id: i1)\n- [x] לחם  (item id: i2)`);
-    expect(output).toContain('--- end of note content ---');
+    expect(output).not.toContain('hidden');
   });
 
   it('shows a shared note in the virtual category, since its own category is not shared', async () => {

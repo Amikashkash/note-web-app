@@ -16,6 +16,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.30.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'ברשימת משימות, המשימות שבוצעו מקופלות לשורה אחת "בוצעו (N)" בסוף הרשימה. לחיצה עליה פותחת וסוגרת אותן. שום דבר לא זז ולא נמחק - זו רק תצוגה',
+      },
+      {
+        type: 'improvement',
+        description:
+          'Claude רואה כברירת מחדל רק את המשימות הפתוחות ואת מספר המשימות שבוצעו, ויכול לבקש לראות גם אותן כשצריך',
+      },
+    ],
+  },
+  {
     version: '1.29.0',
     date: 'אוקטובר 2026',
     changes: [
