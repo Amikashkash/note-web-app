@@ -44,6 +44,24 @@ describe('content in the app format', () => {
     ]);
   });
 
+  it('a checklist task keeps urgent and low priority; normal is not stored', () => {
+    const { draft } = buildNote(
+      checklist([
+        { text: 'דחוף', priority: 'urgent' },
+        { text: 'רגיל', priority: 'normal' },
+        { text: 'נמוך', priority: 'low' },
+      ]),
+      NOW
+    );
+    expect(JSON.parse(draft.content).map((row: { priority?: string }) => row.priority)).toEqual(['urgent', undefined, 'low']);
+  });
+
+  it('refuses a priority on a shopping item', () => {
+    expect(
+      error({ categoryId: 'c1', title: 'קניות', type: 'shopping', items: [{ text: 'לחם', priority: 'urgent' }] })
+    ).toContain('priority is for checklist items');
+  });
+
   it('a shopping list uses name, quantity and checked', () => {
     const { draft } = buildNote(
       { categoryId: 'c1', title: 'קניות', type: 'shopping', items: [{ text: 'עגבניות', quantity: '1 ק"ג' }, { text: 'לחם' }] },

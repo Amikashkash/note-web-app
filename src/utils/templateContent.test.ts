@@ -69,6 +69,20 @@ describe('parseChecklist', () => {
     const [item] = valueOf(parseChecklist('[{"id":"1","text":"x","repeat":"hourly"}]'));
     expect(item.repeat).toBeUndefined();
   });
+
+  it('keeps priority urgent and low, so saving in the app does not delete what Claude wrote', () => {
+    const items = valueOf(
+      parseChecklist('[{"id":"1","text":"a","priority":"urgent"},{"id":"2","text":"b","priority":"low"}]')
+    );
+    expect(items.map((item) => item.priority)).toEqual(['urgent', 'low']);
+    // השמירה באפליקציה היא `JSON.stringify` של הפריטים המפוענחים
+    expect(JSON.parse(JSON.stringify(items))[0].priority).toBe('urgent');
+  });
+
+  it('reads "normal" and unknown priorities as no priority', () => {
+    const items = valueOf(parseChecklist('[{"text":"a","priority":"normal"},{"text":"b","priority":3}]'));
+    expect(items.map((item) => item.priority)).toEqual([undefined, undefined]);
+  });
 });
 
 describe('openTasksFirst (display order of a checklist)', () => {

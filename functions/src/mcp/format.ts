@@ -161,6 +161,7 @@ const checklistWithIds = (content: string, includeDone: boolean): { text: string
     .map(({ row, id }) => {
       const facts = [
         `item id: ${id}`,
+        row.priority === 'urgent' || row.priority === 'low' ? `priority ${row.priority}` : null,
         row.dueDate ? `due ${[row.dueDate, row.dueTime].filter(Boolean).join(' ')}` : null,
         row.repeat ? `repeats ${String(row.repeat)}` : null,
       ].filter(Boolean);

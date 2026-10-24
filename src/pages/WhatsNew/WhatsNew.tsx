@@ -16,6 +16,26 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.31.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'עדיפות למשימות: לחיצה על הדגל בשורת המשימה ובחירה בין דחוף (אדום), רגיל ונמוך (אפור). במקום 🔴 בתחילת הטקסט',
+      },
+      {
+        type: 'feature',
+        description:
+          'כשיש משימות עם עדיפות מופיעים מעל הרשימה "לפי עדיפות" (מיון, עד שמכבים אותו - הסדר שלך לא משתנה) וסינון לפי רמה',
+      },
+      {
+        type: 'improvement',
+        description: 'Claude יכול לקבוע עדיפות כשהוא יוצר או מעדכן משימות, ורואה אותה כשהוא קורא את הרשימה',
+      },
+    ],
+  },
+  {
     version: '1.30.0',
     date: 'אוקטובר 2026',
     changes: [

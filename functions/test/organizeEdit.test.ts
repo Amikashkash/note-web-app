@@ -124,6 +124,16 @@ describe('add_checklist_items', () => {
     expect(rows(outcome)[3]).toMatchObject({ completed: false, dueDate: '2026-10-07', dueTime: '10:00', repeat: 'monthly' });
   });
 
+  it('adds tasks with a priority; normal is not stored', () => {
+    const outcome = buildAddChecklistItemsEdit(
+      [{ text: 'דחוף', priority: 'urgent' }, { text: 'רגיל', priority: 'normal' }],
+      undefined,
+      NOW
+    ).apply(note());
+    expect(rows(outcome)[2].priority).toBe('urgent');
+    expect(rows(outcome)[3]).not.toHaveProperty('priority');
+  });
+
   it('adds right after a given item', () => {
     const outcome = buildAddChecklistItemsEdit([{ text: 'ביצים' }], 'a', NOW).apply(note());
     expect(rows(outcome).map((row: { text: string }) => row.text)).toEqual(['חלב', 'ביצים', 'לחם']);

@@ -241,6 +241,14 @@ Parsers return `{ ok: false }` rather than an empty value, and templates
 initialize only `''`. Converting between templates goes through
 `convertContent`; appending shared content through `appendSnippet`.
 
+**New fields on items** — the app's parsers keep only the fields they know,
+so a save from the app drops anything else. A new field (for example
+`priority` on checklist items, v1.31.0) must be parsed by the app, and that
+version must be live on the owner's devices, **before** the server writes it.
+Order: push (app) → owner confirms the new version on every device → deploy
+the function that writes the field. Parse it in `src/utils/templateContent.ts`
+and its mirror in `functions/src/notesCore/content/` together.
+
 **Backup rendering** — `src/utils/backupFormat.ts` is pure (no Firebase calls,
 no React) so it can be exercised directly. Content renderers dispatch on the
 declared `templateType` but fall back to shape detection, because notes

@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { InvalidError } from '../notesCore/errors';
 import type { NoteDraft } from '../notesCore/store';
 import { MAX_YEARS_AHEAD, validateTiming } from './dates';
+import { storedPriority, type PriorityInput } from './priority';
 
 export const CREATE_LIMITS = {
   /** כמו `LENGTH_LIMITS.NOTE_TITLE` באפליקציה */
@@ -46,6 +47,8 @@ export interface CreateItemInput {
   dueDate?: string;
   dueTime?: string;
   repeat?: string;
+  /** משימות בלבד */
+  priority?: PriorityInput;
   quantity?: string;
 }
 
@@ -175,6 +178,7 @@ export const buildNote = (input: CreateNoteInput, now: Date): BuiltNote => {
         if (item.dueDate !== undefined || item.dueTime !== undefined || item.repeat !== undefined) {
           throw invalid(`${label}: dates, times and repeat are for checklist items. A shopping list has none`);
         }
+        if (item.priority !== undefined) throw invalid(`${label}: priority is for checklist items`);
         const quantity = oneLine(item.quantity ?? '');
         if (quantity.length > CREATE_LIMITS.quantity) throw invalid(`${label}: quantity is too long`);
         return { id: `${stamp}-${index}`, name: text, quantity, checked: false };
@@ -183,6 +187,7 @@ export const buildNote = (input: CreateNoteInput, now: Date): BuiltNote => {
       if (item.quantity !== undefined) throw invalid(`${label}: quantity is for shopping lists`);
       const reminder = validateItemTiming(item, label, now);
       if (reminder) reminders.push(reminder);
+      const priority = storedPriority(item.priority);
       return {
         id: `${stamp}-${index}`,
         text,
@@ -190,6 +195,7 @@ export const buildNote = (input: CreateNoteInput, now: Date): BuiltNote => {
         ...(item.dueDate !== undefined && { dueDate: item.dueDate }),
         ...(item.dueTime !== undefined && { dueTime: item.dueTime }),
         ...(item.repeat !== undefined && { repeat: item.repeat }),
+        ...(priority !== undefined && { priority }),
       };
     });
 

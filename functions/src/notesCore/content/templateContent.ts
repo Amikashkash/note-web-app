@@ -31,6 +31,7 @@ import type {
   RecipeData,
   RepeatRule,
   ShoppingItem,
+  TaskPriority,
   WorkPlanSection,
 } from './types';
 import type { TemplateType } from './types';
@@ -47,6 +48,9 @@ const isObject = (value: unknown): value is JsonObject =>
 const asText = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 const REPEAT_RULES = new Set<string>(['daily', 'weekly', 'monthly', 'yearly']);
+
+// עדיפות רגילה היא היעדר השדה - אין ערך 'normal' שמור
+const PRIORITIES = new Set<string>(['urgent', 'low']);
 
 const parseJson = (value: string): ParseResult<unknown> => {
   try {
@@ -87,6 +91,7 @@ export const parseChecklist = (value: string): ParseResult<ChecklistItem[]> =>
     dueDate: asText(item.dueDate) || undefined,
     dueTime: asText(item.dueTime) || undefined,
     repeat: REPEAT_RULES.has(asText(item.repeat)) ? (item.repeat as RepeatRule) : undefined,
+    priority: PRIORITIES.has(asText(item.priority)) ? (item.priority as TaskPriority) : undefined,
   }));
 
 /**

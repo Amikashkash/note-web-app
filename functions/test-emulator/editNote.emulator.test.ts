@@ -436,6 +436,31 @@ describe('update_checklist_items', () => {
     }
   });
 
+  it('priority: set by the tools, shown by get_note, cleared with normal', async () => {
+    const noteId = await seed(note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()) }));
+    const set = await call(clientA, 'update_checklist_items', {
+      noteId,
+      updates: [
+        { itemId: 'milk', priority: 'urgent' },
+        { itemId: 'gas', priority: 'low' },
+      ],
+    });
+    expect(set.text).toContain('"לקנות חלב" [item id: milk]: not done, priority urgent');
+    expect((await call(clientA, 'get_note', { noteId })).text).toContain('(item id: milk · priority urgent · due');
+
+    await call(clientA, 'update_checklist_item', { noteId, itemId: 'milk', priority: 'normal' });
+    const rows = JSON.parse((await stored(noteId)).content);
+    expect(rows[0]).not.toHaveProperty('priority');
+    expect(rows[2].priority).toBe('low');
+  });
+
+  it('an unknown priority is refused by the input schema', async () => {
+    const noteId = await seed(note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()) }));
+    const result = await call(clientA, 'update_checklist_item', { noteId, itemId: 'milk', priority: 'high' });
+    expect(result.isError).toBe(true);
+    expect((await stored(noteId)).revision).toBe(4);
+  });
+
   it('refuses a read-only note like update_checklist_item does', async () => {
     const noteId = await seed(
       note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()), isReadOnly: true })

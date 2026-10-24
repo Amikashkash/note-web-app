@@ -31,6 +31,9 @@ export interface WorkPlanSection {
 /** מרווחי חזרה נתמכים לתזכורת. חסר = תזכורת חד-פעמית. */
 export type RepeatRule = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
+/** עדיפות של משימה. חסר = רגילה (אין ערך 'normal' שמור) */
+export type TaskPriority = 'urgent' | 'low';
+
 /** משימה ברשימת משימות */
 export interface ChecklistItem {
   id: string;
@@ -39,6 +42,7 @@ export interface ChecklistItem {
   dueDate?: string; // תאריך יעד בפורמט YYYY-MM-DD
   dueTime?: string; // שעת יעד בפורמט HH:MM
   repeat?: RepeatRule; // חזרה תקופתית, ראה `functions/src/recurrence.ts`
+  priority?: TaskPriority;
 }
 
 /** פריט ברשימת קניות */

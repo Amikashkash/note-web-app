@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { InvalidError, ReadOnlyError } from '../notesCore/errors';
 import { TargetCategoryNotFoundError, type NoteEdit } from '../notesCore/store';
 import { validateTiming } from './dates';
+import { PRIORITY_HEBREW, storedPriority, type PriorityInput } from './priority';
 import { findUnique, replaceRange } from './textMatch';
 
 type Row = Record<string, unknown>;
@@ -60,6 +61,8 @@ export interface ChecklistItemChange {
   dueTime?: string | null;
   /** `null` - בלי חזרה */
   repeat?: string | null;
+  /** `normal` או `null` - רגילה (השדה נמחק) */
+  priority?: PriorityInput | null;
 }
 
 const describeChange = (before: Row, after: Row): string => {
@@ -69,6 +72,10 @@ const describeChange = (before: Row, after: Row): string => {
   const when = (row: Row) => [row.dueDate, row.dueTime].filter(Boolean).join(' ');
   if (when(before) !== when(after)) parts.push(when(after) ? `מועד: ${when(after)}` : 'המועד הוסר');
   if ((before.repeat ?? null) !== (after.repeat ?? null)) parts.push(after.repeat ? `חוזרת: ${String(after.repeat)}` : 'בלי חזרה');
+  if ((before.priority ?? null) !== (after.priority ?? null)) {
+    const level = after.priority === 'urgent' || after.priority === 'low' ? after.priority : 'normal';
+    parts.push(`עדיפות: ${PRIORITY_HEBREW[level]}`);
+  }
   return `משימה "${String(after.text ?? '')}": ${parts.join(', ')}`;
 };
 
@@ -82,9 +89,9 @@ interface PreparedChange {
 
 /** הבדיקות שלא תלויות בפתק: יש מה לשנות, והטקסט תקין */
 const prepareItemChange = (change: ChecklistItemChange): PreparedChange => {
-  const fields = ['text', 'completed', 'dueDate', 'dueTime', 'repeat'] as const;
+  const fields = ['text', 'completed', 'dueDate', 'dueTime', 'repeat', 'priority'] as const;
   if (!fields.some((field) => change[field] !== undefined)) {
-    throw new InvalidError('nothing to change. Give text, completed, dueDate, dueTime or repeat');
+    throw new InvalidError('nothing to change. Give text, completed, dueDate, dueTime, repeat or priority');
   }
   const text = change.text === undefined ? undefined : oneLine(change.text);
   if (text !== undefined && !text) throw new InvalidError('text is empty. To remove a task, ask the user to do it in the app');
@@ -148,6 +155,11 @@ const applyItemChange = (
   }
   if (change.repeat === null) delete after.repeat;
   else if (change.repeat !== undefined) after.repeat = change.repeat;
+  if (change.priority !== undefined) {
+    const priority = storedPriority(change.priority);
+    if (priority === undefined) delete after.priority;
+    else after.priority = priority;
+  }
 
   if (change.dueDate !== undefined || change.dueTime !== undefined || change.repeat !== undefined) {
     validateTiming(
@@ -572,6 +584,7 @@ export interface NewTaskInput {
   dueDate?: string;
   dueTime?: string;
   repeat?: string;
+  priority?: PriorityInput;
 }
 
 /** כמה משימות בקריאה אחת - רשימה ארוכה יותר היא כנראה פתק חדש */
@@ -596,6 +609,7 @@ export const buildAddChecklistItemsEdit = (tasks: NewTaskInput[], afterItemId: s
       throw new InvalidError(`${label} is ${text.length} characters; the limit is ${EDIT_LIMITS.itemText}`);
     }
     validateTiming(task, label, now);
+    const priority = storedPriority(task.priority);
     return {
       id: `${stamp}-${index}-${Math.random().toString(36).slice(2, 6)}`,
       text,
@@ -603,6 +617,7 @@ export const buildAddChecklistItemsEdit = (tasks: NewTaskInput[], afterItemId: s
       ...(task.dueDate !== undefined && { dueDate: task.dueDate }),
       ...(task.dueTime !== undefined && { dueTime: task.dueTime }),
       ...(task.repeat !== undefined && { repeat: task.repeat }),
+      ...(priority !== undefined && { priority }),
     };
   });
   const canonical = rows.map(({ id: _id, ...rest }) => rest);

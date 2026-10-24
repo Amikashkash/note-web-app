@@ -79,7 +79,7 @@ export const NoteHistory: React.FC<NoteHistoryProps> = ({ note, onClose, onResto
 
         // שמות תצוגה לכותבים. כישלון כאן לא חוסם - נשאר "משתמש אחר".
         const uids = [...new Set(loaded.map((version) => version.authoredBy))].filter(
-          (uid): uid is string => uid !== null && !uid.startsWith('mcp:')
+          (uid): uid is string => uid !== null && !uid.startsWith('mcp:') && !uid.startsWith('migration:')
         );
         const entries = await getUserLookupEntries(uids);
         if (!cancelled) {
@@ -104,6 +104,8 @@ export const NoteHistory: React.FC<NoteHistoryProps> = ({ note, onClose, onResto
     if (uid === null) return 'לא ידוע';
     if (uid === currentUid) return 'אתה';
     if (uid.startsWith('mcp:')) return 'Claude';
+    // סקריפט חד-פעמי מהשרת, למשל המרת 🔴 לעדיפות (`migrateEmojiPriority.ts`)
+    if (uid.startsWith('migration:')) return 'עדכון אוטומטי';
     return names[uid] ?? 'משתמש אחר';
   };
 

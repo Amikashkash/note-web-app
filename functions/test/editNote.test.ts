@@ -86,6 +86,17 @@ describe('update_checklist_item', () => {
     expect(rowsOf(apply({ itemId: 'p', completed: true }, past))[0].completed).toBe(true);
   });
 
+  it('sets and clears a priority; normal and null both clear it', () => {
+    const urgent = apply({ itemId: 'b', priority: 'urgent' }, list);
+    expect(rowsOf(urgent)[1].priority).toBe('urgent');
+    expect(urgent?.description).toContain('עדיפות: דחוף');
+    const marked = [list[0], { ...list[1], priority: 'urgent' }];
+    expect(rowsOf(apply({ itemId: 'b', priority: 'normal' }, marked))[1]).not.toHaveProperty('priority');
+    expect(rowsOf(apply({ itemId: 'b', priority: null }, marked))[1]).not.toHaveProperty('priority');
+    // כבר רגילה: אין מה לכתוב
+    expect(apply({ itemId: 'b', priority: 'normal' }, list)).toBeNull();
+  });
+
   it('a change to values the task already has writes nothing', () => {
     expect(apply({ itemId: 'a', completed: false }, list)).toBeNull();
   });
@@ -141,6 +152,11 @@ describe('update_checklist_items', () => {
     ];
     const one = changes.reduce<unknown>((content, change) => rowsOf(apply(change, content)), list);
     expect(rowsOf(batch(changes))).toEqual(one);
+  });
+
+  it('sets priorities on several tasks at once', () => {
+    const rows = rowsOf(batch([{ itemId: 'a', priority: 'low' }, { itemId: 'b', priority: 'urgent' }]));
+    expect(rows.map((row: { priority?: string }) => row.priority)).toEqual(['low', 'urgent']);
   });
 
   it('updates that change nothing are left out; when none change, nothing is written', () => {

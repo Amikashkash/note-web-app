@@ -32,3 +32,15 @@ export const moveTask = <T extends { id: string; completed: boolean }>(
   let next = 0;
   return items.map((item) => (item.completed === active.completed ? reordered[next++] : item));
 };
+
+const PRIORITY_RANK: Record<string, number> = { urgent: 0, low: 2 };
+
+/**
+ * סדר לפי עדיפות: דחופות, רגילות, נמוכות - ובתוך כל רמה הסדר השמור.
+ * תצוגה בלבד, כשהמשתמש מפעיל את המיון. הסדר הידני לא משתנה.
+ */
+export const byPriority = <T extends { priority?: string }>(items: readonly T[]): T[] =>
+  items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => (PRIORITY_RANK[a.item.priority ?? ''] ?? 1) - (PRIORITY_RANK[b.item.priority ?? ''] ?? 1) || a.index - b.index)
+    .map(({ item }) => item);

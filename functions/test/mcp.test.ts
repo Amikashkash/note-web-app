@@ -134,6 +134,18 @@ describe('formatNote', () => {
     expect(text).toContain('(no open tasks)\n--- end of note content ---\n2 done tasks hidden.');
   });
 
+  it('shows the priority of urgent and low tasks, not of normal ones', () => {
+    const content = JSON.stringify([
+      { id: 'a', text: 'x', completed: false, priority: 'urgent' },
+      { id: 'b', text: 'y', completed: false, priority: 'low', dueDate: '2026-10-05' },
+      { id: 'c', text: 'z', completed: false },
+    ]);
+    const text = formatNote(note({ content }), 'בית');
+    expect(text).toContain('- [ ] x  (item id: a · priority urgent)');
+    expect(text).toContain('- [ ] y  (item id: b · priority low · due 2026-10-05)');
+    expect(text).toContain('- [ ] z  (item id: c)');
+  });
+
   it('a checklist with nothing done mentions nothing hidden', () => {
     const content = JSON.stringify([{ id: 'a', text: 'x', completed: false }]);
     expect(formatNote(note({ content }), 'בית')).not.toContain('hidden');

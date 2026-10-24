@@ -68,7 +68,8 @@ const SAMPLES: Record<string, string> = {
   emptyArray: '[]',
   checklist: json([
     { id: 'c1', text: 'לקנות חלב', completed: false, dueDate: '2026-10-01', dueTime: '09:00', repeat: 'weekly' },
-    { id: 'c2', text: 'שורה\nשבורה', completed: true },
+    { id: 'c2', text: 'שורה\nשבורה', completed: true, priority: 'urgent' },
+    { id: 'c3', text: 'נמוכה', completed: false, priority: 'low' },
     { text: 'בלי מזהה', completed: 'yes', repeat: 'hourly', priority: 3 },
   ]),
   shopping: json([

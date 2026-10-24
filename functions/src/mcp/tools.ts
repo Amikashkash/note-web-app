@@ -26,6 +26,7 @@ import { EDIT_CONSENT_VERSION, ORGANIZE_CONSENT_VERSION, REWRITE_CONSENT_VERSION
 import type { RateLimitResult } from '../oauth/store';
 import type { AuthContext } from '../oauth/verify';
 import { OUTPUT } from './config';
+import { PRIORITY_INPUTS } from './priority';
 import { buildNote, CREATE_LIMITS, describeReminder } from './createNote';
 import {
   buildAddChecklistItemsEdit,
@@ -84,6 +85,10 @@ const defineTool = <Schema extends z.ZodObject>(tool: ToolDefinition<Schema>) =>
 export const NOT_FOUND_TEXT =
   'Not found: no note or category with this id is available to this connection. Use list_notes or search_notes to find valid ids.';
 const INTERNAL_ERROR_TEXT = 'The notes server could not complete this request. Please try again in a moment.';
+
+const PRIORITY_TEXT =
+  'Task priority: urgent, normal or low (the app shows a colored flag). Set it only when the user asks or clearly says ' +
+  'a task is urgent or minor - do not put an emoji in the text for it.';
 
 // ---------------------------------------------------------------------------
 // עזרים
@@ -316,7 +321,7 @@ const createNote = defineTool({
     '"workplan" (a project plan in `sections`, each with a header and content). WORK PLANS: keep ONE work plan per project ' +
     'and grow it over time. Before creating one, look for an existing plan for the same project (search_notes, list_notes); ' +
     'if there is one, add to it with add_workplan_section or append_text instead of creating a new note for every recording ' +
-    'or conversation. Checklist items may have dueDate (YYYY-MM-DD), dueTime (HH:MM, 24-hour) ' +
+    'or conversation. Checklist items may have a priority (urgent, normal, low), dueDate (YYYY-MM-DD), dueTime (HH:MM, 24-hour) ' +
     'and repeat (daily, weekly, monthly, yearly): a task with a date and a time gets a push reminder at that time. All ' +
     "dates and times are Israel local time (Asia/Jerusalem): convert from the user's words, and the time must be in the " +
     'future. Get categoryId from list_categories: it must be a category the user owns and not one marked read-only for ' +
@@ -354,6 +359,7 @@ const createNote = defineTool({
             .max(20)
             .optional()
             .describe('Checklist only: daily, weekly, monthly or yearly. Needs dueDate and dueTime.'),
+          priority: z.enum(PRIORITY_INPUTS).optional().describe(`Checklist only. ${PRIORITY_TEXT} Default normal.`),
           quantity: z.string().max(200).optional().describe('Shopping only: an amount, for example "2" or "1 kg".'),
         })
       )
@@ -461,6 +467,10 @@ const itemChangeFields = {
   dueDate: nullable(z.string().max(20)).describe('YYYY-MM-DD, Israel date. null removes the date, together with the time and repeat.'),
   dueTime: nullable(z.string().max(10)).describe('HH:MM (24-hour), Israel time. Needs a date. null removes the time and repeat.'),
   repeat: nullable(z.string().max(20)).describe('daily, weekly, monthly or yearly. Needs a date and a time. null stops repeating.'),
+  priority: z
+    .union([z.enum(PRIORITY_INPUTS), z.null()])
+    .optional()
+    .describe(PRIORITY_TEXT + ' normal (or null) clears it.'),
 };
 
 /** מצב המשימה אחרי העדכון, בשורה אחת: בוצעה או לא, מועד ותזכורת */
@@ -472,15 +482,16 @@ const itemState = (item: Record<string, unknown>): string => {
       : item.dueDate && item.dueTime
         ? `A push reminder is set for ${when} Israel time${item.repeat ? `, repeating ${String(item.repeat)}` : ''}.`
         : 'It has no reminder (a reminder needs a date and a time).';
-  return `${item.completed === true ? 'done' : 'not done'}${when ? `, due ${when}` : ''}. ${reminder}`;
+  const priority = item.priority === 'urgent' || item.priority === 'low' ? `, priority ${item.priority}` : '';
+  return `${item.completed === true ? 'done' : 'not done'}${priority}${when ? `, due ${when}` : ''}. ${reminder}`;
 };
 
 const updateChecklistItem = defineTool({
   name: 'update_checklist_item',
   title: 'Update a task in a checklist',
   description:
-    "Change ONE task in one of the user's checklists: its text, mark it done or not done, or set, change or remove its " +
-    'due date, time and repeat. Identify the task by the item id that get_note shows next to it ("item id: ..."); call ' +
+    "Change ONE task in one of the user's checklists: its text, mark it done or not done, set its priority (urgent, " +
+    'normal, low), or set, change or remove its due date, time and repeat. Identify the task by the item id that get_note shows next to it ("item id: ..."); call ' +
     'get_note first. Only change what the user asked for in this conversation. All dates and times are Israel local time ' +
     '(Asia/Jerusalem); a task with a date and a time gets a push reminder, and changing or clearing them moves or cancels ' +
     'the reminder. It works on the user\'s own notes only, not on notes shared with them, not on notes marked read-only for ' +
@@ -516,7 +527,8 @@ const updateChecklistItems = defineTool({
   title: 'Update several tasks in a checklist',
   description:
     'Change SEVERAL tasks of one checklist in a single call - for example mark five tasks done, or move the dates of a ' +
-    'few tasks. Each update has the same fields as update_checklist_item (text, completed, dueDate, dueTime, repeat) and ' +
+    'few tasks. Each update has the same fields as update_checklist_item (text, completed, dueDate, dueTime, repeat, ' +
+    'priority) and ' +
     `identifies its task by the item id from get_note. ${READ_FIRST} All updates are applied together, as one change in ` +
     'the note history: if any one of them is invalid (an unknown id, a time in the past, an empty text), NOTHING is ' +
     'changed and the result says which update to fix. Give each task at most once. Only change what the user asked for. ' +
@@ -749,7 +761,7 @@ const addChecklistItems = defineTool({
   title: 'Add tasks to a checklist',
   description:
     'Add one or more tasks to an existing checklist: at the end, or after a given item id (from get_note). Each task may ' +
-    'have dueDate, dueTime (Israel time, in the future) and repeat, like create_note; a date and a time give a reminder. ' +
+    'have a priority, dueDate, dueTime (Israel time, in the future) and repeat, like create_note; a date and a time give a reminder. ' +
     `Only tasks the user asked for. ${READ_FIRST} Sending the same tasks again within 10 minutes adds nothing.`,
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -762,6 +774,7 @@ const addChecklistItems = defineTool({
           dueDate: z.string().max(20).optional().describe('YYYY-MM-DD, Israel date.'),
           dueTime: z.string().max(10).optional().describe('HH:MM (24-hour), Israel time. Needs dueDate.'),
           repeat: z.string().max(20).optional().describe('daily, weekly, monthly or yearly. Needs dueDate and dueTime.'),
+          priority: z.enum(PRIORITY_INPUTS).optional().describe(`${PRIORITY_TEXT} Default normal.`),
         })
       )
       .max(200)

@@ -26,7 +26,18 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
-import { CalendarDays, ChevronDown, Clock, GripVertical, Repeat, Trash2, X, type LucideIcon } from 'lucide-react';
+import {
+  ArrowDownWideNarrow,
+  CalendarDays,
+  ChevronDown,
+  Clock,
+  Flag,
+  GripVertical,
+  Repeat,
+  Trash2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
 import {
@@ -36,9 +47,9 @@ import {
   DATE_STATUS_BORDER_CLASS,
 } from './dueDate';
 
-import type { ChecklistItem, RepeatRule } from '@/types/template';
+import type { ChecklistItem, RepeatRule, TaskPriority } from '@/types/template';
 import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
-import { moveTask } from '@/utils/checklistOrder';
+import { byPriority, moveTask } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { ChecklistItem, RepeatRule };
@@ -49,6 +60,29 @@ const REPEAT_LABELS: Record<RepeatRule, string> = {
   monthly: 'כל חודש',
   yearly: 'כל שנה',
 };
+
+/** רמת עדיפות לתצוגה. 'normal' לא נשמר - הוא היעדר השדה */
+type PriorityLevel = TaskPriority | 'normal';
+
+const PRIORITY_LEVELS: PriorityLevel[] = ['urgent', 'normal', 'low'];
+
+const PRIORITY_META: Record<PriorityLevel, { label: string; flagClass: string; filled: boolean }> = {
+  urgent: { label: 'דחוף', flagClass: 'text-danger dark:text-danger-dark', filled: true },
+  normal: { label: 'רגיל', flagClass: 'text-ink-3-light dark:text-ink-3-dark', filled: false },
+  low: { label: 'נמוך', flagClass: 'text-ink-2-light dark:text-ink-2-dark', filled: true },
+};
+
+const levelOf = (item: ChecklistItem): PriorityLevel => item.priority ?? 'normal';
+
+/** האייקון של רמה: דגל מלא בצבע הרמה, ורגילה - קו מתאר בלבד */
+const PriorityFlag: React.FC<{ level: PriorityLevel; size?: number }> = ({ level, size = 18 }) => (
+  <Flag
+    size={size}
+    strokeWidth={1.75}
+    className={PRIORITY_META[level].flagClass}
+    fill={PRIORITY_META[level].filled ? 'currentColor' : 'none'}
+  />
+);
 
 
 interface ChecklistTemplateProps {
@@ -193,12 +227,24 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const parsed = useMemo(() => parseChecklist(value), [value]);
   const items = useMemo<ChecklistItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
   // משימות שבוצעו יורדות לסוף הרשימה. תצוגה בלבד - העריכות עובדות לפי מזהה על `items`
-  const shownItems = useMemo(() => openTasksFirst(items), [items]);
-  const openItems = shownItems.filter((item) => !item.completed);
-  const doneItems = shownItems.filter((item) => item.completed);
   // המשימות שבוצעו מקופלות לשורה אחת "בוצעו (N)". תצוגה בלבד: לא נשמר ולא
   // משנה את הפתק, וכל פתיחה של הפתק מתחילה מקופלת
   const [showDone, setShowDone] = useState(false);
+  // מיון לפי עדיפות וסינון לפי רמה - תצוגה בלבד, כמו "בוצעו"
+  const [sortByPriority, setSortByPriority] = useState(false);
+  const [levelFilter, setLevelFilter] = useState<PriorityLevel | null>(null);
+  const [priorityMenuFor, setPriorityMenuFor] = useState<string | null>(null);
+
+  // הכלים של העדיפות מופיעים רק כשלמשימה כלשהי יש עדיפות. בלעדיהם - בלי מיון ובלי סינון
+  const hasPriorities = items.some((item) => item.priority !== undefined);
+  const sorting = hasPriorities && sortByPriority;
+  const filter = hasPriorities ? levelFilter : null;
+  const shownItems = useMemo(() => {
+    const visible = filter ? items.filter((item) => levelOf(item) === filter) : items;
+    return openTasksFirst(sorting ? byPriority(visible) : visible);
+  }, [items, filter, sorting]);
+  const openItems = shownItems.filter((item) => !item.completed);
+  const doneItems = shownItems.filter((item) => item.completed);
 
   const sensors = useSensors(
     // מרחק קטן לפני שהגרירה מתחילה: לחיצה רגילה על הידית לא מזיזה כלום
@@ -247,6 +293,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
 
   const handleAddItem = () => {
     const newId = Date.now().toString();
+    // משימה חדשה היא רגילה, ותחת סינון לרמה אחרת הייתה נעלמת מיד
+    setLevelFilter(null);
     commit([...items, { id: newId, text: '', completed: false }]);
     pendingFocusIdRef.current = newId;
   };
@@ -285,6 +333,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     updateItem(id, { repeat: repeat ? (repeat as RepeatRule) : undefined });
   };
 
+  const handleSetPriority = (id: string, level: PriorityLevel) => {
+    setPriorityMenuFor(null);
+    updateItem(id, { priority: level === 'normal' ? undefined : level });
+  };
+
   const handleDeleteItem = (id: string) => {
     commit(items.filter((item) => item.id !== id));
   };
@@ -319,7 +372,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       <SortableRow
         key={item.id}
         id={item.id}
-        disabled={readOnly}
+        // במיון לפי עדיפות הסדר על המסך הוא לא הסדר השמור, וגרירה הייתה מבלבלת
+        disabled={readOnly || sorting}
         className={`flex flex-col gap-2 p-3 rounded-lg border-2 transition-colors ${
           item.completed
             ? 'bg-success/10 ' + borderColor
@@ -420,6 +474,54 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                 />
               )}
 
+              {/* עדיפות: דגל בצבע הרמה, ותפריט קצר לבחירה */}
+              {readOnly ? (
+                item.priority && (
+                  <span className="flex-shrink-0" title={PRIORITY_META[item.priority].label}>
+                    <PriorityFlag level={item.priority} />
+                  </span>
+                )
+              ) : (
+                <div className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPriorityMenuFor((open) => (open === item.id ? null : item.id))}
+                    aria-haspopup="menu"
+                    aria-expanded={priorityMenuFor === item.id}
+                    title={`עדיפות: ${PRIORITY_META[levelOf(item)].label}`}
+                    className="flex items-center"
+                  >
+                    <PriorityFlag level={levelOf(item)} />
+                  </button>
+                  {priorityMenuFor === item.id && (
+                    <>
+                      {/* לחיצה מחוץ לתפריט סוגרת אותו */}
+                      <div className="fixed inset-0 z-30" onClick={() => setPriorityMenuFor(null)} />
+                      <div
+                        role="menu"
+                        className="absolute end-0 top-full mt-1 z-40 min-w-[7rem] py-1 rounded-lg shadow-lg bg-surface-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark"
+                      >
+                        {PRIORITY_LEVELS.map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={levelOf(item) === level}
+                            onClick={() => handleSetPriority(item.id, level)}
+                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-surface-dark ${
+                              levelOf(item) === level ? 'font-semibold' : ''
+                            }`}
+                          >
+                            <PriorityFlag level={level} size={16} />
+                            {PRIORITY_META[level].label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* כפתור מחיקה */}
               {!readOnly && (
                 <button
@@ -494,6 +596,43 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
         </div>
       )}
 
+      {/* עדיפות: מיון וסינון. רק כשלמשימה כלשהי יש עדיפות */}
+      {hasPriorities && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSortByPriority((on) => !on)}
+            aria-pressed={sorting}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-caption border transition-colors ${
+              sorting
+                ? 'bg-brand-soft dark:bg-brand-soft-dark border-brand text-brand-text dark:text-brand-text-dark'
+                : 'border-hairline-light dark:border-hairline-dark text-ink-2-light dark:text-ink-2-dark'
+            }`}
+            title={sorting ? 'חזרה לסדר שלך' : 'מיון לפי עדיפות'}
+          >
+            <ArrowDownWideNarrow size={14} strokeWidth={1.75} />
+            לפי עדיפות
+          </button>
+          <span className="w-px h-4 bg-hairline-light dark:bg-hairline-dark" />
+          {[null, ...PRIORITY_LEVELS].map((level) => (
+            <button
+              key={level ?? 'all'}
+              type="button"
+              onClick={() => setLevelFilter(level)}
+              aria-pressed={filter === level}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-caption border transition-colors ${
+                filter === level
+                  ? 'bg-brand-soft dark:bg-brand-soft-dark border-brand text-brand-text dark:text-brand-text-dark'
+                  : 'border-hairline-light dark:border-hairline-dark text-ink-2-light dark:text-ink-2-dark'
+              }`}
+            >
+              {level && <PriorityFlag level={level} size={12} />}
+              {level ? PRIORITY_META[level].label : 'הכל'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* רשימת משימות */}
       <div className="space-y-2">
         {items.length === 0 ? (
@@ -508,6 +647,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
             onDragEnd={handleDragEnd}
             accessibility={DRAG_ACCESSIBILITY}
           >
+            {filter && shownItems.length === 0 && (
+              <div className="text-center p-4 text-sm text-ink-3-light dark:text-ink-3-dark">
+                אין משימות בעדיפות {PRIORITY_META[filter].label}
+              </div>
+            )}
             {/* שתי קבוצות נפרדות: גוררים בתוך הפתוחות או בתוך אלה שבוצעו */}
             <SortableContext items={openItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
               {openItems.map(renderItem)}
