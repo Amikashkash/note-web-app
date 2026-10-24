@@ -74,8 +74,14 @@ const describeChange = (before: Row, after: Row): string => {
 
 const sameRow = (a: Row, b: Row) => JSON.stringify(a) === JSON.stringify(b);
 
-export const buildChecklistItemEdit = (change: ChecklistItemChange, now: Date): NoteEdit => {
-  const { itemId } = change;
+/** שינוי שעבר את הבדיקות שלא תלויות בפתק, עם הטקסט המנוקה */
+interface PreparedChange {
+  change: ChecklistItemChange;
+  text: string | undefined;
+}
+
+/** הבדיקות שלא תלויות בפתק: יש מה לשנות, והטקסט תקין */
+const prepareItemChange = (change: ChecklistItemChange): PreparedChange => {
   const fields = ['text', 'completed', 'dueDate', 'dueTime', 'repeat'] as const;
   if (!fields.some((field) => change[field] !== undefined)) {
     throw new InvalidError('nothing to change. Give text, completed, dueDate, dueTime or repeat');
@@ -85,65 +91,88 @@ export const buildChecklistItemEdit = (change: ChecklistItemChange, now: Date): 
   if (text !== undefined && text.length > EDIT_LIMITS.itemText) {
     throw new InvalidError(`text is ${text.length} characters; the limit is ${EDIT_LIMITS.itemText}`);
   }
-  const timingChanged = change.dueDate !== undefined || change.dueTime !== undefined || change.repeat !== undefined;
+  return { change, text };
+};
+
+/** השורות של הרשימה, עם המזהים ש-`get_note` מציג, או שגיאה שאומרת מה לעשות */
+const checklistForUpdate = (note: { templateType: string; content: string }) => {
+  if (note.templateType !== 'checklist') {
+    throw new InvalidError(`this note is not a checklist (it is "${note.templateType}"). Only checklist items can be updated`);
+  }
+  const rows = checklistRows(note.content);
+  if (!rows) {
+    throw new InvalidError('the checklist content could not be read. Ask the user to open the note in the app');
+  }
+  const ids = rows.map(shownItemId);
+  // המזהים שהוצגו נשמרים. שורה עם id שמור לא משתנה
+  const withIds = rows.map((row, position) => (row.id === ids[position] ? row : { ...row, id: ids[position] }));
+  return { rows, ids, withIds };
+};
+
+/**
+ * מחיל שינוי אחד על שורה אחת. המקום היחיד שיודע מה כל שדה עושה - גם
+ * `update_checklist_item` וגם `update_checklist_items` עוברים כאן.
+ */
+const applyItemChange = (
+  ids: string[],
+  rows: Row[],
+  { change, text }: PreparedChange,
+  now: Date
+): { index: number; before: Row; after: Row } => {
+  const { itemId } = change;
+  const matches = ids.flatMap((id, index) => (id === itemId ? [index] : []));
+  if (matches.length === 0) {
+    throw new InvalidError(`there is no item with id "${itemId}" in this note. Call get_note to see the current item ids`);
+  }
+  if (matches.length > 1) {
+    throw new InvalidError(`several items share the id "${itemId}". Ask the user to change this item in the app`);
+  }
+  const index = matches[0];
+  const before = rows[index];
+  const after: Row = { ...before };
+
+  if (text !== undefined) after.text = text;
+  if (change.completed !== undefined) after.completed = change.completed;
+  if (change.dueDate === null) {
+    delete after.dueDate;
+    delete after.dueTime;
+    delete after.repeat;
+  } else if (change.dueDate !== undefined) {
+    after.dueDate = change.dueDate;
+  }
+  if (change.dueTime === null) {
+    delete after.dueTime;
+    delete after.repeat;
+  } else if (change.dueTime !== undefined) {
+    after.dueTime = change.dueTime;
+  }
+  if (change.repeat === null) delete after.repeat;
+  else if (change.repeat !== undefined) after.repeat = change.repeat;
+
+  if (change.dueDate !== undefined || change.dueTime !== undefined || change.repeat !== undefined) {
+    validateTiming(
+      {
+        dueDate: typeof after.dueDate === 'string' ? after.dueDate : undefined,
+        dueTime: typeof after.dueTime === 'string' ? after.dueTime : undefined,
+        repeat: typeof after.repeat === 'string' ? after.repeat : undefined,
+      },
+      'item',
+      now,
+      // משימה שבוצעה לא מקבלת תזכורת ממילא
+      after.completed !== true
+    );
+  }
+  return { index, before, after };
+};
+
+export const buildChecklistItemEdit = (change: ChecklistItemChange, now: Date): NoteEdit => {
+  const prepared = prepareItemChange(change);
 
   return {
     action: 'checklist_item.update',
     apply: (note) => {
-      if (note.templateType !== 'checklist') {
-        throw new InvalidError(`this note is not a checklist (it is "${note.templateType}"). Only checklist items can be updated`);
-      }
-      const rows = checklistRows(note.content);
-      if (!rows) {
-        throw new InvalidError('the checklist content could not be read. Ask the user to open the note in the app');
-      }
-
-      const ids = rows.map(shownItemId);
-      const matches = ids.flatMap((id, index) => (id === itemId ? [index] : []));
-      if (matches.length === 0) {
-        throw new InvalidError(`there is no item with id "${itemId}" in this note. Call get_note to see the current item ids`);
-      }
-      if (matches.length > 1) {
-        throw new InvalidError(`several items share the id "${itemId}". Ask the user to change this item in the app`);
-      }
-      const index = matches[0];
-
-      // המזהים שהוצגו נשמרים. שורה עם id שמור לא משתנה
-      const withIds = rows.map((row, position) => (row.id === ids[position] ? row : { ...row, id: ids[position] }));
-      const before = withIds[index];
-      const after: Row = { ...before };
-
-      if (text !== undefined) after.text = text;
-      if (change.completed !== undefined) after.completed = change.completed;
-      if (change.dueDate === null) {
-        delete after.dueDate;
-        delete after.dueTime;
-        delete after.repeat;
-      } else if (change.dueDate !== undefined) {
-        after.dueDate = change.dueDate;
-      }
-      if (change.dueTime === null) {
-        delete after.dueTime;
-        delete after.repeat;
-      } else if (change.dueTime !== undefined) {
-        after.dueTime = change.dueTime;
-      }
-      if (change.repeat === null) delete after.repeat;
-      else if (change.repeat !== undefined) after.repeat = change.repeat;
-
-      if (timingChanged) {
-        validateTiming(
-          {
-            dueDate: typeof after.dueDate === 'string' ? after.dueDate : undefined,
-            dueTime: typeof after.dueTime === 'string' ? after.dueTime : undefined,
-            repeat: typeof after.repeat === 'string' ? after.repeat : undefined,
-          },
-          'item',
-          now,
-          // משימה שבוצעה לא מקבלת תזכורת ממילא
-          after.completed !== true
-        );
-      }
+      const { rows, ids, withIds } = checklistForUpdate(note);
+      const { index, before, after } = applyItemChange(ids, withIds, prepared, now);
 
       // הערכים כבר כאלה: לא כותבים כלום (גם לא את המזהים)
       if (sameRow(before, after)) return null;
@@ -154,6 +183,76 @@ export const buildChecklistItemEdit = (change: ChecklistItemChange, now: Date): 
         description: describeChange(before, after),
         before: rows[index],
         after,
+      };
+    },
+  };
+};
+
+/** כמה משימות בקריאה אחת של `update_checklist_items` */
+export const MAX_BATCH_UPDATES = 50;
+
+/** כמה שינויים מפורטים בתיאור ל"פעילות Claude" - השאר נספרים */
+const DESCRIBED_CHANGES = 5;
+
+/**
+ * `update_checklist_items`: כמה משימות באותו פתק, בעריכה אחת - transaction
+ * אחד, גרסה אחת בהיסטוריה, רשומת audit אחת. השינויים מוחלים לפי הסדר, כל
+ * אחד בדיוק כמו `update_checklist_item`. שינוי אחד שגוי - שום דבר לא נכתב.
+ */
+export const buildChecklistItemsEdit = (changes: ChecklistItemChange[], now: Date): NoteEdit => {
+  if (changes.length === 0) throw new InvalidError('give at least one update');
+  if (changes.length > MAX_BATCH_UPDATES) {
+    throw new InvalidError(`${changes.length} updates; the limit is ${MAX_BATCH_UPDATES} per call. Split them`);
+  }
+  const label = (position: number) => `update ${position + 1} (item "${changes[position].itemId}")`;
+  const seen = new Map<string, number>();
+  changes.forEach((change, position) => {
+    const first = seen.get(change.itemId);
+    if (first !== undefined) {
+      throw new InvalidError(
+        `updates ${first + 1} and ${position + 1} are both for item "${change.itemId}". Put all its changes in one update. Nothing was changed`
+      );
+    }
+    seen.set(change.itemId, position);
+  });
+  /** שגיאה של שינוי אחד: אומרת איזה, ושאף שינוי לא נכתב */
+  const inUpdate = <T>(position: number, run: () => T): T => {
+    try {
+      return run();
+    } catch (error) {
+      if (error instanceof InvalidError) {
+        throw new InvalidError(`${label(position)}: ${error.message}. Nothing was changed`);
+      }
+      throw error;
+    }
+  };
+  const prepared = changes.map((change, position) => inUpdate(position, () => prepareItemChange(change)));
+
+  return {
+    action: 'checklist_item.update',
+    apply: (note) => {
+      const { rows, ids, withIds } = checklistForUpdate(note);
+      const next = [...withIds];
+      const changed: { index: number; before: Row; after: Row }[] = [];
+      prepared.forEach((item, position) => {
+        const { index, before, after } = inUpdate(position, () => applyItemChange(ids, next, item, now));
+        next[index] = after;
+        if (!sameRow(before, after)) changed.push({ index, before: rows[index], after });
+      });
+
+      // כל הערכים כבר כאלה: לא כותבים כלום (גם לא את המזהים)
+      if (changed.length === 0) return null;
+
+      const described = changed.slice(0, DESCRIBED_CHANGES).map(({ before, after }) => describeChange(before, after));
+      const rest = changed.length - described.length;
+      return {
+        content: JSON.stringify(next),
+        description:
+          changed.length === 1
+            ? described[0]
+            : `עודכנו ${changed.length} משימות: ${described.join(' · ')}${rest > 0 ? ` · ועוד ${rest}` : ''}`,
+        before: changed.map((entry) => entry.before),
+        after: changed.map((entry) => entry.after),
       };
     },
   };

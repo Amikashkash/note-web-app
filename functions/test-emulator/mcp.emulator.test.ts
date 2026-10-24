@@ -345,7 +345,7 @@ describe('the /mcp endpoint', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'notes-4-me' } } });
   });
 
-  it('lists the four read tools and the eleven write tools, each with a description', async () => {
+  it('lists the four read tools and the twelve write tools, each with a description', async () => {
     const { tools } = await clientA.listTools();
     const writeTools = [
       'add_checklist_items',
@@ -359,6 +359,7 @@ describe('the /mcp endpoint', () => {
       'remove_workplan_section',
       'unarchive_note',
       'update_checklist_item',
+      'update_checklist_items',
     ];
     expect(tools.map((tool) => tool.name).sort()).toEqual(
       [...writeTools, 'get_note', 'list_categories', 'list_notes', 'search_notes'].sort()

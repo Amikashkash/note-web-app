@@ -324,6 +324,128 @@ describe('update_checklist_item and reminders', () => {
 });
 
 // ---------------------------------------------------------------------------
+// update_checklist_items
+// ---------------------------------------------------------------------------
+
+describe('update_checklist_items', () => {
+  const dueDate = israelDate(3);
+  const items = () => [
+    { id: 'milk', text: 'לקנות חלב', completed: false, dueDate, dueTime: '09:30' },
+    { id: 'rent', text: 'שכר דירה', completed: false },
+    { id: 'gas', text: 'דלק', completed: false },
+  ];
+  const auditOf = async (noteId: string) =>
+    (await db.collection('auditLog').where('target.id', '==', noteId).get()).docs.map((doc) => doc.data());
+
+  it('several tasks in one call: one revision, one version in history, one audit entry, reminders follow', async () => {
+    const noteId = await seed(note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()) }));
+    expect(await runTrigger(noteId, { ...note(users.a, C.home), templateType: 'checklist', content: '[]' })).toHaveLength(1);
+    const before = await stored(noteId);
+
+    const result = await call(clientA, 'update_checklist_items', {
+      noteId,
+      updates: [
+        { itemId: 'milk', completed: true },
+        { itemId: 'rent', dueDate, dueTime: '08:00' },
+        { itemId: 'gas', text: 'דלק לרכב' },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    expect(result.text).toContain('Updated 3 tasks');
+    expect(result.text).toContain('"דלק לרכב" [item id: gas]: not done');
+
+    const after = await stored(noteId);
+    expect(after.revision).toBe(5);
+    expect(JSON.parse(after.content)).toEqual([
+      { ...items()[0], completed: true },
+      { ...items()[1], dueDate, dueTime: '08:00' },
+      { ...items()[2], text: 'דלק לרכב' },
+    ]);
+
+    const reminders = await runTrigger(noteId, before);
+    expect(reminders.map((reminder) => reminder.itemId)).toEqual(['rent']);
+    // ההכנה (התזכורת) יצרה גרסה משלה; כאן נספרות רק הגרסאות שהעריכה של Claude החליפה
+    const versions = (await db.collection(`notes/${noteId}/versions`).get()).docs
+      .map((doc) => doc.data())
+      .filter((version) => String(version.replacedBy).startsWith('mcp:'));
+    expect(versions).toHaveLength(1);
+    expect(JSON.parse(versions[0].content)).toEqual(items());
+
+    const audit = await auditOf(noteId);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      action: 'checklist_item.update',
+      tool: 'update_checklist_items',
+      changes: { before: items() },
+      summary: { revisionBefore: 4, revisionAfter: 5 },
+    });
+  });
+
+  it('one invalid update refuses the whole batch, and nothing is written', async () => {
+    const noteId = await seed(note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()) }));
+    const result = await call(clientA, 'update_checklist_items', {
+      noteId,
+      updates: [
+        { itemId: 'milk', completed: true },
+        { itemId: 'nope', completed: true },
+      ],
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('update 2 (item "nope")');
+    expect(result.text).toContain('Nothing was changed');
+    const after = await stored(noteId);
+    expect(after.revision).toBe(4);
+    expect(JSON.parse(after.content)).toEqual(items());
+    expect(await auditOf(noteId)).toEqual([]);
+  });
+
+  it('counts as one write for the rate limit', async () => {
+    const uid = (await auth.createUser({ email: `edit-quota-${RUN}@example.com`, emailVerified: true })).uid;
+    const config = (await db.doc('config/mcp').get()).data() ?? {};
+    await db.doc('config/mcp').set({ ...config, allowedUids: [...(config.allowedUids ?? []), uid] });
+    await db.doc(`categories/${id('cat-quota')}`).set(category(uid));
+    const noteId = await seed(note(uid, id('cat-quota'), { templateType: 'checklist', content: JSON.stringify(items()) }));
+
+    const quota = await listen(
+      createMcpApp({
+        store,
+        auth,
+        rateLimits: GENEROUS,
+        mcpLimits: MANY,
+        mcpWriteLimits: [{ name: 'minute', windowMs: 60_000, max: 1 }],
+        scopeFor: (identity) => UserScope.for(identity, db),
+      })
+    );
+    const client = new Client({ name: 'quota-test', version: '1.0.0' });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${quota.base}/mcp`), {
+        requestInit: { headers: { Authorization: `Bearer ${(await issueToken(uid)).token}` } },
+      })
+    );
+    try {
+      const first = await call(client, 'update_checklist_items', {
+        noteId,
+        updates: items().map((item) => ({ itemId: item.id, completed: true })),
+      });
+      expect(first.isError).toBe(false);
+      const second = await call(client, 'update_checklist_item', { noteId, itemId: 'milk', completed: false });
+      expect(second.text).toContain('too many changes');
+    } finally {
+      await client.close();
+      await new Promise((resolve) => quota.server.close(resolve));
+    }
+  });
+
+  it('refuses a read-only note like update_checklist_item does', async () => {
+    const noteId = await seed(
+      note(users.a, C.home, { templateType: 'checklist', content: JSON.stringify(items()), isReadOnly: true })
+    );
+    const result = await call(clientA, 'update_checklist_items', { noteId, updates: [{ itemId: 'milk', completed: true }] });
+    expect(result.text).toMatch(/^Read-only:/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // append_text
 // ---------------------------------------------------------------------------
 

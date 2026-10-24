@@ -3,7 +3,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildAppendEdit, buildChecklistItemEdit, type ChecklistItemChange } from '../src/mcp/editNote';
+import {
+  buildAppendEdit,
+  buildChecklistItemEdit,
+  buildChecklistItemsEdit,
+  type ChecklistItemChange,
+} from '../src/mcp/editNote';
 import { InvalidError } from '../src/notesCore/errors';
 import type { NoteRecord } from '../src/notesCore/model';
 
@@ -108,6 +113,78 @@ describe('update_checklist_item', () => {
       );
     expect(run).toThrow(InvalidError);
     expect(run).toThrow(message);
+  });
+});
+
+describe('update_checklist_items', () => {
+  const batch = (changes: ChecklistItemChange[], content: unknown = list) =>
+    buildChecklistItemsEdit(changes, NOW).apply(note(content));
+
+  it('applies every update in one edit, with each changed task before and after for the audit', () => {
+    const outcome = batch([
+      { itemId: 'a', completed: true },
+      { itemId: 'b', dueDate: '2026-10-07', text: 'לשלם חשמל ומים' },
+    ]);
+    expect(rowsOf(outcome)).toEqual([
+      { ...list[0], completed: true },
+      { ...list[1], dueDate: '2026-10-07', text: 'לשלם חשמל ומים' },
+    ]);
+    expect(outcome?.before).toEqual(list);
+    expect(outcome?.after).toEqual(rowsOf(outcome));
+    expect(outcome?.description).toMatch(/^עודכנו 2 משימות: /);
+  });
+
+  it('each update does exactly what update_checklist_item does', () => {
+    const changes: ChecklistItemChange[] = [
+      { itemId: 'a', completed: true },
+      { itemId: 'b', dueTime: null },
+    ];
+    const one = changes.reduce<unknown>((content, change) => rowsOf(apply(change, content)), list);
+    expect(rowsOf(batch(changes))).toEqual(one);
+  });
+
+  it('updates that change nothing are left out; when none change, nothing is written', () => {
+    const outcome = batch([
+      { itemId: 'a', completed: false },
+      { itemId: 'b', completed: true },
+    ]);
+    expect(outcome?.after).toEqual([{ ...list[1], completed: true }]);
+    expect(outcome?.description).toContain('סומנה כבוצעה');
+    expect(batch([{ itemId: 'a', completed: false }])).toBeNull();
+  });
+
+  it('old tasks without ids keep the ids get_note showed', () => {
+    const old = [{ text: 'ישן 1', completed: false }, { text: 'ישן 2', completed: false }];
+    expect(rowsOf(batch([{ itemId: 'item-0', completed: true }, { itemId: 'item-1', completed: true }], old))).toEqual([
+      { text: 'ישן 1', completed: true, id: 'item-0' },
+      { text: 'ישן 2', completed: true, id: 'item-1' },
+    ]);
+  });
+
+  it('the activity description lists the first five changes and counts the rest', () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({ id: `t${index}`, text: `משימה ${index}`, completed: false }));
+    const outcome = batch(many.map((row) => ({ itemId: row.id, completed: true })), many);
+    expect(outcome?.description).toMatch(/^עודכנו 8 משימות: /);
+    expect(outcome?.description).toContain('ועוד 3');
+  });
+
+  it.each([
+    ['an unknown item id in the middle', [{ itemId: 'a', completed: true }, { itemId: 'zzz', completed: true }], 'update 2 (item "zzz"): there is no item'],
+    ['a time that already passed', [{ itemId: 'a', dueDate: '2026-09-30', dueTime: '09:00' }], 'update 1 (item "a")'],
+    ['an empty text', [{ itemId: 'b', completed: true }, { itemId: 'a', text: ' ' }], 'update 2 (item "a"): text is empty'],
+    ['the same task twice', [{ itemId: 'a', completed: true }, { itemId: 'a', text: 'x' }], 'updates 1 and 2 are both for item "a"'],
+    ['no updates', [], 'give at least one update'],
+    ['too many updates', Array.from({ length: 51 }, (_, index) => ({ itemId: `x${index}`, completed: true })), 'the limit is 50'],
+  ])('refuses the whole batch for %s', (_label, changes, message) => {
+    const run = () => batch(changes as ChecklistItemChange[]);
+    expect(run).toThrow(InvalidError);
+    expect(run).toThrow(message);
+  });
+
+  it('refuses a note that is not a checklist', () => {
+    expect(() => buildChecklistItemsEdit([{ itemId: 'a', completed: true }], NOW).apply(note('x', 'plain'))).toThrow(
+      'not a checklist'
+    );
   });
 });
 

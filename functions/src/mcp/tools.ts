@@ -33,12 +33,14 @@ import {
   buildAppendEdit,
   buildArchiveEdit,
   buildChecklistItemEdit,
+  buildChecklistItemsEdit,
   buildMoveEdit,
   buildRemoveChecklistItemEdit,
   buildRemoveSectionEdit,
   buildReplaceEdit,
   buildUnarchiveEdit,
   EDIT_LIMITS,
+  MAX_BATCH_UPDATES,
   MAX_NEW_TASKS,
 } from './editNote';
 import {
@@ -445,6 +447,28 @@ const spendWriteQuota = async (deps: ToolDeps) => {
 
 const nullable = (schema: z.ZodString) => z.union([schema, z.null()]).optional();
 
+/** השדות של שינוי במשימה - אותם בעדכון של אחת ושל כמה */
+const itemChangeFields = {
+  itemId: z.string().min(1).max(128).describe('The task id, exactly as get_note shows it after "item id:".'),
+  text: z.string().max(2_000).optional().describe(`New text for the task, one line, at most ${EDIT_LIMITS.itemText} characters.`),
+  completed: z.boolean().optional().describe('true: mark done (its reminder is cancelled). false: mark not done.'),
+  dueDate: nullable(z.string().max(20)).describe('YYYY-MM-DD, Israel date. null removes the date, together with the time and repeat.'),
+  dueTime: nullable(z.string().max(10)).describe('HH:MM (24-hour), Israel time. Needs a date. null removes the time and repeat.'),
+  repeat: nullable(z.string().max(20)).describe('daily, weekly, monthly or yearly. Needs a date and a time. null stops repeating.'),
+};
+
+/** מצב המשימה אחרי העדכון, בשורה אחת: בוצעה או לא, מועד ותזכורת */
+const itemState = (item: Record<string, unknown>): string => {
+  const when = [item.dueDate, item.dueTime].filter(Boolean).join(' ');
+  const reminder =
+    item.completed === true
+      ? 'It is done, so it has no reminder.'
+      : item.dueDate && item.dueTime
+        ? `A push reminder is set for ${when} Israel time${item.repeat ? `, repeating ${String(item.repeat)}` : ''}.`
+        : 'It has no reminder (a reminder needs a date and a time).';
+  return `${item.completed === true ? 'done' : 'not done'}${when ? `, due ${when}` : ''}. ${reminder}`;
+};
+
 const updateChecklistItem = defineTool({
   name: 'update_checklist_item',
   title: 'Update a task in a checklist',
@@ -459,12 +483,7 @@ const updateChecklistItem = defineTool({
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
     noteId: z.string().min(1).max(128).describe('The checklist note id.'),
-    itemId: z.string().min(1).max(128).describe('The task id, exactly as get_note shows it after "item id:".'),
-    text: z.string().max(2_000).optional().describe(`New text for the task, one line, at most ${EDIT_LIMITS.itemText} characters.`),
-    completed: z.boolean().optional().describe('true: mark done (its reminder is cancelled). false: mark not done.'),
-    dueDate: nullable(z.string().max(20)).describe('YYYY-MM-DD, Israel date. null removes the date, together with the time and repeat.'),
-    dueTime: nullable(z.string().max(10)).describe('HH:MM (24-hour), Israel time. Needs a date. null removes the time and repeat.'),
-    repeat: nullable(z.string().max(20)).describe('daily, weekly, monthly or yearly. Needs a date and a time. null stops repeating.'),
+    ...itemChangeFields,
   }),
   run: async (deps, input) => {
     requireEditConsent(deps);
@@ -478,16 +497,52 @@ const updateChecklistItem = defineTool({
 
     const rows = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
     const item = rows.find((row) => row.id === input.itemId) ?? {};
-    const when = [item.dueDate, item.dueTime].filter(Boolean).join(' ');
-    const reminder =
-      item.completed === true
-        ? 'It is done, so it has no reminder.'
-        : item.dueDate && item.dueTime
-          ? `A push reminder is set for ${when} Israel time${item.repeat ? `, repeating ${String(item.repeat)}` : ''}.`
-          : 'It has no reminder (a reminder needs a date and a time).';
     return [
       `Updated the task "${String(item.text ?? '')}" [item id: ${input.itemId}] in "${result.note.title}" [id: ${noteId}].`,
-      `Now: ${item.completed === true ? 'done' : 'not done'}${when ? `, due ${when}` : ''}. ${reminder}`,
+      `Now: ${itemState(item)}`,
+      RECOVERABLE,
+    ].join('\n');
+  },
+});
+
+const updateChecklistItems = defineTool({
+  name: 'update_checklist_items',
+  title: 'Update several tasks in a checklist',
+  description:
+    'Change SEVERAL tasks of one checklist in a single call - for example mark five tasks done, or move the dates of a ' +
+    'few tasks. Each update has the same fields as update_checklist_item (text, completed, dueDate, dueTime, repeat) and ' +
+    `identifies its task by the item id from get_note. ${READ_FIRST} All updates are applied together, as one change in ` +
+    'the note history: if any one of them is invalid (an unknown id, a time in the past, an empty text), NOTHING is ' +
+    'changed and the result says which update to fix. Give each task at most once. Only change what the user asked for. ' +
+    "Israel local time. It works on the user's own notes only, not on notes marked read-only for Claude, and not while " +
+    'the note is open in the app. For a single task, update_checklist_item is enough.',
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The checklist note id.'),
+    updates: z
+      .array(z.object(itemChangeFields))
+      .max(200)
+      .describe(`1 to ${MAX_BATCH_UPDATES} updates, one per task, applied in this order.`),
+  }),
+  run: async (deps, input) => {
+    requireEditConsent(deps);
+    const at = (deps.now ?? (() => new Date()))();
+    const edit = buildChecklistItemsEdit(input.updates, at);
+    // כתיבה אחת למכסה, כמה משימות שלא יהיו
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'update_checklist_items', at);
+    if (!result.changed) return 'Nothing changed: all these tasks already have these values.';
+
+    const rows = JSON.parse(result.note.content) as Array<Record<string, unknown>>;
+    const lines = input.updates.map(({ itemId }) => {
+      const item = rows.find((row) => row.id === itemId) ?? {};
+      return `- "${String(item.text ?? '')}" [item id: ${itemId}]: ${itemState(item)}`;
+    });
+    return [
+      `Updated ${input.updates.length} tasks in "${result.note.title}" [id: ${input.noteId}], as one change:`,
+      ...lines,
       RECOVERABLE,
     ].join('\n');
   },
@@ -773,6 +828,7 @@ export const TOOLS = [
   getNote,
   createNote,
   updateChecklistItem,
+  updateChecklistItems,
   appendText,
   addWorkplanSection,
   editNoteText,

@@ -52,6 +52,10 @@ numbers for changes no user could observe.)
   (`needs: test`) — a deploy of Hosting and Firestore rules/indexes (see
   `.github/workflows/SETUP.md`). Cloud Functions are still deployed manually.
 - Use a branch and a PR only when the owner asks for one.
+- **Round 1 of improvements (October 2026) is main-only, by the owner's
+  decision:** no branches, no PRs. Each step is one commit pushed to `main`,
+  then stop and report before starting the next. **From round 2 on, work goes
+  through branches and PRs again.**
 
 ### Commit Messages
 - Clear, descriptive commit messages
@@ -305,7 +309,7 @@ minor versions and has been removed rather than updated again.
 
 ## Quick Checklist for Each Change
 
-- [ ] Make code changes on a `claude/<topic>` branch
+- [ ] Make code changes on `main` (round 1) or on a `claude/<topic>` branch (round 2 on)
 - [ ] Run the checks and test suites listed above
 - [ ] If the app changed: increment the version and add a WhatsNew entry
 - [ ] Commit each logical step separately, with the version in the message
