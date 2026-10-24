@@ -7,14 +7,20 @@
  */
 
 import { useEffect, useState } from 'react';
+import { onPageHidden } from '@/utils/pageLifecycle';
 import { createPatchDebouncer, type PatchDebouncer } from '@/utils/patchDebouncer';
 
 export const useDebouncedPatch = <T extends object>(
   save: (patch: Partial<T>) => void,
-  delayMs: number
+  delayMs: number,
+  maxWaitMs?: number
 ): PatchDebouncer<T> => {
   // נוצר פעם אחת, כדי שהצבירה והטיימר ישרדו רינדורים
-  const [debouncer] = useState(() => createPatchDebouncer<T>(save, delayMs));
+  const [debouncer] = useState(() => createPatchDebouncer<T>(save, delayMs, maxWaitMs));
+
+  // מעבר לאפליקציה אחרת, נעילת מסך או סגירה: שומרים מיד. ב-PWA במובייל
+  // אין unmount לפני שהמערכת הורגת אפליקציה ברקע (`utils/pageLifecycle.ts`)
+  useEffect(() => onPageHidden(debouncer.flush), [debouncer]);
 
   // הקולבק מתחלף בכל רינדור (פונקציה אנונימית) - מעדכנים אותו בלי
   // לאתחל את ה-debounce ובלי לאבד את מה שממתין

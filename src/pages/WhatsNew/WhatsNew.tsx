@@ -16,6 +16,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.33.1',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'מה שהקלדתם נשמר מיד כשנועלים את המסך, עוברים לאפליקציה אחרת או סוגרים - גם אם הטלפון סוגר את האפליקציה ברקע. קודם השניות האחרונות של הקלדה יכלו ללכת לאיבוד',
+      },
+      {
+        type: 'improvement',
+        description: 'הקלדה ארוכה בלי הפסקה נשמרת בדרך, לפחות כל 5 שניות, ולא רק כשעוצרים',
+      },
+    ],
+  },
+  {
     version: '1.33.0',
     date: 'אוקטובר 2026',
     changes: [

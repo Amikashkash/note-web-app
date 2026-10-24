@@ -23,12 +23,20 @@ export interface PatchDebouncer<T extends object> {
   setSave: (save: (patch: Partial<T>) => void) => void;
 }
 
+/**
+ * `maxWaitMs`: הקלדה רצופה מאריכה את ההשהיה בכל הקשה, ובלי תקרה שום דבר
+ * לא היה נשמר עד שהמשתמש עוצר. עם תקרה, נשלחת שמירה לכל המאוחר `maxWaitMs`
+ * אחרי השינוי הראשון שממתין - גם באמצע הקלדה.
+ */
 export const createPatchDebouncer = <T extends object>(
   save: (patch: Partial<T>) => void,
-  delayMs: number
+  delayMs: number,
+  maxWaitMs?: number
 ): PatchDebouncer<T> => {
   let pending: Partial<T> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /** מתי נכנס השינוי הראשון שעוד ממתין */
+  let firstPendingAt = 0;
 
   const clearTimer = () => {
     if (timer !== null) {
@@ -48,9 +56,12 @@ export const createPatchDebouncer = <T extends object>(
 
   return {
     call: (patch) => {
+      if (pending === null) firstPendingAt = Date.now();
       pending = { ...pending, ...patch };
       clearTimer();
-      timer = setTimeout(flush, delayMs);
+      const wait =
+        maxWaitMs === undefined ? delayMs : Math.max(0, Math.min(delayMs, firstPendingAt + maxWaitMs - Date.now()));
+      timer = setTimeout(flush, wait);
     },
     flush,
     cancel: () => {
