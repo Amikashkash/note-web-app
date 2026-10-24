@@ -20,8 +20,10 @@ import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { NoteText } from '@/utils/noteMerge';
+import { useAppVersionStore, writesBlocked } from '@/store/appVersionStore';
 import {
   editDraft,
+  hasUnconfirmedEdits,
   initialSync,
   markSent,
   onSnapshot,
@@ -60,10 +62,14 @@ export interface NoteSync {
   onRestored: () => void;
   /** זורק עריכה שעוד לא נשלחה (ארכוב, יציאה משיתוף) */
   cancel: () => void;
+  /** הגרסה ישנה מדי לשמור (`minClientVersion`): העורך לקריאה בלבד */
+  writesBlocked: boolean;
 }
 
 export const useNoteSync = (note: Note): NoteSync => {
   const uid = useAuthStore((state) => state.user?.uid);
+  const blocked = useAppVersionStore((state) => state.writesBlocked);
+  const holdUnsaved = useAppVersionStore((state) => state.holdUnsaved);
   const [noteId, setNoteId] = useState(note.id);
   const [sync, setSyncState] = useState<SyncState>(() => fromNote(note));
   const [discarded, setDiscarded] = useState<NoteText | null>(null);
@@ -94,23 +100,44 @@ export const useNoteSync = (note: Note): NoteSync => {
 
   const save = useCallback(
     (patch: noteAPI.NoteTextPatch) => {
+      // גרסה ישנה מדי (`minClientVersion`): לא שולחים. הטקסט נשאר בעורך,
+      // ונשמר בצד כדי שמסך "יש גרסה חדשה" יציג אותו להעתקה
+      if (writesBlocked()) {
+        const { draft } = syncRef.current;
+        holdUnsaved({ noteId: noteRef.current.id, title: draft.title, content: draft.content });
+        return;
+      }
       const { state, revision } = markSent(syncRef.current);
       setSync(state);
       const current = noteRef.current;
       noteAPI.saveNoteText(current.id, patch, revision).catch((error: unknown) => {
         if (getFirebaseErrorCode(error) === 'permission-denied') {
+          const text = state.sent[revision];
+          // הגרסה נחסמה בינתיים: גם עותק בפתק חדש לא ייכתב, אז הטקסט נשמר בצד להעתקה
+          if (writesBlocked()) {
+            holdUnsaved({ noteId: current.id, title: text.title, content: text.content });
+            return;
+          }
           // מישהו כתב בינתיים. עורך פתוח יציג התנגשות; עורך שנסגר - עותק בפתק חדש
-          if (uid) recoverRejectedText({ ...current, ...state.sent[revision] }, uid);
+          if (uid) recoverRejectedText({ ...current, ...text }, uid);
           return;
         }
         logger.error('Note save failed:', error);
         window.alert(getErrorMessage(error));
       });
     },
-    [setSync, uid]
+    [setSync, uid, holdUnsaved]
   );
 
   const debouncer = useDebouncedPatch<noteAPI.NoteTextPatch>(save, AUTOSAVE_DELAY_MS);
+
+  // החסימה נכנסה בזמן שהפתק פתוח: מה שעוד לא נשלח לא יישלח, ונשמר בצד
+  useEffect(() => {
+    if (!blocked || !hasUnconfirmedEdits(syncRef.current, debouncer.hasPending())) return;
+    debouncer.cancel();
+    const { draft } = syncRef.current;
+    holdUnsaved({ noteId: noteRef.current.id, title: draft.title, content: draft.content });
+  }, [blocked, debouncer, holdUnsaved]);
 
   // עורך פתוח: שמירה שנדחית מוצגת כאן ולא הופכת לעותק
   useEffect(() => registerOpenEditor(note.id), [note.id]);
@@ -137,7 +164,8 @@ export const useNoteSync = (note: Note): NoteSync => {
 
   const edit = useCallback(
     (patch: noteAPI.NoteTextPatch) => {
-      if (syncRef.current.conflict) return;
+      // בזמן התנגשות, או כשהגרסה ישנה מדי לשמור - אין עריכה
+      if (syncRef.current.conflict || writesBlocked()) return;
       const text: Partial<NoteText> = {};
       if (patch.title !== undefined) text.title = patch.title;
       if (patch.content !== undefined) text.content = patch.content;
@@ -200,6 +228,7 @@ export const useNoteSync = (note: Note): NoteSync => {
     saveMineAsNew,
     onRestored,
     cancel: debouncer.cancel,
+    writesBlocked: blocked,
   };
 };
 

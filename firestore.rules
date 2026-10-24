@@ -38,11 +38,12 @@ service cloud.firestore {
 
     // נמען שמסיר את עצמו משיתוף (SH-1). העדכון היחיד המותר: להוריד את
     // עצמו מ-`sharedWith` - לא אחרים, לא להוסיף, ולא לגעת בשום שדה אחר
-    // חוץ מחותמת הכותב. בלי זה לנמען לא הייתה דרך להיפטר מפתק ששותף איתו.
+    // חוץ מחותמת הכותב (כולל `clientVersion`, D4a). בלי זה לנמען לא הייתה
+    // דרך להיפטר מפתק ששותף איתו.
     function isLeavingShare() {
       return isSharedWithMe(resource.data)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['sharedWith', 'updatedAt', 'updatedBy'])
+          .hasOnly(['sharedWith', 'updatedAt', 'updatedBy', 'clientVersion'])
         && request.resource.data.get('sharedWith', []).toSet()
           == sharedUsers(resource.data).toSet().difference([request.auth.uid].toSet());
     }
@@ -282,8 +283,13 @@ service cloud.firestore {
 
     // allowlist המשתמשים של שרת ה-MCP (`config/mcp`). נערך רק מה-console:
     // לקוח שיכול לקרוא אותו יודע מי מורשה, ולקוח שיכול לכתוב - מורשה.
+    // `config/app` (D4a): `minClientVersion` - כל לקוח קורא אותו בפתיחה,
+    // גם לפני התחברות, כדי לדעת אם הגרסה שלו עוד רשאית לכתוב. רק `get`:
+    // אי אפשר לרשום את `config` (ו-`config/mcp` נשאר סגור). כתיבה - רק
+    // מהמסוף של Firebase / Admin SDK.
     match /config/{configId} {
-      allow read, write: if false;
+      allow get: if configId == 'app';
+      allow list, write: if false;
     }
   }
 }

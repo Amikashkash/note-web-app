@@ -16,6 +16,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.33.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description:
+          'הגנה לקראת שינויים בפורמט: גרסה ישנה מדי של האפליקציה מפסיקה לשמור ומבקשת לרענן, כדי שלא תשמור משהו שהיא לא מבינה. מה שכתבתם ולא נשמר נשאר גלוי להעתקה, ומוצג שוב אחרי הרענון',
+      },
+    ],
+  },
+  {
     version: '1.32.0',
     date: 'אוקטובר 2026',
     changes: [

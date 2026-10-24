@@ -680,14 +680,15 @@ describe('revision (C-1, phase 2: required on content writes)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// כל סוג כתיבה שהאפליקציה (v1.32.0) עושה לפתק - חייב לעבור את שלב 2.
+// כל סוג כתיבה שהאפליקציה עושה לפתק - חייב לעבור את שלב 2.
 // ה-payloads מועתקים מ-`src/services/api/notes.ts` ו-`categories.ts`. כתיבה
-// חדשה באפליקציה צריכה שורה כאן.
+// חדשה באפליקציה צריכה שורה כאן. `writeStamp` (notes.ts) כולל `clientVersion`
+// מ-v1.33.0; הכתיבות של categories.ts לא.
 // ---------------------------------------------------------------------------
 
 describe('every kind of note write the app makes passes phase 2', () => {
   const NOTE = 'notes/app-1';
-  const stamp = (uid: string) => ({ updatedBy: uid, updatedAt: serverTimestamp() });
+  const stamp = (uid: string) => ({ updatedBy: uid, updatedAt: serverTimestamp(), clientVersion: '1.33.0' });
 
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (context) => {
@@ -773,6 +774,46 @@ describe('every kind of note write the app makes passes phase 2', () => {
     await assertSucceeds(updateDoc(doc(as(OWNER), NOTE), { isPinned: true, ...stamp(OWNER) }));
     await assertSucceeds(updateDoc(doc(as(OWNER), NOTE), { title: 'x', revision: 6, saveId: 'b', ...stamp(OWNER) }));
     await assertSucceeds(updateDoc(doc(as(SHARED), NOTE), { title: 'y', revision: increment(1), ...stamp(SHARED) }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// config/app - minClientVersion (D4a)
+// ---------------------------------------------------------------------------
+
+describe('config/app (minClientVersion)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'config/app'), { minClientVersion: '1.33.0' });
+      await setDoc(doc(context.firestore(), 'config/mcp'), { allowedUids: [OWNER] });
+    });
+  });
+
+  it('every client can read it, signed in or not (the check runs before sign-in too)', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER), 'config/app')));
+    await assertSucceeds(getDoc(doc(asUnverified(STRANGER), 'config/app')));
+    await assertSucceeds(getDoc(doc(anonymous(), 'config/app')));
+  });
+
+  it('a missing config/app is readable too: the app treats it as no minimum', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), 'config/app'));
+    });
+    await assertSucceeds(getDoc(doc(as(OWNER), 'config/app')));
+  });
+
+  it('no client can write it - an old version cannot lower the minimum for itself', async () => {
+    for (const db of [as(OWNER), anonymous()]) {
+      await assertFails(setDoc(doc(db, 'config/app'), { minClientVersion: '0.0.1' }));
+      await assertFails(updateDoc(doc(db, 'config/app'), { minClientVersion: '0.0.1' }));
+      await assertFails(deleteDoc(doc(db, 'config/app')));
+    }
+  });
+
+  it('config cannot be listed, and config/mcp stays closed', async () => {
+    await assertFails(getDocs(collection(as(OWNER), 'config')));
+    await assertFails(getDoc(doc(as(OWNER), 'config/mcp')));
+    await assertFails(getDoc(doc(anonymous(), 'config/mcp')));
   });
 });
 
