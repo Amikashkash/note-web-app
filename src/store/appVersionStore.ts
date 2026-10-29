@@ -8,6 +8,9 @@
  *
  * `unsaved`: טקסט שהמשתמש כתב ולא נשמר כי הכתיבה נחסמה. נשמר כאן ולא
  * רק בעורך, כדי שיישאר גלוי ואפשר יהיה להעתיק אותו גם אחרי שהפתק נסגר.
+ *
+ * `rawMinClientVersion` ו-`lastCheck`: לאבחון במכשיר (שורת הגרסה ב"מה
+ * חדש"). בפרודקשן אין לוגים, וזו הדרך היחידה לראות מה האפליקציה קראה ומתי.
  */
 
 import { create } from 'zustand';
@@ -19,25 +22,44 @@ export interface UnsavedText {
   content: string;
 }
 
+export interface MinVersionCheckResult {
+  ok: boolean;
+  at: number;
+}
+
 interface AppVersionState {
   /** המינימום האחרון שנקרא, או `null` כשאין (אין מסמך, או עוד לא נקרא) */
   minClientVersion: string | null;
+  /** הערך כפי שנקרא, גם כשאינו תקין (`"1.33.1"` עם מירכאות, מספר) - `undefined` כשאין */
+  rawMinClientVersion: unknown;
+  /** הקריאה האחרונה מהשרת: הצליחה או נכשלה, ומתי. `null` - עוד לא הייתה */
+  lastCheck: MinVersionCheckResult | null;
   writesBlocked: boolean;
   unsaved: Record<string, UnsavedText>;
   setMinClientVersion: (value: unknown) => void;
+  recordCheck: (result: MinVersionCheckResult) => void;
+  /** נקרא לפני כל כתיבה; `useMinClientVersion` מחבר אותו לבדיקה מהשרת */
+  onWriteAttempt: () => void;
   holdUnsaved: (text: UnsavedText) => void;
 }
 
 export const useAppVersionStore = create<AppVersionState>((set) => ({
   minClientVersion: null,
+  rawMinClientVersion: undefined,
+  lastCheck: null,
   writesBlocked: false,
   unsaved: {},
 
   setMinClientVersion: (value) =>
     set({
       minClientVersion: typeof value === 'string' ? value : null,
+      rawMinClientVersion: value,
       writesBlocked: isBelowMinimum(__APP_VERSION__, value),
     }),
+
+  recordCheck: (result) => set({ lastCheck: result }),
+
+  onWriteAttempt: () => {},
 
   holdUnsaved: (text) => set((state) => ({ unsaved: { ...state.unsaved, [text.noteId]: text } })),
 }));

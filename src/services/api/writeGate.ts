@@ -7,7 +7,7 @@
  * תוכן שגרסה ישנה עלולה לא להבין, וחסימה שלהם הייתה שוברת התראות.
  */
 
-import { writesBlocked } from '@/store/appVersionStore';
+import { useAppVersionStore, writesBlocked } from '@/store/appVersionStore';
 
 export const WRITES_BLOCKED_MESSAGE =
   'יש גרסה חדשה של האפליקציה, והגרסה הזו כבר לא שומרת שינויים. רעננו כדי לעבור לגרסה החדשה. מה שכתבתם לא נמחק.';
@@ -21,4 +21,6 @@ export class WritesBlockedError extends Error {
 
 export const assertWritesAllowed = (): void => {
   if (writesBlocked()) throw new WritesBlockedError();
+  // הכתיבה הזו עוברת; אם לא בדקנו מהשרת לאחרונה - בודקים, כדי שהבאה תיחסם
+  useAppVersionStore.getState().onWriteAttempt();
 };
