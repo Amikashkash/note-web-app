@@ -113,6 +113,49 @@ describe('createPatchDebouncer', () => {
     expect(second).toHaveBeenCalledWith({ title: 'a' });
   });
 
+  it('max-wait: continuous typing still saves, at most maxWait after the first pending change', () => {
+    const save = vi.fn();
+    const debouncer = createPatchDebouncer<NoteUpdates>(save, 600, 5000);
+
+    // הקשה כל 400ms - ההשהיה של 600ms לעולם לא מסתיימת לבד
+    let text = '';
+    for (let elapsed = 0; elapsed < 4800; elapsed += 400) {
+      text += 'א';
+      debouncer.call({ content: text });
+      vi.advanceTimersByTime(400);
+    }
+    expect(save).not.toHaveBeenCalled();
+    debouncer.call({ content: `${text}ב` });
+    vi.advanceTimersByTime(200);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith({ content: `${text}ב` });
+  });
+
+  it('max-wait counts again from the first change after a save', () => {
+    const save = vi.fn();
+    const debouncer = createPatchDebouncer<NoteUpdates>(save, 600, 5000);
+    debouncer.call({ content: 'a' });
+    vi.advanceTimersByTime(600);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(10_000);
+    debouncer.call({ content: 'ab' });
+    vi.advanceTimersByTime(599);
+    expect(save).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it('without max-wait, continuous typing waits for a pause (the old behavior)', () => {
+    const save = vi.fn();
+    const debouncer = createPatchDebouncer<NoteUpdates>(save, 600);
+    for (let index = 0; index < 30; index += 1) {
+      debouncer.call({ content: String(index) });
+      vi.advanceTimersByTime(400);
+    }
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('reports a pending patch until it is sent or cancelled (C-1: unsaved edits)', () => {
     const debouncer = createPatchDebouncer<NoteUpdates>(vi.fn(), 600);
     expect(debouncer.hasPending()).toBe(false);

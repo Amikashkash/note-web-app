@@ -31,3 +31,6 @@ export const LENGTH_LIMITS = {
 
 /** השהיה לפני שמירה אוטומטית בעריכה inline (מילישניות) */
 export const AUTOSAVE_DELAY_MS = 600;
+
+/** הקלדה רצופה נשמרת לפחות פעם בזמן הזה, גם בלי הפסקה (`patchDebouncer.ts`) */
+export const AUTOSAVE_MAX_WAIT_MS = 5000;

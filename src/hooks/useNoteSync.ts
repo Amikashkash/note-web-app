@@ -16,7 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import * as noteAPI from '@/services/api/notes';
 import { recoverRejectedText, registerOpenEditor } from '@/services/api/noteRecovery';
-import { AUTOSAVE_DELAY_MS, LENGTH_LIMITS } from '@/utils/constants';
+import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { NoteText } from '@/utils/noteMerge';
@@ -129,7 +129,7 @@ export const useNoteSync = (note: Note): NoteSync => {
     [setSync, uid, holdUnsaved]
   );
 
-  const debouncer = useDebouncedPatch<noteAPI.NoteTextPatch>(save, AUTOSAVE_DELAY_MS);
+  const debouncer = useDebouncedPatch<noteAPI.NoteTextPatch>(save, AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS);
 
   // החסימה נכנסה בזמן שהפתק פתוח: מה שעוד לא נשלח לא יישלח, ונשמר בצד
   useEffect(() => {
