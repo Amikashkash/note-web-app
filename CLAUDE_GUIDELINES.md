@@ -266,6 +266,19 @@ overwrite, and only after the version that understands the format is out.
   `clientVersion` (written by `writeStamp` since v1.33.0) - see
   `thinking/round2-plan.md`.
 
+**Merging an open note (`src/utils/noteMerge.ts`)** — three-way: different
+items merge; the same item changed on both sides merges **by field** (since
+v1.34.0). Dependent fields merge as one unit: `dueDate`, `dueTime`, `repeat`,
+`repeatBase` always, plus `completed` when the task is recurring (the server
+reset in `functions/src/recurringTasks.ts` would otherwise advance it twice).
+Same field (or unit) changed differently on both sides → the choice panel. A
+new item field: decide whether it is independent or joins a unit, and add its
+name to `REPORTABLE_FIELDS` and to the `conflictEvents` rule.
+Each conflict that reaches the panel writes one `conflictEvents` document:
+reason, field names, template type, client version, server time - no uid,
+note id or content (enforced by the rules). Read it in the Firebase console to
+decide whether E1 is needed (`thinking/round2-plan.md`).
+
 **New fields on items** — the app's parsers keep only the fields they know,
 so a save from the app drops anything else. A new field (for example
 `priority` on checklist items, v1.31.0) must be parsed by the app, and that

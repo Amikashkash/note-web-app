@@ -25,7 +25,7 @@
  * מזוהה, כי ההשוואה היא גם על התוכן.
  */
 
-import { mergeNote, type NoteText } from './noteMerge';
+import { mergeNote, type MergeConflict, type NoteText } from './noteMerge';
 
 export interface NoteSnapshot extends NoteText {
   revision: number;
@@ -57,8 +57,8 @@ export type SyncAction =
   | { kind: 'adopted' }
   /** השינויים מוזגו. הטיוטה החדשה צריכה להישמר */
   | { kind: 'merged' }
-  /** התנגשות: לבטל שמירה ממתינה ולהציג בחירה */
-  | { kind: 'conflict' };
+  /** התנגשות: לבטל שמירה ממתינה ולהציג בחירה. `why` - למדידה, בלי תוכן */
+  | { kind: 'conflict'; why: MergeConflict };
 
 export const initialSync = (snapshot: NoteSnapshot): SyncState => ({
   base: { title: snapshot.title, content: snapshot.content, revision: snapshot.revision },
@@ -141,8 +141,9 @@ export const onSnapshot = (
     return { state: { ...confirm(state, snapshot, remote), sent: {}, lastSentRevision: snapshot.revision }, action: { kind: 'adopted' } };
   }
 
-  const merged = mergeNote(state.base, state.draft, snapshot, snapshot.templateType);
-  if (merged) {
+  const result = mergeNote(state.base, state.draft, snapshot, snapshot.templateType);
+  if ('merged' in result) {
+    const { merged } = result;
     // הכתיבות שיצאו על בסיס ישן יידחו ע"י ה-rules - שוכחים אותן ושולחים מחדש מהבסיס החדש
     return {
       state: { ...confirm(state, snapshot, merged), sent: {}, lastSentRevision: snapshot.revision },
@@ -152,7 +153,7 @@ export const onSnapshot = (
 
   return {
     state: { ...state, conflict: { remote: snapshot, local: { ...state.draft } } },
-    action: { kind: 'conflict' },
+    action: { kind: 'conflict', why: result.conflict },
   };
 };
 

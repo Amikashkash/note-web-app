@@ -818,6 +818,60 @@ describe('config/app (minClientVersion)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// conflictEvents - אירוע אנונימי לכל התנגשות שהגיעה לבחירה
+// ---------------------------------------------------------------------------
+
+describe('conflictEvents (anonymous conflict measurement)', () => {
+  const event = () => ({
+    at: serverTimestamp(),
+    reason: 'same-field',
+    fields: ['text'],
+    templateType: 'checklist',
+    clientVersion: '1.34.0',
+  });
+
+  it('a signed-in user can create one, with every allowed reason and field', async () => {
+    await assertSucceeds(setDoc(doc(as(OWNER), 'conflictEvents/e1'), event()));
+    for (const reason of ['title', 'text', 'unreadable', 'schedule', 'edit-vs-delete', 'both-added']) {
+      await assertSucceeds(setDoc(doc(as(OWNER), `conflictEvents/${reason}`), { ...event(), reason, fields: [] }));
+    }
+    await assertSucceeds(
+      setDoc(doc(as(OWNER), 'conflictEvents/all-fields'), {
+        ...event(),
+        reason: 'schedule',
+        fields: ['completed', 'dueDate', 'dueTime', 'repeat', 'repeatBase', 'other'],
+      })
+    );
+  });
+
+  it('nothing that identifies a user, a note or content can be attached', async () => {
+    for (const extra of [{ uid: OWNER }, { noteId: 'note-1' }, { content: 'חלב' }, { title: 'קניות' }]) {
+      await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e2'), { ...event(), ...extra }));
+    }
+    // ערך של שדה במקום שם של שדה
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e3'), { ...event(), fields: ['חלב סויה'] }));
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e4'), { ...event(), templateType: 'חלב' }));
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e5'), { ...event(), reason: 'חלב' }));
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e6'), { ...event(), clientVersion: 'x'.repeat(21) }));
+  });
+
+  it('the time is the server time, and every field is required', async () => {
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e7'), { ...event(), at: Timestamp.fromMillis(0) }));
+    const { clientVersion: _omit, ...partial } = event();
+    await assertFails(setDoc(doc(as(OWNER), 'conflictEvents/e8'), partial));
+  });
+
+  it('not signed in cannot create; nobody can read, list, change or delete', async () => {
+    await assertFails(setDoc(doc(anonymous(), 'conflictEvents/e9'), event()));
+    await assertSucceeds(setDoc(doc(as(OWNER), 'conflictEvents/e10'), event()));
+    await assertFails(getDoc(doc(as(OWNER), 'conflictEvents/e10')));
+    await assertFails(getDocs(collection(as(OWNER), 'conflictEvents')));
+    await assertFails(updateDoc(doc(as(OWNER), 'conflictEvents/e10'), { reason: 'text' }));
+    await assertFails(deleteDoc(doc(as(OWNER), 'conflictEvents/e10')));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // "הפתק פתוח" - סימוני נוכחות
 // ---------------------------------------------------------------------------
 

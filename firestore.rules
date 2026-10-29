@@ -281,6 +281,26 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // התנגשות שהגיעה לבחירה בעורך (`services/api/conflictEvents.ts`): אירוע
+    // אנונימי, למדידה אם E1 נחוץ. **בלי** uid, מזהה פתק או תוכן - רק סיבה,
+    // שמות שדות מתוך רשימה סגורה, סוג תבנית וגרסה. נוצר ע"י משתמש מחובר
+    // (נגד הצפה מבחוץ), לא נקרא ולא משתנה מהלקוח; קוראים במסוף.
+    match /conflictEvents/{eventId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly(['at', 'reason', 'fields', 'templateType', 'clientVersion'])
+        && request.resource.data.keys().hasAll(['at', 'reason', 'fields', 'templateType', 'clientVersion'])
+        && request.resource.data.at == request.time
+        && request.resource.data.reason in ['title', 'text', 'unreadable', 'same-field', 'schedule', 'edit-vs-delete', 'both-added']
+        && request.resource.data.fields is list
+        && request.resource.data.fields.size() <= 16
+        && request.resource.data.fields.hasOnly(['text', 'completed', 'dueDate', 'dueTime', 'repeat', 'repeatBase',
+             'priority', 'name', 'quantity', 'checked', 'header', 'content', 'description', 'amount', 'date', 'other'])
+        && request.resource.data.templateType in ['plain', 'checklist', 'shopping', 'workplan', 'accounting', 'recipe', 'other']
+        && request.resource.data.clientVersion is string
+        && request.resource.data.clientVersion.size() <= 20;
+      allow read, update, delete: if false;
+    }
+
     // allowlist המשתמשים של שרת ה-MCP (`config/mcp`). נערך רק מה-console:
     // לקוח שיכול לקרוא אותו יודע מי מורשה, ולקוח שיכול לכתוב - מורשה.
     // `config/app` (D4a): `minClientVersion` - כל לקוח קורא אותו בפתיחה,

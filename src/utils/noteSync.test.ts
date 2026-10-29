@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { mergeNote } from './noteMerge';
+import { mergeNote as mergeNoteText } from './noteMerge';
 import { editDraft, initialSync, markSent, onSnapshot, takeRemote, type NoteSnapshot } from './noteSync';
 
 const snap = (overrides: Partial<NoteSnapshot> = {}): NoteSnapshot => ({
@@ -17,6 +17,12 @@ const snap = (overrides: Partial<NoteSnapshot> = {}): NoteSnapshot => ({
   pending: false,
   ...overrides,
 });
+
+/** המיזוג, או `null` בהתנגשות */
+const mergeNote = (...args: Parameters<typeof mergeNoteText>) => {
+  const result = mergeNoteText(...args);
+  return 'merged' in result ? result.merged : null;
+};
 
 const checklist = (items: Array<{ id: string; text: string; completed?: boolean }>) =>
   JSON.stringify(items.map((item) => ({ completed: false, ...item })));
@@ -60,7 +66,23 @@ describe('remote change with local edits', () => {
       content: checklist([{ id: 'a', text: 'חלב סויה' }]),
     });
     const remote = snap({ templateType: 'checklist', revision: 6, content: checklist([{ id: 'a', text: 'חלב 3%' }]) });
-    expect(onSnapshot(edited, remote, true).action.kind).toBe('conflict');
+    // הסיבה והשדה, בלי תוכן - לאירוע המדידה
+    expect(onSnapshot(edited, remote, true).action).toEqual({
+      kind: 'conflict',
+      why: { reason: 'same-field', fields: ['text'] },
+    });
+  });
+
+  it('the same item changed on both sides in different fields is merged and saved, not a conflict', () => {
+    const base = checklist([{ id: 'a', text: 'חלב' }]);
+    const edited = editDraft(initialSync(snap({ templateType: 'checklist', content: base })), {
+      content: checklist([{ id: 'a', text: 'חלב', completed: true }]),
+    });
+    const remote = snap({ templateType: 'checklist', revision: 6, content: checklist([{ id: 'a', text: 'חלב 3%' }]) });
+    const { state, action } = onSnapshot(edited, remote, true);
+    expect(action.kind).toBe('merged');
+    expect(JSON.parse(state.draft.content)).toEqual([{ id: 'a', text: 'חלב 3%', completed: true }]);
+    expect(markSent(state).revision).toBe(7);
   });
 
   it('while in conflict, a newer server version replaces the stored one, so reload loads the latest', () => {
@@ -131,13 +153,13 @@ describe('both edited different items', () => {
   it('an item edited on one side and deleted on the other is a conflict', () => {
     const base = checklist([{ id: 'a', text: 'חלב' }]);
     expect(
-      mergeNote(
+      mergeNoteText(
         { title: 't', content: base },
         { title: 't', content: checklist([{ id: 'a', text: 'חלב סויה' }]) },
         { title: 't', content: checklist([]) },
         'checklist'
       )
-    ).toBeNull();
+    ).toEqual({ conflict: { reason: 'edit-vs-delete', fields: [] } });
   });
 
   const order = (merged: { content: string } | null) => JSON.parse(merged!.content).map((row: { id: string }) => row.id);
@@ -177,13 +199,13 @@ describe('both edited different items', () => {
   it('does not merge items without stable ids', () => {
     const noIds = JSON.stringify([{ text: 'חלב', completed: false }]);
     expect(
-      mergeNote(
+      mergeNoteText(
         { title: 't', content: noIds },
         { title: 't', content: JSON.stringify([{ text: 'חלב', completed: true }]) },
         { title: 't', content: JSON.stringify([{ text: 'חלב 3%', completed: false }]) },
         'checklist'
       )
-    ).toBeNull();
+    ).toEqual({ conflict: { reason: 'unreadable', fields: [] } });
   });
 });
 
