@@ -47,7 +47,8 @@ export const useAuth = () => {
 
     // ניקוי המצב נעשה ע"י המאזין ב-`authStore` כשמתקבל משתמש `null`,
     // וה-hooks של הפתקים והקטגוריות סוגרים את המנויים שלהם בתגובה.
-    signOut: () => run(() => authService.signOut()),
+    // הבדיקה של כתיבות ממתינות לפני (ובחירה של המשתמש) - ב-`useSafeSignOut`
+    signOut: (options?: { keepLocalData?: boolean }) => run(() => authService.signOut(options)),
 
     resetPassword: (email: string) => run(() => authService.resetPassword(email)),
   };

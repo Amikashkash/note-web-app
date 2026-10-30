@@ -67,6 +67,7 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
     revision: asNumber(data.revision),
+    saveId: typeof data.saveId === 'string' ? data.saveId : undefined,
   };
 };
 

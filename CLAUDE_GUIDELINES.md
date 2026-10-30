@@ -262,6 +262,8 @@ overwrite, and only after the version that understands the format is out.
 - **Offline:** the check is client-side. A device that never read the new
   value (offline since before it was set) keeps writing locally, and those
   queued writes go out on reconnect, before the listener delivers the value.
+  With persistence (v1.35.0) the queue survives restarts: writes queued by
+  an old version go out even after the device refreshes to a new one.
   Edits made after that are blocked. Closing that gap needs rules that check
   `clientVersion` (written by `writeStamp` since v1.33.0) - see
   `thinking/round2-plan.md`.
@@ -278,6 +280,29 @@ Each conflict that reaches the panel writes one `conflictEvents` document:
 reason, field names, template type, client version, server time - no uid,
 note id or content (enforced by the rules). Read it in the Firebase console to
 decide whether E1 is needed (`thinking/round2-plan.md`).
+
+**Persistence (v1.35.0)** — Firestore uses `persistentLocalCache` with the
+multi-tab manager (`services/firebase/config.ts`): notes and queued writes
+live in IndexedDB and survive closing the app. Consequences:
+- **`baseSaveId`**: every editor save names the `saveId` it is based on, and
+  the rules reject it unless that is the server's `saveId`. `revision` alone
+  let a second queued save (6 + 1) overwrite another device's 6 after our
+  own 6 was rejected. Checked only when sent, so 1.34.0 and older still have
+  the hole until `minClientVersion` is 1.35.0. Server writes (MCP, recurring
+  reset) leave `saveId` unchanged - the chain still holds through `revision`.
+- **Unconfirmed base** (`utils/noteSync.ts`): an editor opened on a write
+  still pending (previous session, other tab) never adopts or merges a
+  different server version silently - it shows the choice.
+- **Still open (step 5, `draftJournal`)**: a queued write from a previous
+  session that is rejected while its note is **not** open is lost silently,
+  as it was before persistence (then it was lost on close, always).
+- **Sign-out** clears the local data (`services/firebase/localData.ts`):
+  first waits for pending writes; if they do not reach the server, the user
+  chooses (stay / sign out and keep on this device / sign out and delete) -
+  never silently. Other tabs reload. A clear that did not finish is retried
+  on the next load, before Firestore starts.
+- "Waiting for connection" (`components/common/PendingWrites`): pending note
+  writes for more than 2.5s. The full status line is step 6.
 
 **New fields on items** — the app's parsers keep only the fields they know,
 so a save from the app drops anything else. A new field (for example

@@ -16,6 +16,8 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
 import { signOut } from '@/services/firebase/auth';
+import { db } from '@/services/firebase/config';
+import { pendingWritesSettle } from '@/services/firebase/localData';
 import { loadConnectRequest, sendConnectDecision } from '@/services/api/mcpConnect';
 import { isFramed, requestsWrite, scopeLabel, type ConnectProblem, type ConnectRequest } from '@/utils/mcpConnect';
 import { loginRedirectState } from '@/utils/returnTo';
@@ -89,7 +91,8 @@ export const Connect: React.FC = () => {
 
   const signInAgain = async () => {
     try {
-      await signOut();
+      // כתיבות שלא הגיעו לשרת: לא מוחקים אותן. מתנתקים ומשאירים במכשיר
+      await signOut({ keepLocalData: !(await pendingWritesSettle(db)) });
     } finally {
       navigate('/login', { replace: true, state: loginRedirectState(location) });
     }

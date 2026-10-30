@@ -142,12 +142,19 @@ export interface NoteTextPatch {
  * כ-`permission-denied`, וה-snapshot חוזר לגרסת השרת; העורך מזהה זאת
  * ומציג בחירה, בלי לאבד את הטקסט.
  */
-export const saveNoteText = (noteId: string, patch: NoteTextPatch, revision: number): Promise<void> =>
+export const saveNoteText = (
+  noteId: string,
+  patch: NoteTextPatch,
+  chain: { revision: number; saveId: string; baseSaveId: string | null }
+): Promise<void> =>
   updateDoc(noteRef(noteId), {
     ...patch,
-    revision,
+    revision: chain.revision,
     // משתנה בכל שמירה, כדי שה-rules תמיד יבדקו אותה (ראו revisionPhase1)
-    saveId: crypto.randomUUID(),
+    saveId: chain.saveId,
+    // ה-saveId של מה שהשמירה נשענת עליו: נדחית אם בשרת כבר משהו אחר,
+    // גם כשה-revision יוצא במקרה נכון (`utils/noteSync.ts`)
+    baseSaveId: chain.baseSaveId,
     ...writeStamp(),
   });
 
@@ -158,6 +165,7 @@ export interface LiveNoteText {
   content: string;
   templateType: string;
   revision: number;
+  saveId: string | null;
   /** hasPendingWrites: כתיבה מקומית שהשרת עוד לא אישר */
   pending: boolean;
 }
@@ -177,7 +185,7 @@ export const subscribeToNoteText = (
     { includeMetadataChanges: true },
     (snapshot) => {
       if (!snapshot.exists()) {
-        onChange({ exists: false, title: '', content: '', templateType: 'plain', revision: 0, pending: false });
+        onChange({ exists: false, title: '', content: '', templateType: 'plain', revision: 0, saveId: null, pending: false });
         return;
       }
       const note = toNote(snapshot);
@@ -187,6 +195,7 @@ export const subscribeToNoteText = (
         content: note.content,
         templateType: note.templateType,
         revision: note.revision,
+        saveId: note.saveId ?? null,
         pending: snapshot.metadata.hasPendingWrites,
       });
     },
@@ -348,6 +357,32 @@ export const subscribeToNotes = (
     }
   );
 
+  return () => {
+    unsubscribeOwned();
+    unsubscribeShared();
+  };
+};
+
+/**
+ * האם יש כתיבות לפתקים שעוד לא הגיעו לשרת ("ממתין לחיבור", v1.35.0).
+ * אותן שתי שאילתות כמו `subscribeToNotes`, עם metadata: Firestore משתף את
+ * ה-target, ולכן אין קריאות נוספות - רק שינויי metadata. כולל כתיבות
+ * ממתינות מסשן קודם (persistence) ומלשוניות אחרות.
+ */
+export const subscribeToPendingNoteWrites = (userId: string, onChange: (pending: boolean) => void): Unsubscribe => {
+  const pending = { owned: false, shared: false };
+  const listen = (key: keyof typeof pending, field: string, op: '==' | 'array-contains') =>
+    onSnapshot(
+      query(notesRef(), where(field, op, userId)),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        pending[key] = snapshot.metadata.hasPendingWrites;
+        onChange(pending.owned || pending.shared);
+      },
+      (error) => logger.warn('Pending writes listener failed:', error)
+    );
+  const unsubscribeOwned = listen('owned', 'userId', '==');
+  const unsubscribeShared = listen('shared', 'sharedWith', 'array-contains');
   return () => {
     unsubscribeOwned();
     unsubscribeShared();

@@ -11,7 +11,14 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, Auth } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore, Firestore } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore,
+} from 'firebase/firestore';
+import { clearLocalDataIfRequested } from './localData';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions, Functions } from 'firebase/functions';
 
@@ -61,7 +68,14 @@ if (isFirebaseConfigured) {
   });
 
   authInstance = getAuth(app);
-  dbInstance = getFirestore(app);
+  // Persistence (v1.35.0, צעד 4 בסבב 2): הפתקים והכתיבות הממתינות נשמרים
+  // ב-IndexedDB, משותף לכל הלשוניות. פתיחה בלי רשת עובדת, ומה שנכתב
+  // offline נשלח גם אחרי סגירה ופתיחה. דפדפן בלי IndexedDB (גלישה פרטית
+  // ישנה) - ה-SDK חוזר לזיכרון בעצמו, כמו לפני. מחיקה בהתנתקות:
+  // `localData.ts`.
+  dbInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
   storageInstance = getStorage(app);
   // אותו region שבו הפונקציות נפרסות (`setGlobalOptions` ב-`functions/src/index.ts`)
   functionsInstance = getFunctions(app, 'europe-west1');
@@ -75,6 +89,9 @@ if (isFirebaseConfigured) {
     connectFirestoreEmulator(dbInstance, '127.0.0.1', 8080);
     connectFunctionsEmulator(functionsInstance, '127.0.0.1', 5001);
   }
+
+  // לפני כל שימוש אחר ב-db (ואחרי ה-emulator): מחיקה שלא הסתיימה בהתנתקות הקודמת
+  clearLocalDataIfRequested(dbInstance);
 } else {
   console.error(
     [

@@ -16,6 +16,7 @@ import { DEFAULT_USER_SETTINGS } from '@/utils/defaults';
 import { getErrorMessage } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { User, UserSettings } from '@/types';
+import { isClearRequested, isSigningOutHere } from '@/services/firebase/localData';
 
 interface AuthState {
   firebaseUser: FirebaseUser | null;
@@ -112,6 +113,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     authUnsubscribe = onAuthChange(async (firebaseUser) => {
       if (!firebaseUser) {
+        // התנתקות עם מחיקת הנתונים המקומיים בלשונית אחרת: Firestore כאן
+        // נעצר במחיקה (ה-SDK עוצר כל לשונית כדי לאפשר אותה). טוענים מחדש
+        if (get().firebaseUser && isClearRequested() && !isSigningOutHere()) {
+          window.location.reload();
+          return;
+        }
         logger.debug('User signed out');
         set({ firebaseUser: null, user: null, isLoading: false, error: null });
         return;

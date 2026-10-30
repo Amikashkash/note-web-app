@@ -15,7 +15,8 @@ import {
   updateProfile,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from './config';
+import { auth, db } from './config';
+import { cancelLocalDataClear, clearLocalData, requestLocalDataClear } from './localData';
 import { unregisterDeviceForPush } from '@/services/notifications/fcmService';
 import { logger } from '@/utils/logger';
 import { getFirebaseErrorCode } from '@/utils/errors';
@@ -113,19 +114,33 @@ export const signInWithGoogle = async (): Promise<void> => {
  * רישום ההתראות של המכשיר מבוטל לפני ההתנתקות עצמה, כדי שמכשיר משותף
  * לא ימשיך לקבל את התזכורות של המשתמש שיצא. הביטול לא חוסם התנתקות
  * אם נכשל - עדיף להתנתק בלי לנקות מאשר לא להתנתק כלל.
+ *
+ * הנתונים המקומיים (persistence, v1.35.0) נמחקים אחרי ההתנתקות, והדף
+ * נטען מחדש - המופע של Firestore מת במחיקה. `keepLocalData`: המשתמש בחר
+ * להשאיר אותם, כי יש כתיבות שעוד לא הגיעו לשרת (`localData.ts`). הקורא
+ * אחראי לבדוק את זה לפני (`pendingWritesSettle`) - כאן לא שואלים.
  */
-export const signOut = async (): Promise<void> => {
+export const signOut = async (options: { keepLocalData?: boolean } = {}): Promise<void> => {
   const userId = auth.currentUser?.uid;
+  const clear = !options.keepLocalData;
 
   if (userId) {
     await unregisterDeviceForPush(userId);
   }
 
+  if (clear) requestLocalDataClear();
   try {
     await firebaseSignOut(auth);
   } catch (error) {
+    if (clear) cancelLocalDataClear();
     logger.error('Error signing out:', error);
     throw new Error('שגיאה בהתנתקות', { cause: error });
+  }
+
+  if (clear) {
+    await clearLocalData(db);
+    // אותה כתובת: מסלול מוגן מפנה ל-login, עם חזרה לכאן אחרי ההתחברות
+    window.location.reload();
   }
 };
 

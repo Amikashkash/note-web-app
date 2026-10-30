@@ -13,6 +13,7 @@ const snap = (overrides: Partial<NoteSnapshot> = {}): NoteSnapshot => ({
   title: 'קניות',
   content: 'שורה ראשונה',
   revision: 5,
+  saveId: 'srv-5',
   templateType: 'plain',
   pending: false,
   ...overrides,

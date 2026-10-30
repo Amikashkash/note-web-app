@@ -80,7 +80,9 @@ export type ConflictReason =
   /** פריט שנערך בצד אחד ונמחק בשני */
   | 'edit-vs-delete'
   /** אותו מזהה נוסף בשני הצדדים, בתוכן שונה */
-  | 'both-added';
+  | 'both-added'
+  /** העורך נפתח על כתיבה ממתינה (מסשן קודם / לשונית אחרת), והשרת מחזיק משהו אחר (`noteSync.ts`) */
+  | 'unconfirmed';
 
 export interface MergeConflict {
   reason: ConflictReason;
