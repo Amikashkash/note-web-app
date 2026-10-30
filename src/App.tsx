@@ -10,6 +10,7 @@ import { useAuthStore } from './store/authStore';
 import { usePushRegistration } from './hooks/usePushRegistration';
 import { useMinClientVersion } from './hooks/useMinClientVersion';
 import { RecoveredText, UpdateRequired } from './components/common/UpdateRequired/UpdateRequired';
+import { PendingWrites } from './components/common/PendingWrites/PendingWrites';
 import './styles/globals.css';
 
 const App: React.FC = () => {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
       <RouterProvider router={router} />
       <UpdateRequired />
       <RecoveredText />
+      <PendingWrites />
     </ThemeProvider>
   );
 };

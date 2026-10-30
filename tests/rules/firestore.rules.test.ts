@@ -12,7 +12,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
@@ -25,7 +25,9 @@ import {
   increment,
   collection,
   deleteDoc,
+  disableNetwork,
   doc,
+  enableNetwork,
   getDoc,
   getDocs,
   query,
@@ -673,6 +675,73 @@ describe('revision (C-1, phase 2: required on content writes)', () => {
     await assertFails(save(SHARED, 'מחשב', 5));
   });
 
+  /** שמירה של העורך מ-v1.35.0: עם `baseSaveId` - ה-saveId של מה שהיא נשענת עליו */
+  const chained = (uid: string, content: string, revision: number, saveId: string, baseSaveId: string | null) =>
+    updateDoc(doc(as(uid), 'notes/rev-1'), { content, revision, saveId, baseSaveId, updatedBy: uid });
+
+  const seedSaved = (revision: number, saveId: string | null) =>
+    env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'notes/rev-1'), { ...baseNote, revision, ...(saveId && { saveId }) });
+    });
+
+  it('baseSaveId: two queued saves, another device wrote first - both are rejected, nothing is overwritten', async () => {
+    await seedSaved(4, 'S4');
+    // המחשב offline שמר פעמיים: 5 (על S4) ו-6 (על 5 שלו). בינתיים הטלפון כתב 5
+    await assertSucceeds(chained(SHARED, 'מהטלפון', 5, 'P5', 'S4'));
+    await assertFails(chained(OWNER, 'מהמחשב', 5, 'C5', 'S4'));
+    // ה-revision יוצא נכון במקרה (5 + 1), אבל הבסיס C5 לא בשרת
+    await assertFails(chained(OWNER, 'מהמחשב ועוד', 6, 'C6', 'C5'));
+  });
+
+  it('baseSaveId: the same queue with nobody in between is accepted in order', async () => {
+    await seedSaved(4, 'S4');
+    await assertSucceeds(chained(OWNER, 'א', 5, 'C5', 'S4'));
+    await assertSucceeds(chained(OWNER, 'אב', 6, 'C6', 'C5'));
+  });
+
+  it('baseSaveId: a note without saveId chains from null; a wrong base is rejected', async () => {
+    await seedSaved(4, null);
+    await assertFails(chained(OWNER, 'x', 5, 'C5', 'S-other'));
+    await assertSucceeds(chained(OWNER, 'x', 5, 'C5', null));
+  });
+
+  it('baseSaveId: a server write (increment, saveId unchanged) in between - the next save names the same saveId', async () => {
+    await seedSaved(4, 'S4');
+    // Claude / האיפוס של משימה חוזרת: revision + 1, בלי saveId
+    await env.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'notes/rev-1'), { content: 'מ-Claude', revision: 5 });
+    });
+    await assertFails(chained(OWNER, 'ישן', 5, 'C5', 'S4'));
+    await assertSucceeds(chained(OWNER, 'על בסיס Claude', 6, 'C6', 'S4'));
+  });
+
+  it('the real offline queue: saves queued while offline, another device writes first, reconnect - nothing is overwritten', async () => {
+    await seedSaved(4, 'S4');
+    const computer = as(OWNER);
+    const phone = as(SHARED);
+    await disableNetwork(computer);
+    const ref = doc(computer, 'notes/rev-1');
+    // שתי שמירות בתור, כמו שהעורך שולח אותן offline
+    const first = updateDoc(ref, { content: 'מחשב 1', revision: 5, saveId: 'C5', baseSaveId: 'S4', updatedBy: OWNER });
+    const second = updateDoc(ref, { content: 'מחשב 2', revision: 6, saveId: 'C6', baseSaveId: 'C5', updatedBy: OWNER });
+    await assertSucceeds(updateDoc(doc(phone, 'notes/rev-1'), { content: 'טלפון', revision: 5, saveId: 'P5', baseSaveId: 'S4', updatedBy: SHARED }));
+    await enableNetwork(computer);
+    await assertFails(first);
+    await assertFails(second);
+    let stored: unknown;
+    await env.withSecurityRulesDisabled(async (context) => {
+      stored = (await getDoc(doc(context.firestore() as unknown as Firestore, 'notes/rev-1'))).data();
+    });
+    expect(stored).toMatchObject({ content: 'טלפון', revision: 5, saveId: 'P5' });
+  });
+
+  knownHole('baseSaveId (until minClientVersion 1.35.0)', 'a client from before baseSaveId still overwrites with a queued second save', async () => {
+    await seedSaved(4, 'S4');
+    await assertSucceeds(save(SHARED, 'מהטלפון', 5));
+    await assertFails(save(OWNER, 'מהמחשב', 5));
+    await assertSucceeds(save(OWNER, 'דורס את הטלפון', 6));
+  });
+
   it('a note is created at revision 0 (or without it), never higher', async () => {
     await assertSucceeds(setDoc(doc(as(OWNER), 'notes/new-rev'), { ...baseNote, sharedWith: [], revision: 0 }));
     await assertFails(setDoc(doc(as(OWNER), 'notes/new-rev-2'), { ...baseNote, sharedWith: [], revision: 7 }));
@@ -710,13 +779,13 @@ describe('every kind of note write the app makes passes phase 2', () => {
           title: 'כותרת', content: '[]', templateType: 'checklist', tags: ['t'], color: '#fff', revision: increment(1), ...stamp(uid),
         }),
     ]),
-    // saveNoteText - העורך הפתוח: revision מפורש + saveId. גם החלפת תבנית ("המר לטקסט")
+    // saveNoteText - העורך הפתוח: revision מפורש + saveId + baseSaveId (v1.35.0). גם החלפת תבנית ("המר לטקסט")
     ...[OWNER, SHARED].flatMap((uid): [string, string, (db: Firestore) => Promise<unknown>][] => [
       ['saveNoteText (content)', uid, (db) =>
-        updateDoc(doc(db, NOTE), { content: '[{"id":"1","text":"א","completed":true}]', revision: 5, saveId: 's1', ...stamp(uid) })],
-      ['saveNoteText (title)', uid, (db) => updateDoc(doc(db, NOTE), { title: 'חדש', revision: 5, saveId: 's2', ...stamp(uid) })],
+        updateDoc(doc(db, NOTE), { content: '[{"id":"1","text":"א","completed":true}]', revision: 5, saveId: 's1', baseSaveId: null, ...stamp(uid) })],
+      ['saveNoteText (title)', uid, (db) => updateDoc(doc(db, NOTE), { title: 'חדש', revision: 5, saveId: 's2', baseSaveId: null, ...stamp(uid) })],
       ['saveNoteText (convert to text)', uid, (db) =>
-        updateDoc(doc(db, NOTE), { templateType: 'plain', revision: 5, saveId: 's3', ...stamp(uid) })],
+        updateDoc(doc(db, NOTE), { templateType: 'plain', revision: 5, saveId: 's3', baseSaveId: null, ...stamp(uid) })],
     ]),
     // appendToNote - "הוסף לפתק" מדף השיתוף, ב-transaction
     ['appendToNote', OWNER, (db) =>
@@ -832,7 +901,7 @@ describe('conflictEvents (anonymous conflict measurement)', () => {
 
   it('a signed-in user can create one, with every allowed reason and field', async () => {
     await assertSucceeds(setDoc(doc(as(OWNER), 'conflictEvents/e1'), event()));
-    for (const reason of ['title', 'text', 'unreadable', 'schedule', 'edit-vs-delete', 'both-added']) {
+    for (const reason of ['title', 'text', 'unreadable', 'schedule', 'edit-vs-delete', 'both-added', 'unconfirmed']) {
       await assertSucceeds(setDoc(doc(as(OWNER), `conflictEvents/${reason}`), { ...event(), reason, fields: [] }));
     }
     await assertSucceeds(

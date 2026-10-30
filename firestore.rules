@@ -113,6 +113,17 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'content', 'templateType']);
       }
 
+      // `baseSaveId` (v1.35.0): שמירה של העורך מציינת את ה-`saveId` של הגרסה
+      // שהיא נשענת עליה, וחייב להיות זה שבשרת. `revision` לבדו לא מספיק:
+      // שתי שמירות בתור (offline) נושאות 6 ו-7; מכשיר אחר כתב 6 קודם; 6
+      // שלנו נדחית, ו-7 (6 + 1) הייתה עוברת ודורסת אותו. נבדק רק כששולחים
+      // אותו, כדי שגרסה ישנה (1.34.0 ומטה) לא תינעל מחוץ לשמירה עם ה-deploy;
+      // את החור שלה סוגר `minClientVersion` = 1.35.0.
+      function baseChecked() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['baseSaveId'])
+          || request.resource.data.baseSaveId == resource.data.get('saveId', null);
+      }
+
       function revisionChecked() {
         return request.resource.data.get('revision', 0) == resource.data.get('revision', 0) + 1
           || (!contentChanged()
@@ -131,6 +142,7 @@ service cloud.firestore {
       // `isReadOnly` (קריאה בלבד ל-Claude) - רק הבעלים, כמו `isSensitive`.
       allow update: if writerStamp()
         && revisionChecked()
+        && baseChecked()
         && createdViaUnchanged()
         && (isOwner(resource.data.userId)
           || (isSharedWithMe(resource.data) && ownershipUnchanged()
@@ -290,7 +302,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['at', 'reason', 'fields', 'templateType', 'clientVersion'])
         && request.resource.data.keys().hasAll(['at', 'reason', 'fields', 'templateType', 'clientVersion'])
         && request.resource.data.at == request.time
-        && request.resource.data.reason in ['title', 'text', 'unreadable', 'same-field', 'schedule', 'edit-vs-delete', 'both-added']
+        && request.resource.data.reason in ['title', 'text', 'unreadable', 'same-field', 'schedule', 'edit-vs-delete', 'both-added', 'unconfirmed']
         && request.resource.data.fields is list
         && request.resource.data.fields.size() <= 16
         && request.resource.data.fields.hasOnly(['text', 'completed', 'dueDate', 'dueTime', 'repeat', 'repeatBase',

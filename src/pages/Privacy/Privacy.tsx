@@ -7,7 +7,7 @@ import { Button } from '@/components/common/Button';
 
 export const Privacy: React.FC = () => {
   const navigate = useNavigate();
-  const lastUpdated = 'ינואר 2025';
+  const lastUpdated = 'אוקטובר 2026';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors">
@@ -216,6 +216,11 @@ export const Privacy: React.FC = () => {
               <p className="leading-relaxed">
                 האפליקציה משתמשת ב-Local Storage כדי לשמור העדפות שלך (כמו מצב כהה/בהיר) ופרטי
                 התחברות. מידע זה נשמר רק במכשיר שלך ואינו מועבר לשרתים שלנו.
+              </p>
+              <p className="leading-relaxed mt-2">
+                כדי שהאפליקציה תעבוד גם בלי חיבור לאינטרנט, עותק של הפתקים שלך ושל שינויים שעוד לא נשלחו
+                נשמר בדפדפן (IndexedDB). בהתנתקות העותק נמחק מהמכשיר. אם יש שינויים שעוד לא הגיעו לשרת,
+                תישאל/י לפני ההתנתקות אם להשאיר אותם במכשיר עד שתתחבר/י שוב או למחוק אותם.
               </p>
             </section>
 

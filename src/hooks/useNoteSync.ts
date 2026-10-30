@@ -39,7 +39,9 @@ const fromNote = (note: Note): SyncState =>
     title: note.title,
     content: note.content,
     revision: note.revision,
+    saveId: note.saveId ?? null,
     templateType: note.templateType,
+    // לא ידוע כאן. ה-snapshot הראשון של המאזין יגלה אם זה הד של כתיבה ממתינה
     pending: false,
   });
 
@@ -108,10 +110,10 @@ export const useNoteSync = (note: Note): NoteSync => {
         holdUnsaved({ noteId: noteRef.current.id, title: draft.title, content: draft.content });
         return;
       }
-      const { state, revision } = markSent(syncRef.current);
+      const { state, revision, saveId, baseSaveId } = markSent(syncRef.current);
       setSync(state);
       const current = noteRef.current;
-      noteAPI.saveNoteText(current.id, patch, revision).catch((error: unknown) => {
+      noteAPI.saveNoteText(current.id, patch, { revision, saveId, baseSaveId }).catch((error: unknown) => {
         if (getFirebaseErrorCode(error) === 'permission-denied') {
           const text = state.sent[revision];
           // הגרסה נחסמה בינתיים: גם עותק בפתק חדש לא ייכתב, אז הטקסט נשמר בצד להעתקה

@@ -34,3 +34,6 @@ export const AUTOSAVE_DELAY_MS = 600;
 
 /** הקלדה רצופה נשמרת לפחות פעם בזמן הזה, גם בלי הפסקה (`patchDebouncer.ts`) */
 export const AUTOSAVE_MAX_WAIT_MS = 5000;
+
+/** "ממתין לחיבור" מופיע רק אם כתיבה ממתינה יותר מזה - שמירה רגילה מאושרת מהר יותר */
+export const PENDING_WRITES_BADGE_DELAY_MS = 2500;

@@ -5,11 +5,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { SignOutDialog } from '@/components/profile/SignOutDialog/SignOutDialog';
+import { useSafeSignOut } from '@/hooks/useSafeSignOut';
 
 export const ProfileMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const safeSignOut = useSafeSignOut();
   const navigate = useNavigate();
 
   // סגירת התפריט בלחיצה מחוץ לתפריט
@@ -36,11 +39,12 @@ export const ProfileMenu: React.FC = () => {
 
   const handleSignOut = async () => {
     setIsOpen(false);
-    await signOut();
+    await safeSignOut.start();
   };
 
   return (
     <div className="relative" ref={menuRef}>
+      <SignOutDialog signOut={safeSignOut} />
       {/* כפתור פרופיל */}
       <button
         onClick={() => setIsOpen(!isOpen)}
