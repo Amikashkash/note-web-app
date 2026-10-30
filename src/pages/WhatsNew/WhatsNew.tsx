@@ -18,6 +18,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.37.0',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'feature',
+        description:
+          'בפתק פתוח, ליד סוג הפתק: "נשמר", "שומר…", "ממתין לחיבור" או "לא נשמר". "נשמר" מופיע רק כשהשרת קיבל את מה שרואים. נגיעה או ריחוף מסבירים, ו"לא נשמר" אומר גם למה',
+      },
+    ],
+  },
+  {
     version: '1.36.1',
     date: 'אוקטובר 2026',
     changes: [

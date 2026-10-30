@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { editDraft, initialSync, markSent, onSnapshot, type NoteSnapshot } from './noteSync';
+import { awaitingServer, editDraft, initialSync, markSent, onSnapshot, type NoteSnapshot } from './noteSync';
 
 const snap = (overrides: Partial<NoteSnapshot> = {}): NoteSnapshot => ({
   title: 'קניות',
@@ -148,3 +148,27 @@ describe('two tabs on the same note', () => {
     expect(action).toEqual({ kind: 'conflict', why: { reason: 'text', fields: [] } });
   });
 });
+
+describe('awaitingServer (the status line, step 6)', () => {
+  it('a confirmed note, untouched: nothing awaits the server', () => {
+    expect(awaitingServer(initialSync(snap()))).toBe(false);
+  });
+
+  it('an edit, then a save on its way, then confirmed', () => {
+    let state = editDraft(initialSync(snap()), { content: 'חלב וביצים' });
+    expect(awaitingServer(state)).toBe(true);
+    state = markSent(state, 'A6').state;
+    expect(awaitingServer(state)).toBe(true);
+    state = onSnapshot(state, snap({ content: 'חלב וביצים', revision: 6, saveId: 'A6' }), false).state;
+    expect(awaitingServer(state)).toBe(false);
+  });
+
+  it('opened on a write still pending from a previous session, untouched: NOT "saved" until the server confirms', () => {
+    let state = initialSync(snap());
+    state = onSnapshot(state, snap({ pending: true }), false).state;
+    expect(awaitingServer(state)).toBe(true);
+    state = onSnapshot(state, snap({ saveId: 'S5' }), false).state;
+    expect(awaitingServer(state)).toBe(false);
+  });
+});
+

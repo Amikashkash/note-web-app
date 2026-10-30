@@ -20,13 +20,24 @@ import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import * as noteAPI from '@/services/api/notes';
 import { registerOpenEditor } from '@/services/api/noteRecovery';
 import { reportConflict } from '@/services/api/conflictEvents';
-import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, LENGTH_LIMITS } from '@/utils/constants';
+import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, LENGTH_LIMITS, PENDING_WRITES_BADGE_DELAY_MS } from '@/utils/constants';
 import { getErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { NoteText } from '@/utils/noteMerge';
-import { baseForNextEntry, dropEntry, getEntry, recordEntry, TAB_ID } from '@/utils/draftJournal';
+import {
+  baseForNextEntry,
+  dropEntry,
+  entriesOnlyInMemory,
+  getEntry,
+  onJournalChange,
+  recordEntry,
+  TAB_ID,
+} from '@/utils/draftJournal';
+import { createDelayedFlag } from '@/utils/delayedFlag';
+import { saveStatus, type SaveStatus } from '@/utils/saveStatus';
 import { useAppVersionStore, writesBlocked } from '@/store/appVersionStore';
 import {
+  awaitingServer,
   editDraft,
   hasUnconfirmedEdits,
   initialSync,
@@ -71,6 +82,8 @@ export interface NoteSync {
   cancel: () => void;
   /** הגרסה ישנה מדי לשמור (`minClientVersion`): העורך לקריאה בלבד */
   writesBlocked: boolean;
+  /** שורת המצב: "נשמר" / "שומר…" / "ממתין לחיבור" / "לא נשמר" (`utils/saveStatus.ts`) */
+  status: SaveStatus;
 }
 
 export const useNoteSync = (note: Note): NoteSync => {
@@ -80,6 +93,12 @@ export const useNoteSync = (note: Note): NoteSync => {
   const [noteId, setNoteId] = useState(note.id);
   const [sync, setSyncState] = useState<SyncState>(() => fromNote(note));
   const [discarded, setDiscarded] = useState<NoteText | null>(null);
+  // לשורת המצב
+  const [failed, setFailed] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
+  const [browserOffline, setBrowserOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
+  const [slow, setSlow] = useState(false);
+  const [, setJournalChanges] = useState(0);
 
   // הערכים העדכניים לקולבקים של Firestore ושל ה-debounce, שחיים מחוץ לרינדור
   const syncRef = useRef(sync);
@@ -100,6 +119,7 @@ export const useNoteSync = (note: Note): NoteSync => {
     setNoteId(note.id);
     setSyncState(fromNote(note));
     setDiscarded(null);
+    setFailed(false);
   }
   useEffect(() => {
     syncRef.current = sync;
@@ -153,12 +173,14 @@ export const useNoteSync = (note: Note): NoteSync => {
         .saveNoteText(current.id, patch, { revision, saveId, baseSaveId })
         .then(() => {
           if (uid) dropEntry(uid, current.id, saveId);
+          setFailed(false);
         })
         .catch((error: unknown) => {
           // נדחתה (מישהו כתב בינתיים): עורך פתוח יציג התנגשות, עורך שנסגר -
           // ה-journal. גם אם הגרסה נחסמה בינתיים: הרשומה מחכה לגרסה החדשה
           if (getFirebaseErrorCode(error) === 'permission-denied') return;
           logger.error('Note save failed:', error);
+          setFailed(true);
           window.alert(getErrorMessage(error));
         });
     },
@@ -182,6 +204,7 @@ export const useNoteSync = (note: Note): NoteSync => {
       note.id,
       (live) => {
         if (!live.exists) return;
+        setFromCache(live.fromCache);
         if (adoptNextRef.current && !live.pending) {
           adoptNextRef.current = false;
           setSync(initialSync(live));
@@ -262,7 +285,50 @@ export const useNoteSync = (note: Note): NoteSync => {
     adoptNextRef.current = true;
   }, [debouncer]);
 
+  // שורת המצב
+  const unconfirmed = awaitingServer(sync);
+  useEffect(() => {
+    const goOnline = () => setBrowserOffline(false);
+    const goOffline = () => setBrowserOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+  // "שומר…" שלא אושר כמה שניות → "ממתין לחיבור", גם כשהדפדפן חושב שיש חיבור
+  const slowFlag = useRef<ReturnType<typeof createDelayedFlag> | null>(null);
+  useEffect(() => {
+    const flag = createDelayedFlag({
+      delayMs: PENDING_WRITES_BADGE_DELAY_MS,
+      onChange: setSlow,
+      setTimer: (callback, ms) => window.setTimeout(callback, ms),
+      clearTimer: (handle) => window.clearTimeout(handle as number),
+    });
+    slowFlag.current = flag;
+    return () => {
+      flag.stop();
+      slowFlag.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    slowFlag.current?.set(unconfirmed);
+  }, [unconfirmed]);
+  useEffect(() => onJournalChange(() => setJournalChanges((count) => count + 1)), []);
+  const notOnDevice = uid ? entriesOnlyInMemory(uid).some((entry) => entry.noteId === note.id) : false;
+  const status = saveStatus({
+    unconfirmed,
+    conflict: sync.conflict !== null,
+    writesBlocked: blocked,
+    failed,
+    offline: fromCache || browserOffline,
+    slow,
+    notOnDevice,
+  });
+
   return {
+    status,
     title: sync.draft.title,
     content: sync.draft.content,
     edit,
