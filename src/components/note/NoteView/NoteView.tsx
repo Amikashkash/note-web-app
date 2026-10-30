@@ -30,6 +30,7 @@ import type { NoteVersion } from '@/types/version';
 import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from '@/utils/share';
 import { useAuthStore } from '@/store/authStore';
 import { useNoteSync } from '@/hooks/useNoteSync';
+import { SaveStatusLine } from '@/components/note/SaveStatusLine/SaveStatusLine';
 import { useNotePresence } from '@/hooks/useNotePresence';
 import { presenceMessage } from '@/utils/presence';
 import { LENGTH_LIMITS } from '@/utils/constants';
@@ -323,7 +324,9 @@ export const NoteView: React.FC<NoteViewProps> = ({
               className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-2 border-none focus:ring-2 focus:ring-brand/40 dark:focus:ring-brand-dark/40 rounded px-2 dark:bg-surface-dark"
               placeholder="כותרת הפתק..."
             />
-            <div className="flex items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
+            <div className="flex flex-wrap items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
+              <SaveStatusLine status={editor.status} />
+              <span>•</span>
               <span className="inline-flex items-center gap-1.5">
                 <TemplateIcon size={16} strokeWidth={1.75} />
                 {getTemplateLabel(note.templateType)}

@@ -95,6 +95,13 @@ const sameText = (a: NoteText, b: NoteText) => a.title === b.title && a.content 
 export const hasUnconfirmedEdits = (state: SyncState, pendingLocalPatch: boolean): boolean =>
   pendingLocalPatch || !sameText(state.draft, state.base) || state.lastSentRevision > state.base.revision;
 
+/**
+ * יש משהו שהשרת עוד לא אישר, לשורת המצב: שינויים שלא אושרו, **או** בסיס
+ * שהוא בעצמו כתיבה ממתינה (מסשן קודם או מלשונית אחרת) - גם אם לא נגעו בכלום.
+ */
+export const awaitingServer = (state: SyncState): boolean =>
+  hasUnconfirmedEdits(state, false) || state.unconfirmedBase;
+
 /** המשתמש ערך. בזמן התנגשות אין עריכה - הקורא חוסם אותה */
 export const editDraft = (state: SyncState, patch: Partial<NoteText>): SyncState => ({
   ...state,

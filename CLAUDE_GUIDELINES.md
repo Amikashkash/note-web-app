@@ -316,7 +316,14 @@ live in IndexedDB and survive closing the app. Consequences:
   removes the journal and the stash. Other tabs reload. A clear that did not
   finish is retried on the next load, before Firestore starts.
 - "Waiting for connection" (`components/common/PendingWrites`): pending note
-  writes for more than 2.5s. The full status line is step 6.
+  writes for more than 2.5s, outside the editor.
+- **Save status line (v1.37.0, step 6)**: `useNoteSync().status`, decided by
+  the pure `utils/saveStatus.ts`, shown by `SaveStatusLine` in `NoteView`.
+  "נשמר" only when nothing awaits the server (`awaitingServer`: unconfirmed
+  edits, or a base that is itself a pending write). Conflict, blocked
+  version or a failed save → "לא נשמר" with the reason. Offline (snapshot
+  from cache, or the browser says so) or unconfirmed for 2.5s → "ממתין
+  לחיבור", which says when the journal record is not on the device.
 
 **New fields on items** — the app's parsers keep only the fields they know,
 so a save from the app drops anything else. A new field (for example
