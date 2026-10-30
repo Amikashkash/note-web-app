@@ -166,14 +166,25 @@ service cloud.firestore {
       // עד מחר"), ו-`expiresAt` מוגבל ל-5 דקות קדימה (לניקוי TTL בלבד).
       // שרת ה-MCP קורא את הסימונים לפני עריכה (Admin SDK).
       match /presence/{sessionId} {
+        // `typedAt` (v1.39.0): "מקליד עכשיו". רק כלי העריכה של Claude נחסמים
+        // לפיו, ולכן אי אפשר לזייף אותו: זמן השרת של הכתיבה הזו, או בדיוק
+        // מה שכבר היה (רענון ב-merge שלא נוגע בו). שדה רשות - גרסה ישנה לא
+        // שולחת אותו.
+        function typedAtValid(data) {
+          return !('typedAt' in data)
+            || data.typedAt == request.time
+            || (resource != null && data.typedAt == resource.data.get('typedAt', null));
+        }
+
         function validPresence() {
           let data = request.resource.data;
-          return data.keys().hasOnly(['uid', 'device', 'refreshedAt', 'expiresAt'])
+          return data.keys().hasOnly(['uid', 'device', 'refreshedAt', 'expiresAt', 'typedAt'])
             && data.uid == request.auth.uid
             && data.device is string && data.device.size() <= 40
             && data.refreshedAt == request.time
             && data.expiresAt is timestamp
-            && data.expiresAt <= request.time + duration.value(5, 'm');
+            && data.expiresAt <= request.time + duration.value(5, 'm')
+            && typedAtValid(data);
         }
 
         allow read: if canReadNote(get(/databases/$(database)/documents/notes/$(noteId)).data);

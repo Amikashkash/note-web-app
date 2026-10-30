@@ -317,7 +317,7 @@ live in IndexedDB and survive closing the app. Consequences:
   finish is retried on the next load, before Firestore starts.
 - "Waiting for connection" (`components/common/PendingWrites`): pending note
   writes for more than 2.5s, outside the editor.
-- **No edit mode (v1.38.0, step 7)**: `NoteView` always renders the editor
+- **No edit mode (v1.39.0, step 7)**: `NoteView` always renders the editor
   for every template; view-only only while frozen (conflict, or
   `minClientVersion` - shown as "לצפייה בלבד"). Opening a note never writes:
   an empty checklist/work plan shows a computed first row (`utils/firstRow.ts`)
@@ -325,6 +325,16 @@ live in IndexedDB and survive closing the app. Consequences:
   a 250ms press (`TouchSensor`), and a number field blurs on wheel. Links in
   edited text show as cards below it (`NoteLinks`). There are no view-only
   shares: every recipient can edit (rules).
+- **Claude is blocked only while the user types (v1.39.0)**: the editor
+  writes `typedAt` (server time, rules-checked) on its presence marker, at
+  most every 15s while editing (`createTypingSignal`); the periodic refresh
+  merges and keeps it. The server (`functions/src/notesCore/typing.ts`)
+  refuses edit tools only if a marker's `typedAt` is under 75s old (= at
+  least 60s after the last keystroke) - `UserTypingError`, telling Claude to
+  tell the user and retry later. A note that is only open is changed, and the
+  open editor adopts or merges it (`noteSync`). Windows mirrored in
+  `tests/mirrors/typingWindow.mirror.test.ts`. The status line and close
+  button sit in a sticky bar at the top of `NoteView`.
 - **Save status line (v1.37.0, step 6)**: `useNoteSync().status`, decided by
   the pure `utils/saveStatus.ts`, shown by `SaveStatusLine` in `NoteView`.
   "נשמר" only when nothing awaits the server (`awaitingServer`: unconfirmed

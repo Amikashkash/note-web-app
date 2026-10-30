@@ -23,7 +23,7 @@ const INSTRUCTIONS =
   'Start with list_categories or search_notes, then read a note with get_note, and read it again right before editing. ' +
   'Notes the user marked as sensitive are not available at all. Change only what the user asked for. Notes are never ' +
   'deleted: when the user says delete, use archive_note (restorable). Notes marked read-only for Claude, notes shared by ' +
-  "other users and notes open in the app cannot be changed; every change is kept in the note's history.";
+  "other users and a note the user is typing in right now cannot be changed; every change is kept in the note's history.";
 
 export interface ServerDeps {
   scopeFor?: ScopeFactory;

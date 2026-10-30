@@ -43,15 +43,17 @@ export class ReadOnlyError extends Error {
 }
 
 /**
- * הפתק פתוח עכשיו באפליקציה (סימון נוכחות טרי). עריכה מהשרת בזמן הזה
- * הייתה מתנגשת עם העורך הפתוח, ולכן לא כותבים ומבקשים לסגור אותו.
+ * המשתמש מקליד בפתק עכשיו באפליקציה (`typedAt` טרי, `typing.ts`). עריכה
+ * מהשרת בזמן הזה הייתה קוטעת אותו (בטקסט חופשי - בחירה באמצע הקלדה), ולכן
+ * לא כותבים, ו-Claude מתבקש לומר למשתמש ולנסות שוב אחר כך. פתק שרק פתוח
+ * (בלי הקלדה) כבר לא חוסם (v1.39.0).
  */
-export class OpenElsewhereError extends Error {
-  readonly code = 'open-elsewhere';
+export class UserTypingError extends Error {
+  readonly code = 'user-typing';
   readonly devices: string[];
   constructor(devices: string[]) {
-    super('The note is open in the app');
-    this.name = 'OpenElsewhereError';
+    super('The user is typing in the note in the app');
+    this.name = 'UserTypingError';
     this.devices = devices;
   }
 }

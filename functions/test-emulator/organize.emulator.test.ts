@@ -378,12 +378,16 @@ describe('the usual refusals', () => {
     expect(await stored(noteId)).toMatchObject({ revision: 3, isArchived: false, categoryId: expect.any(String) });
   };
 
-  it('open in the app', async () => {
+  it('the user is typing in it in the app', async () => {
     const noteId = await seedWithReminders();
     await db.doc(`notes/${noteId}/presence/s1`).set({
-      uid: users.a, device: 'iPhone', refreshedAt: Timestamp.fromMillis(Date.now() - 5_000), expiresAt: Timestamp.fromMillis(Date.now() + 55_000),
+      uid: users.a,
+      device: 'iPhone',
+      refreshedAt: Timestamp.fromMillis(Date.now() - 5_000),
+      typedAt: Timestamp.fromMillis(Date.now() - 5_000),
+      expiresAt: Timestamp.fromMillis(Date.now() + 55_000),
     });
-    await expectAll(noteId, (text) => expect(text).toContain('open in the app right now'));
+    await expectAll(noteId, (text) => expect(text).toContain('typing in this note in the app right now'));
   });
 
   it('read-only note', async () => {

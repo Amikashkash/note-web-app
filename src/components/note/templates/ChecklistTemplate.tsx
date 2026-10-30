@@ -258,7 +258,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     // עכבר: מרחק קטן לפני שהגרירה מתחילה - לחיצה רגילה על הידית לא מזיזה כלום
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     // מגע: לחיצה ארוכה. בלי מצב עריכה הידית תמיד שם, וגלילה שמתחילה עליה
-    // אסור שתזיז משימה (v1.38.0)
+    // אסור שתזיז משימה (v1.39.0)
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
