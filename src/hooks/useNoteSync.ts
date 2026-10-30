@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import * as noteAPI from '@/services/api/notes';
 import { recoverRejectedText, registerOpenEditor } from '@/services/api/noteRecovery';
+import { reportConflict } from '@/services/api/conflictEvents';
 import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { logger } from '@/utils/logger';
@@ -155,7 +156,11 @@ export const useNoteSync = (note: Note): NoteSync => {
         const { state, action } = onSnapshot(syncRef.current, live, debouncer.hasPending());
         if (state === syncRef.current) return;
         setSync(state);
-        if (action.kind === 'conflict') debouncer.cancel();
+        if (action.kind === 'conflict') {
+          debouncer.cancel();
+          // פעם אחת לכל התנגשות: snapshots נוספים בזמן ההתנגשות מחזירים 'none'
+          reportConflict(action.why, live.templateType);
+        }
         if (action.kind === 'merged') debouncer.call({ title: state.draft.title, content: state.draft.content });
       },
       (error) => logger.error('Live note listener failed:', error)
