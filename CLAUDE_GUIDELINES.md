@@ -244,9 +244,14 @@ initialize only `''`. Converting between templates goes through
 
 **Minimum client version (D4a)** — `config/app.minClientVersion` (a string
 like `"1.40.0"`, set by the owner in the Firebase console; no client can write
-it) makes every older version stop writing. Read on start (live listener), on
-returning to the app and when the connection comes back
-(`hooks/useMinClientVersion.ts`). Blocked: every note write (`writeStamp` calls
+it) makes every older version stop writing. Read by a live listener, plus a
+server read on start, on returning to the app (`visibilitychange`,
+`pageshow`, `focus`, `resume`), when the connection comes back, every 5
+minutes while visible, and before a write when the last successful read is
+over a minute old. A failed read is retried (2s → 60s). Since v1.33.2; the
+single unretried read of v1.33.0 failed silently after phone sleep
+(`utils/minVersionChecker.ts`, `hooks/useMinClientVersion.ts`). What the
+device read and when is shown at the top of What's New. Blocked: every note write (`writeStamp` calls
 `assertWritesAllowed`, `services/api/writeGate.ts`), category writes, product
 learning. Not blocked: presence, FCM tokens, user profile. The open editor
 stops sending and becomes read-only; unsaved text is kept in

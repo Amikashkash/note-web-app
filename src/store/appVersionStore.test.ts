@@ -6,7 +6,14 @@ import { useAppVersionStore, writesBlocked } from './appVersionStore';
 describe('minClientVersion: the store and the write gate', () => {
   beforeEach(() => {
     vi.stubGlobal('__APP_VERSION__', '1.33.0');
-    useAppVersionStore.setState({ minClientVersion: null, writesBlocked: false, unsaved: {} });
+    useAppVersionStore.setState({
+      minClientVersion: null,
+      rawMinClientVersion: undefined,
+      lastCheck: null,
+      writesBlocked: false,
+      unsaved: {},
+      onWriteAttempt: () => {},
+    });
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -42,5 +49,28 @@ describe('minClientVersion: the store and the write gate', () => {
       'ראשון, מעודכן',
       'שני',
     ]);
+  });
+
+  it('keeps the raw value for the diagnostic line, even when it cannot be read', () => {
+    const { setMinClientVersion } = useAppVersionStore.getState();
+    setMinClientVersion('"1.33.1"');
+    expect(useAppVersionStore.getState()).toMatchObject({
+      minClientVersion: '"1.33.1"',
+      rawMinClientVersion: '"1.33.1"',
+      writesBlocked: false,
+    });
+    setMinClientVersion(undefined);
+    expect(useAppVersionStore.getState().rawMinClientVersion).toBeUndefined();
+  });
+
+  it('an allowed write asks for a server check; a blocked write does not need one', () => {
+    const onWriteAttempt = vi.fn();
+    useAppVersionStore.setState({ onWriteAttempt });
+    assertWritesAllowed();
+    expect(onWriteAttempt).toHaveBeenCalledTimes(1);
+
+    useAppVersionStore.getState().setMinClientVersion('9.0.0');
+    expect(() => assertWritesAllowed()).toThrow(WritesBlockedError);
+    expect(onWriteAttempt).toHaveBeenCalledTimes(1);
   });
 });

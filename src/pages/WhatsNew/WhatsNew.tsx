@@ -4,6 +4,8 @@
 
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
+import { useAppVersionStore } from '@/store/appVersionStore';
+import { describeMinVersionStatus } from '@/utils/appVersion';
 
 interface ChangelogEntry {
   version: string;
@@ -15,6 +17,21 @@ interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+  {
+    version: '1.33.2',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'ההודעה "יש גרסה חדשה" מופיעה גם כשחוזרים לאפליקציה אחרי שהטלפון היה במצב שינה. קודם הבדיקה יכלה להיכשל בשקט, והגרסה הישנה המשיכה לשמור',
+      },
+      {
+        type: 'improvement',
+        description: 'בראש הדף הזה: הגרסה המותקנת, הגרסה המינימלית שנקראה, ומתי נבדקה לאחרונה',
+      },
+    ],
+  },
   {
     version: '1.33.1',
     date: 'אוקטובר 2026',
@@ -1119,6 +1136,24 @@ const getTypeName = (type: ChangelogEntry['changes'][0]['type']) => {
   }
 };
 
+/** מה האפליקציה קראה מ-`config/app` (D4a) ומתי - לבדיקה במכשיר */
+const VersionStatus: React.FC = () => {
+  const raw = useAppVersionStore((state) => state.rawMinClientVersion);
+  const blocked = useAppVersionStore((state) => state.writesBlocked);
+  const lastCheck = useAppVersionStore((state) => state.lastCheck);
+  return (
+    <p dir="rtl" className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+      {describeMinVersionStatus({
+        running: __APP_VERSION__,
+        raw,
+        blocked,
+        lastCheck,
+        formatTime: (at) => new Date(at).toLocaleTimeString('he-IL'),
+      })}
+    </p>
+  );
+};
+
 export const WhatsNew: React.FC = () => {
   const navigate = useNavigate();
 
@@ -1153,6 +1188,7 @@ export const WhatsNew: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400">
               היסטוריית גרסאות ושינויים באפליקציה
             </p>
+            <VersionStatus />
           </div>
 
           {/* Changelog Timeline */}

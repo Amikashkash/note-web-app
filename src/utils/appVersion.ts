@@ -23,3 +23,26 @@ export const isBelowMinimum = (running: string, minimum: unknown): boolean => {
   }
   return false;
 };
+
+/**
+ * שורת האבחון ב"מה חדש": מה האפליקציה קראה מ-`config/app` ומתי. בלי לוגים
+ * בפרודקשן, זו הדרך לבדוק במכשיר למה חסימה הופיעה או לא.
+ */
+export const describeMinVersionStatus = (status: {
+  running: string;
+  raw: unknown;
+  blocked: boolean;
+  lastCheck: { ok: boolean; at: number } | null;
+  formatTime: (at: number) => string;
+}): string => {
+  const minimum =
+    status.raw === undefined
+      ? 'אין'
+      : parse(status.raw)
+        ? `${(status.raw as string).trim()}${status.blocked ? ' (חוסם)' : ''}`
+        : `${JSON.stringify(status.raw)} (לא תקין, לא חוסם)`;
+  const check = !status.lastCheck
+    ? 'עוד לא נבדק מהשרת'
+    : `${status.lastCheck.ok ? 'נבדק מהשרת' : 'בדיקה נכשלה'} ב-${status.formatTime(status.lastCheck.at)}`;
+  return `גרסה ${status.running} · מינימום: ${minimum} · ${check}`;
+};

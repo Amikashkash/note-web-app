@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBelowMinimum } from './appVersion';
+import { describeMinVersionStatus, isBelowMinimum } from './appVersion';
 
 describe('isBelowMinimum (minClientVersion)', () => {
   it.each([
@@ -33,5 +33,30 @@ describe('isBelowMinimum (minClientVersion)', () => {
 
   it('a running version that cannot be read never blocks', () => {
     expect(isBelowMinimum('dev', '1.33.0')).toBe(false);
+  });
+});
+
+describe('describeMinVersionStatus (the diagnostic line)', () => {
+  const base = { running: '1.33.2', blocked: false, lastCheck: null, formatTime: () => '14:03:00' };
+
+  it.each([
+    [undefined, false, 'מינימום: אין'],
+    ['1.33.1', false, 'מינימום: 1.33.1 ·'],
+    ['1.34.0', true, 'מינימום: 1.34.0 (חוסם)'],
+    // מה שהבעלים עלול להקליד במסוף - מוצג כמו שהוא, כדי שיראה למה לא חסם
+    ['"1.33.1"', false, 'מינימום: "\\"1.33.1\\"" (לא תקין, לא חוסם)'],
+    [1.34, false, 'מינימום: 1.34 (לא תקין, לא חוסם)'],
+  ])('minimum %j', (raw, blocked, expected) => {
+    expect(describeMinVersionStatus({ ...base, raw, blocked })).toContain(expected);
+  });
+
+  it('says whether and when the server was read', () => {
+    expect(describeMinVersionStatus({ ...base, raw: undefined })).toContain('עוד לא נבדק מהשרת');
+    expect(describeMinVersionStatus({ ...base, raw: undefined, lastCheck: { ok: true, at: 1 } })).toContain(
+      'נבדק מהשרת ב-14:03:00'
+    );
+    expect(describeMinVersionStatus({ ...base, raw: undefined, lastCheck: { ok: false, at: 1 } })).toContain(
+      'בדיקה נכשלה ב-14:03:00'
+    );
   });
 });
