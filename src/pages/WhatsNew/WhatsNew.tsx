@@ -18,6 +18,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.36.1',
+    date: 'אוקטובר 2026',
+    changes: [
+      {
+        type: 'fix',
+        description:
+          'אם האחסון של הדפדפן מלא ושינוי לא נשמר במכשיר, מופיעה הודעה ברורה עם הטקסט להעתקה, עד שהשינוי מגיע לשרת. קודם זה קרה בשקט',
+      },
+    ],
+  },
+  {
     version: '1.36.0',
     date: 'אוקטובר 2026',
     changes: [
