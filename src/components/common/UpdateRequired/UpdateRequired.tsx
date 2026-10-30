@@ -57,7 +57,7 @@ const UnsavedEntry: React.FC<{ text: UnsavedText }> = ({ text }) => {
   );
 };
 
-const UnsavedList: React.FC<{ entries: UnsavedText[] }> = ({ entries }) => (
+export const UnsavedList: React.FC<{ entries: UnsavedText[] }> = ({ entries }) => (
   <div className="space-y-2 max-h-[50vh] overflow-y-auto">
     {entries.map((entry) => (
       <UnsavedEntry key={entry.noteId} text={entry} />

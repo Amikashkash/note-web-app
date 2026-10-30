@@ -12,6 +12,7 @@ import { useMinClientVersion } from './hooks/useMinClientVersion';
 import { useDraftJournal } from './hooks/useDraftJournal';
 import { RecoveredText, UpdateRequired } from './components/common/UpdateRequired/UpdateRequired';
 import { PendingWrites } from './components/common/PendingWrites/PendingWrites';
+import { DeviceStorageWarning } from './components/common/DeviceStorageWarning/DeviceStorageWarning';
 import './styles/globals.css';
 
 const App: React.FC = () => {
@@ -37,6 +38,7 @@ const App: React.FC = () => {
       <UpdateRequired />
       <RecoveredText />
       <PendingWrites />
+      <DeviceStorageWarning />
     </ThemeProvider>
   );
 };

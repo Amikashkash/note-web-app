@@ -9,6 +9,7 @@ import {
   baseForNextEntry,
   clearAllEntries,
   dropEntry,
+  entriesOnlyInMemory,
   FOREIGN_ENTRY_GRACE_MS,
   getEntry,
   listEntries,
@@ -126,6 +127,74 @@ describe('journal records', () => {
     recordEntry('u1', entry());
     expect(getEntry('u1', 'n1')?.saveId).toBe('A6');
     expect(listEntries('u1')).toHaveLength(1);
+  });
+
+  describe('storage full or unavailable: never silent (v1.36.1)', () => {
+    const failing = () => {
+      const working = mapStorage();
+      let full = true;
+      setJournalStorage({
+        ...working,
+        setItem: (key, value) => {
+          if (full) throw new DOMException('quota', 'QuotaExceededError');
+          working.setItem(key, value);
+        },
+      });
+      return { recover: () => (full = false) };
+    };
+
+    it('the write reports that it was not stored, and the record is listed for the warning', () => {
+      failing();
+      expect(recordEntry('u1', entry())).toBe(false);
+      expect(entriesOnlyInMemory('u1').map((e) => e.text)).toEqual([{ title: 'קניות', content: 'חלב וביצים' }]);
+      expect(entriesOnlyInMemory('u2')).toEqual([]);
+    });
+
+    it('a storage that throws on every access (blocked) behaves the same', () => {
+      setJournalStorage({
+        getItem: () => {
+          throw new Error('SecurityError');
+        },
+        setItem: () => {
+          throw new Error('SecurityError');
+        },
+        removeItem: () => {
+          throw new Error('SecurityError');
+        },
+        keys: () => {
+          throw new Error('SecurityError');
+        },
+      });
+      expect(recordEntry('u1', entry())).toBe(false);
+      expect(entriesOnlyInMemory('u1')).toHaveLength(1);
+      expect(getEntry('u1', 'n1')?.saveId).toBe('A6');
+    });
+
+    it('the warning is told (change event), and the text leaves it only when the server confirmed', () => {
+      failing();
+      let calls = 0;
+      const stop = onJournalChange(() => calls++);
+      recordEntry('u1', entry({ saveId: 'A6' }));
+      expect(calls).toBe(1);
+      dropEntry('u1', 'n1', 'A6');
+      expect(calls).toBe(2);
+      expect(entriesOnlyInMemory('u1')).toEqual([]);
+      stop();
+    });
+
+    it('a newer save that was stored on the device clears the warning for that note', () => {
+      const storage = failing();
+      recordEntry('u1', entry({ saveId: 'A6' }));
+      storage.recover();
+      expect(recordEntry('u1', entry({ saveId: 'A7' }))).toBe(true);
+      expect(entriesOnlyInMemory('u1')).toEqual([]);
+      expect(getEntry('u1', 'n1')?.saveId).toBe('A7');
+    });
+
+    it('a working storage: stored, and nothing to warn about', () => {
+      expect(recordEntry('u1', entry())).toBe(true);
+      expect(entriesOnlyInMemory('u1')).toEqual([]);
+    });
   });
 
   it('a corrupt record is ignored, not thrown', () => {

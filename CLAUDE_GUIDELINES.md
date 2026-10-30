@@ -304,7 +304,10 @@ live in IndexedDB and survive closing the app. Consequences:
   editor shows the choice), while the version is blocked, and for 10s on
   another tab's fresh record. A new record invalidates the last snapshot seen
   (it predates the write). **It never deletes text: it confirms, merges or
-  copies.** `noteRecovery` no longer copies per rejected save.
+  copies.** `noteRecovery` no longer copies per rejected save. If localStorage
+  is full or blocked, the record stays in memory and `DeviceStorageWarning`
+  shows the text for copying until the server confirms it (v1.36.1) - never
+  silent.
 - **Sign-out** clears the local data (`services/firebase/localData.ts`):
   first waits for pending writes and for the journal to empty; journal
   records and the `minClientVersion` stash (`utils/unsavedStash.ts`) count as

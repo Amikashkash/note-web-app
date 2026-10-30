@@ -87,7 +87,8 @@ export const setJournalStorage = (next: JournalStorage | null): void => {
 
 /**
  * כשה-storage לא זמין או מלא: הרשומה נשמרת בזיכרון. מגן בתוך הסשן, לא
- * אחרי סגירה - עדיף מכלום.
+ * אחרי סגירה - ולכן **לא בשקט** (v1.36.1): `entriesOnlyInMemory` מחזיר
+ * אותן, ו-`DeviceStorageWarning` מציג אותן למשתמש עם העתקה, עד שהשרת מאשר.
  */
 const memory = new Map<string, string>();
 
@@ -137,16 +138,32 @@ export const listEntries = (uid: string): JournalEntry[] => {
   return [...all].map(read).filter((entry): entry is JournalEntry => entry !== null);
 };
 
-export const recordEntry = (uid: string, entry: JournalEntry): void => {
+/** `true` - נשמרה במכשיר. `false` - רק בזיכרון (storage מלא או לא זמין) */
+export const recordEntry = (uid: string, entry: JournalEntry): boolean => {
   const key = keyFor(uid, entry.noteId);
   const raw = JSON.stringify(entry);
+  let stored = true;
   try {
     storage.setItem(key, raw);
     memory.delete(key);
   } catch {
     memory.set(key, raw);
+    stored = false;
   }
   changed();
+  return stored;
+};
+
+/**
+ * רשומות שלא נשמרו במכשיר: אם האפליקציה תיסגר לפני שהשרת יאשר אותן, אין
+ * להן גיבוי. נעלמות מכאן כשהשרת מאשר (או כשהרשומה הבאה כן נשמרה).
+ */
+export const entriesOnlyInMemory = (uid: string): JournalEntry[] => {
+  const prefix = `${KEY_PREFIX}${uid}.`;
+  return [...memory.entries()]
+    .filter(([key]) => key.startsWith(prefix))
+    .map(([, raw]) => parse(raw))
+    .filter((entry): entry is JournalEntry => entry !== null);
 };
 
 /**

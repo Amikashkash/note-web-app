@@ -10,10 +10,15 @@ import { useAuthStore } from '@/store/authStore';
 import { subscribeToPendingNoteWrites } from '@/services/api/notes';
 import { createDelayedFlag } from '@/utils/delayedFlag';
 import { PENDING_WRITES_BADGE_DELAY_MS } from '@/utils/constants';
+import { entriesOnlyInMemory, onJournalChange } from '@/utils/draftJournal';
 
 export const PendingWrites: React.FC = () => {
   const uid = useAuthStore((state) => state.user?.uid);
   const [shown, setShown] = useState(false);
+  // האחסון במכשיר נכשל (`DeviceStorageWarning`): לא מבטיחים "שמורים במכשיר"
+  const [, setChanges] = useState(0);
+  useEffect(() => onJournalChange(() => setChanges((count) => count + 1)), []);
+  const notOnDevice = uid ? entriesOnlyInMemory(uid).length > 0 : false;
 
   useEffect(() => {
     if (!uid) return;
@@ -40,7 +45,7 @@ export const PendingWrites: React.FC = () => {
       className="fixed bottom-4 inset-x-0 mx-auto w-fit z-[90] flex items-center gap-2 px-4 py-2 rounded-full shadow-lg bg-slate-800 text-white text-sm dark:bg-slate-200 dark:text-slate-900"
     >
       <CloudOff size={16} strokeWidth={2} aria-hidden />
-      ממתין לחיבור · השינויים שמורים במכשיר
+      {notOnDevice ? 'ממתין לחיבור' : 'ממתין לחיבור · השינויים שמורים במכשיר'}
     </div>
   );
 };
