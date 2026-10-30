@@ -1,10 +1,13 @@
 /**
  * הנתונים המקומיים בהתנתקות: לא נמחקים כשיש כתיבות שלא הגיעו לשרת (הקורא
- * שואל את המשתמש), ומחיקה שלא הסתיימה נשארת לטעינה הבאה.
+ * שואל את המשתמש), ומחיקה שלא הסתיימה נשארת לטעינה הבאה. מאז v1.36.0 גם
+ * `draftJournal` והטקסט שנשמר בצד בחסימת גרסה: נספרים, ונמחקים יחד.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
+import { dropEntry, getEntry, recordEntry, type JournalEntry } from '@/utils/draftJournal';
+import { readStash, stashUnsaved } from '@/utils/unsavedStash';
 
 const firestore = vi.hoisted(() => ({
   waitForPendingWrites: vi.fn(),
@@ -19,6 +22,7 @@ import {
   clearLocalDataIfRequested,
   isClearRequested,
   isSigningOutHere,
+  localChangesSettle,
   pendingWritesSettle,
   requestLocalDataClear,
 } from './localData';
@@ -26,14 +30,33 @@ import {
 const db = {} as Firestore;
 const never = () => new Promise<void>(() => undefined);
 
+const journaled = (): JournalEntry => ({
+  noteId: 'n1',
+  saveId: 'A6',
+  revision: 6,
+  text: { title: 'קניות', content: 'חלב' },
+  templateType: 'plain',
+  base: null,
+  meta: { categoryId: 'c1', tags: [], color: null, isSensitive: false, isReadOnly: false },
+  clientVersion: '1.36.0',
+  tabId: 't',
+  at: 0,
+});
+
+let store: Map<string, string>;
+
 describe('local data on sign-out', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    const store = new Map<string, string>();
+    store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => store.get(key) ?? null,
       setItem: (key: string, value: string) => store.set(key, value),
       removeItem: (key: string) => store.delete(key),
+      get length() {
+        return store.size;
+      },
+      key: (index: number) => [...store.keys()][index] ?? null,
     });
     firestore.terminate.mockResolvedValue(undefined);
     firestore.clearIndexedDbPersistence.mockResolvedValue(undefined);
@@ -101,5 +124,67 @@ describe('local data on sign-out', () => {
     cancelLocalDataClear();
     expect(isSigningOutHere()).toBe(false);
     expect(isClearRequested()).toBe(false);
+  });
+
+  describe('everything kept outside Firestore (v1.36.0)', () => {
+    it('nothing pending anywhere: safe to delete', async () => {
+      firestore.waitForPendingWrites.mockResolvedValue(undefined);
+      await expect(localChangesSettle(db, 'u1')).resolves.toBe(true);
+    });
+
+    it('a journal record that empties in time (the save was confirmed): safe to delete', async () => {
+      firestore.waitForPendingWrites.mockResolvedValue(undefined);
+      recordEntry('u1', journaled());
+      const result = localChangesSettle(db, 'u1');
+      await vi.advanceTimersByTimeAsync(400);
+      dropEntry('u1', 'n1', 'A6');
+      await vi.advanceTimersByTimeAsync(400);
+      await expect(result).resolves.toBe(true);
+    });
+
+    it('a journal record that stays (offline, or a copy not made yet): not settled - the user is asked', async () => {
+      firestore.waitForPendingWrites.mockResolvedValue(undefined);
+      recordEntry('u1', journaled());
+      const result = localChangesSettle(db, 'u1');
+      await vi.advanceTimersByTimeAsync(5000);
+      await expect(result).resolves.toBe(false);
+    });
+
+    it('text kept aside by a blocked version (minClientVersion): not settled', async () => {
+      firestore.waitForPendingWrites.mockResolvedValue(undefined);
+      stashUnsaved([{ noteId: 'n1', title: 'קניות', content: 'חלב' }]);
+      await expect(localChangesSettle(db, 'u1')).resolves.toBe(false);
+    });
+
+    it('another user’s journal on this browser does not hold this sign-out', async () => {
+      firestore.waitForPendingWrites.mockResolvedValue(undefined);
+      recordEntry('someone-else', journaled());
+      await expect(localChangesSettle(db, 'u1')).resolves.toBe(true);
+    });
+
+    it('clearing on sign-out removes the journal and the kept-aside text', async () => {
+      recordEntry('u1', journaled());
+      stashUnsaved([{ noteId: 'n1', title: 'קניות', content: 'חלב' }]);
+      await clearLocalData(db);
+      expect(getEntry('u1', 'n1')).toBeNull();
+      expect(readStash()).toEqual([]);
+    });
+
+    it('a clear left for the next load removes them too, before Firestore starts', () => {
+      recordEntry('u1', journaled());
+      stashUnsaved([{ noteId: 'n1', title: 'קניות', content: 'חלב' }]);
+      requestLocalDataClear();
+      clearLocalDataIfRequested(db);
+      expect(getEntry('u1', 'n1')).toBeNull();
+      expect(readStash()).toEqual([]);
+    });
+
+    it('keeping the data (the user chose to) touches neither', () => {
+      recordEntry('u1', journaled());
+      stashUnsaved([{ noteId: 'n1', title: 'קניות', content: 'חלב' }]);
+      clearLocalDataIfRequested(db);
+      expect(getEntry('u1', 'n1')).not.toBeNull();
+      expect(readStash()).toHaveLength(1);
+    });
   });
 });

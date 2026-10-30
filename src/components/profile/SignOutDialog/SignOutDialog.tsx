@@ -33,8 +33,8 @@ export const SignOutDialog: React.FC<{ signOut: SafeSignOut }> = ({ signOut }) =
     <Modal onClose={signOut.stay} title="יש שינויים שעוד לא נשמרו בשרת">
       <div dir="rtl" className="space-y-4 text-sm text-ink-light dark:text-ink-dark">
         <p>
-          כנראה שאין חיבור לאינטרנט. השינויים האחרונים שמורים רק במכשיר הזה, ויישלחו כשהחיבור יחזור. התנתקות רגילה
-          מוחקת את הפתקים מהמכשיר - וגם אותם.
+          השינויים האחרונים שמורים רק במכשיר הזה - בדרך כלל כי אין חיבור לאינטרנט, והם יישלחו כשהחיבור יחזור.
+          התנתקות רגילה מוחקת את הפתקים מהמכשיר - וגם אותם.
         </p>
         <div className="flex flex-col gap-2">
           <button

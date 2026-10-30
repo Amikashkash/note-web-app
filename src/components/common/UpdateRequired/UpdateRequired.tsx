@@ -4,8 +4,8 @@
  *
  * טקסט שנכתב ולא נשמר לא נעלם בשקט:
  * - הוא מוצג כאן, להעתקה, גם אם הפתק כבר נסגר.
- * - "רענן" שומר אותו ב-localStorage לפני הטעינה מחדש, והגרסה החדשה מציגה
- *   אותו שוב (`RecoveredText`). הוא לא נשמר לפתק אוטומטית: הוא נכתב בפורמט
+ * - הוא נשמר ב-localStorage כבר כשהוא נעצר (`utils/unsavedStash.ts`), והגרסה
+ *   החדשה מציגה אותו שוב (`RecoveredText`). הוא לא נשמר לפתק אוטומטית: הוא נכתב בפורמט
  *   של הגרסה הישנה, וזה בדיוק מה שלא רוצים לכתוב.
  */
 
@@ -14,8 +14,7 @@ import { Copy, RefreshCw } from 'lucide-react';
 import { useAppVersionStore, type UnsavedText } from '@/store/appVersionStore';
 import { WRITES_BLOCKED_MESSAGE } from '@/services/api/writeGate';
 import { logger } from '@/utils/logger';
-
-const STASH_KEY = 'notes4me.unsavedBeforeUpdate';
+import { clearStash, readStash, stashUnsaved } from '@/utils/unsavedStash';
 
 const copyText = async (text: string, fallback: HTMLTextAreaElement | null): Promise<boolean> => {
   try {
@@ -68,13 +67,8 @@ const UnsavedList: React.FC<{ entries: UnsavedText[] }> = ({ entries }) => (
 
 /** טעינה מחדש לגרסה החדשה: קודם שומרים בצד את מה שלא נשמר */
 const refreshToNewVersion = async (unsaved: UnsavedText[]) => {
-  if (unsaved.length > 0) {
-    try {
-      localStorage.setItem(STASH_KEY, JSON.stringify(unsaved));
-    } catch (error) {
-      logger.warn('Could not stash unsaved text before refresh:', error);
-    }
-  }
+  // כבר נשמר כשנעצר; שוב ליתר ביטחון
+  stashUnsaved(unsaved);
   try {
     // מבקשים מה-Service Worker לבדוק עדכון לפני הטעינה, עם תקרת זמן
     const registration = await navigator.serviceWorker?.getRegistration();
@@ -130,16 +124,6 @@ export const UpdateRequired: React.FC = () => {
   );
 };
 
-const readStash = (): UnsavedText[] => {
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STASH_KEY) ?? '[]');
-    return Array.isArray(parsed) ? (parsed as UnsavedText[]) : [];
-  } catch (error) {
-    logger.warn('Could not read stashed unsaved text:', error);
-    return [];
-  }
-};
-
 /** אחרי הרענון: הטקסט ששמרנו בצד לפני הטעינה, להעתקה. לא נשמר לפתק אוטומטית */
 export const RecoveredText: React.FC = () => {
   const [entries, setEntries] = useState<UnsavedText[]>(readStash);
@@ -147,11 +131,7 @@ export const RecoveredText: React.FC = () => {
   if (entries.length === 0) return null;
 
   const dismiss = () => {
-    try {
-      localStorage.removeItem(STASH_KEY);
-    } catch {
-      // אין גישה ל-storage: רק מסתירים
-    }
+    clearStash();
     setEntries([]);
   };
 

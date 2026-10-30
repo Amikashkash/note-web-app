@@ -9,6 +9,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuthStore } from './store/authStore';
 import { usePushRegistration } from './hooks/usePushRegistration';
 import { useMinClientVersion } from './hooks/useMinClientVersion';
+import { useDraftJournal } from './hooks/useDraftJournal';
 import { RecoveredText, UpdateRequired } from './components/common/UpdateRequired/UpdateRequired';
 import { PendingWrites } from './components/common/PendingWrites/PendingWrites';
 import './styles/globals.css';
@@ -26,6 +27,9 @@ const App: React.FC = () => {
 
   // גרסה מינימלית (D4a): גרסה ישנה מדי מפסיקה לכתוב ומבקשת לרענן
   useMinClientVersion();
+
+  // שמירות שלא אושרו: נדחו → מיזוג או עותק, גם מהפעלה קודמת (צעד 5)
+  useDraftJournal();
 
   return (
     <ThemeProvider>
