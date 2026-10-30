@@ -12,7 +12,8 @@ import React, { useMemo, useEffect, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -49,6 +50,7 @@ import {
 
 import type { ChecklistItem, RepeatRule, TaskPriority } from '@/types/template';
 import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
+import { withFirstRow } from '@/utils/firstRow';
 import { moveTask, sortTasksByPriority } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
 
@@ -160,8 +162,9 @@ interface SortableRowProps {
 
 /**
  * שורת משימה שאפשר לגרור. רק הידית מתחילה גרירה, כך שהקלדה בשדה, סימון
- * וגלילה בנייד ממשיכים לעבוד כרגיל. `touch-none` על הידית: בלי זה הדפדפן
- * בנייד גולל את הדף במקום לגרור.
+ * וגלילה בנייד ממשיכים לעבוד כרגיל. במגע הגרירה מתחילה רק בלחיצה ארוכה
+ * (`TouchSensor`), ולכן הידית `touch-manipulation` ולא `touch-none`: גלילה
+ * שמתחילה על הידית גוללת, ולא מזיזה משימה.
  */
 const SortableRow: React.FC<SortableRowProps> = ({ id, disabled, className, children }) => {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
@@ -173,7 +176,7 @@ const SortableRow: React.FC<SortableRowProps> = ({ id, disabled, className, chil
       ref={setActivatorNodeRef}
       {...attributes}
       {...listeners}
-      className="flex-shrink-0 -ms-1 p-1 touch-none cursor-grab active:cursor-grabbing text-ink-3-light dark:text-ink-3-dark hover:text-ink-2-light dark:hover:text-ink-2-dark"
+      className="flex-shrink-0 -ms-1 p-1 touch-manipulation select-none cursor-grab active:cursor-grabbing text-ink-3-light dark:text-ink-3-dark hover:text-ink-2-light dark:hover:text-ink-2-dark"
       title="גרור לשינוי הסדר"
       aria-label="גרור לשינוי הסדר"
     >
@@ -225,7 +228,14 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
 
   // פענוח שנכשל אינו "רשימה ריקה" - ראה `templateContent.ts`
   const parsed = useMemo(() => parseChecklist(value), [value]);
-  const items = useMemo<ChecklistItem[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
+  // רשימה חדשה (תוכן ריק לגמרי) מוצגת עם שורה ראשונה ריקה - בלי לכתוב:
+  // בלי מצב עריכה, פתיחה של פתק לא כותבת כלום. השורה נשמרת עם השינוי הראשון.
+  // `[]` (רשימה שכל משימותיה נמחקו) נשאר כמו שהוא, ותוכן שלא פוענח לא נדרס
+  const [firstRowId] = useState(() => Date.now().toString());
+  const items = useMemo<ChecklistItem[]>(
+    () => withFirstRow(value, parsed, readOnly, { id: firstRowId, text: '', completed: false }),
+    [parsed, value, readOnly, firstRowId]
+  );
   // משימות שבוצעו יורדות לסוף הרשימה. תצוגה בלבד - העריכות עובדות לפי מזהה על `items`
   // המשימות שבוצעו מקופלות לשורה אחת "בוצעו (N)". תצוגה בלבד: לא נשמר ולא
   // משנה את הפתק, וכל פתיחה של הפתק מתחילה מקופלת
@@ -245,8 +255,11 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   const doneItems = shownItems.filter((item) => item.completed);
 
   const sensors = useSensors(
-    // מרחק קטן לפני שהגרירה מתחילה: לחיצה רגילה על הידית לא מזיזה כלום
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    // עכבר: מרחק קטן לפני שהגרירה מתחילה - לחיצה רגילה על הידית לא מזיזה כלום
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    // מגע: לחיצה ארוכה. בלי מצב עריכה הידית תמיד שם, וגלילה שמתחילה עליה
+    // אסור שתזיז משימה (v1.38.0)
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -263,23 +276,6 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   });
 
   const commit = (updated: ChecklistItem[]) => onChange(JSON.stringify(updated));
-
-  /**
-   * רשימת משימות ריקה מקבלת שורה ראשונה אוטומטית.
-   *
-   * רשימה בלי משימה אחת לפחות היא חסרת משמעות, ולכן הלחיצה על "הוסף
-   * משימה" רק כדי להתחיל הייתה מיותרת. בכוונה בלי פוקוס: פתיחת פתק
-   * קיים הייתה מקפיצה את המקלדת בנייד בכל פעם.
-   */
-  useEffect(() => {
-    // רק תוכן ריק לגמרי. `[]` (רשימה שכל משימותיה נמחקו) נשאר כמו שהוא,
-    // ותוכן שלא פוענח לעולם לא נדרס - זה מה שמחק פתקים בגרסה קודמת.
-    if (readOnly || value !== '') return;
-
-    onChange(
-      JSON.stringify([{ id: Date.now().toString(), text: '', completed: false }])
-    );
-  }, [readOnly, value, onChange]);
 
   /**
    * עדכון משימה בודדת. נקודת המעבר היחידה לשינוי פריט - קריאה אחת
@@ -399,6 +395,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
               <button
                 type="button"
                 onClick={() => handleToggleItem(item.id, item.completed)}
+                disabled={readOnly}
+                aria-pressed={item.completed}
                 className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                   item.completed
                     ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'
@@ -482,11 +480,12 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                 />
               )}
 
-              {/* עדיפות: דגל בצבע הרמה, ותפריט קצר לבחירה. גם בצפייה, כמו הסימון */}
+              {/* עדיפות: דגל בצבע הרמה, ותפריט קצר לבחירה. פועל מיד, בלי מקלדת */}
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setPriorityMenuFor((open) => (open === item.id ? null : item.id))}
+                  disabled={readOnly}
                   aria-haspopup="menu"
                   aria-expanded={priorityMenuFor === item.id}
                   title={`עדיפות: ${PRIORITY_META[levelOf(item)].label}`}

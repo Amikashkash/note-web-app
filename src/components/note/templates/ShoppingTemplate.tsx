@@ -251,6 +251,8 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
               <button
                 type="button"
                 onClick={() => updateItem(item.id, { checked: !item.checked })}
+                disabled={readOnly}
+                aria-pressed={item.checked}
                 className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                   item.checked
                     ? 'bg-success border-success dark:bg-success-dark dark:border-success-dark'

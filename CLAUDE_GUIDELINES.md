@@ -317,6 +317,14 @@ live in IndexedDB and survive closing the app. Consequences:
   finish is retried on the next load, before Firestore starts.
 - "Waiting for connection" (`components/common/PendingWrites`): pending note
   writes for more than 2.5s, outside the editor.
+- **No edit mode (v1.38.0, step 7)**: `NoteView` always renders the editor
+  for every template; view-only only while frozen (conflict, or
+  `minClientVersion` - shown as "לצפייה בלבד"). Opening a note never writes:
+  an empty checklist/work plan shows a computed first row (`utils/firstRow.ts`)
+  that is saved with the first change. Scrolling never edits: touch drag needs
+  a 250ms press (`TouchSensor`), and a number field blurs on wheel. Links in
+  edited text show as cards below it (`NoteLinks`). There are no view-only
+  shares: every recipient can edit (rules).
 - **Save status line (v1.37.0, step 6)**: `useNoteSync().status`, decided by
   the pure `utils/saveStatus.ts`, shown by `SaveStatusLine` in `NoteView`.
   "נשמר" only when nothing awaits the server (`awaitingServer`: unconfirmed

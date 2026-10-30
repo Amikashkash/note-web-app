@@ -224,6 +224,9 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                           handleUpdateRow(row.id, 'amount', parseFloat(e.target.value) || 0)
                         }
                         onKeyDown={handleKeyDown}
+                        // גלילה בעכבר מעל שדה מספר בפוקוס משנה את הערך בחלק מהדפדפנים.
+                        // גלילה לעולם לא עורכת (v1.38.0): השדה משחרר את הפוקוס, והדף נגלל
+                        onWheel={(e) => e.currentTarget.blur()}
                         placeholder="0"
                         className={`w-full px-0.5 py-0.5 text-xs sm:text-sm text-ink-light dark:text-ink-dark border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-brand/40 rounded text-center ${NUMBER_INPUT_CHROME}`}
                       />

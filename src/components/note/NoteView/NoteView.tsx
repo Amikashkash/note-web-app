@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, Lock, PenOff, Pencil, Sparkles, X } from 'lucide-react';
+import { Eye, Lock, PenOff, Sparkles, X } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -31,6 +31,7 @@ import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from
 import { useAuthStore } from '@/store/authStore';
 import { useNoteSync } from '@/hooks/useNoteSync';
 import { SaveStatusLine } from '@/components/note/SaveStatusLine/SaveStatusLine';
+import { NoteLinks } from '@/components/note/NoteLinks/NoteLinks';
 import { useNotePresence } from '@/hooks/useNotePresence';
 import { presenceMessage } from '@/utils/presence';
 import { LENGTH_LIMITS } from '@/utils/constants';
@@ -49,9 +50,6 @@ interface NoteViewProps {
   categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean; isReadOnly?: boolean }>;
 }
 
-/** תבניות שהתוכן שלהן נערך כטקסט ולכן יש להן מתג צפייה/עריכה */
-const TOGGLEABLE_TEMPLATES = new Set(['plain', 'checklist', 'workplan']);
-
 export const NoteView: React.FC<NoteViewProps> = ({
   note,
   onClose,
@@ -67,24 +65,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [shownNoteId, setShownNoteId] = useState(note.id);
   const editor = useNoteSync(note);
   const { title, content, conflict } = editor;
   // "פתוח גם במקום אחר": נוחות בלבד. ההגנה מדריסה היא ב-useNoteSync
   const presence = useNotePresence(note.id);
   const openElsewhere = presence.myUid ? presenceMessage(presence.others, presence.myUid) : null;
 
-  // פתק אחר - חוזרים לצפייה (הטיוטה עצמה מתאפסת ב-useNoteSync)
-  if (shownNoteId !== note.id) {
-    setShownNoteId(note.id);
-    setIsEditMode(false);
-  }
-
-  // בזמן התנגשות אין עריכה: העורך מציג את הטקסט של המשתמש, קפוא, עד שיבחר.
-  // כך גם כשהגרסה ישנה מדי לשמור (`minClientVersion`) - הטקסט נשאר גלוי ואפשר להעתיק
+  // אין מצב עריכה (v1.38.0): כל פתק נפתח מוכן לעריכה, בכל תבנית. כל שינוי
+  // עובר דרך `useNoteSync` (שמירה אוטומטית, revision, מיזוג, journal, שורת המצב).
+  // לצפייה בלבד רק כשאי אפשר לשמור: בזמן התנגשות (העורך מציג את הטקסט של
+  // המשתמש, קפוא, עד שיבחר), וכשהגרסה ישנה מדי (`minClientVersion`) - הטקסט
+  // נשאר גלוי ואפשר להעתיק. (שיתוף בלי הרשאת עריכה לא קיים: כל נמען יכול לערוך)
   const frozen = Boolean(conflict) || editor.writesBlocked;
-  const editing = isEditMode && !frozen;
 
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
@@ -250,7 +242,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <ChecklistTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!editing}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
@@ -277,24 +269,27 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <WorkPlanTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!editing}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
       default:
-        return editing ? (
-          <EnhancedTextarea
-            value={content}
-            onChange={handleContentChange}
-            placeholder="הזן תוכן..."
-            rows={8}
-            className="min-h-[200px]"
-          />
-        ) : (
+        return frozen ? (
           <FormattedText
             content={content}
             className="p-4 bg-raised-light dark:bg-raised-dark rounded-lg min-h-[200px]"
           />
+        ) : (
+          <>
+            <EnhancedTextarea
+              value={content}
+              onChange={handleContentChange}
+              placeholder="הזן תוכן..."
+              rows={8}
+              className="min-h-[200px]"
+            />
+            <NoteLinks text={content} />
+          </>
         );
     }
   };
@@ -405,23 +400,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-ink-light dark:text-ink-dark">תוכן:</h3>
-            {TOGGLEABLE_TEMPLATES.has(note.templateType) && (
-              <button
-                onClick={() => setIsEditMode((previous) => !previous)}
-                className="inline-flex items-center gap-1.5 text-body-sm h-9 px-4 rounded-lg bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark transition-colors font-medium"
+            {editor.writesBlocked && (
+              <span
+                className="inline-flex items-center gap-1.5 text-body-sm h-9 px-3 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-800"
+                title="יש גרסה חדשה של האפליקציה. רעננו כדי לערוך"
               >
-                {editing ? (
-                  <>
-                    <Eye size={16} strokeWidth={1.75} />
-                    צפייה
-                  </>
-                ) : (
-                  <>
-                    <Pencil size={16} strokeWidth={1.75} />
-                    עריכה
-                  </>
-                )}
-              </button>
+                <Eye size={16} strokeWidth={1.75} />
+                לצפייה בלבד
+              </span>
             )}
           </div>
           {renderContent()}
