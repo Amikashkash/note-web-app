@@ -71,7 +71,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const presence = useNotePresence(note.id);
   const openElsewhere = presence.myUid ? presenceMessage(presence.others, presence.myUid) : null;
 
-  // אין מצב עריכה (v1.38.0): כל פתק נפתח מוכן לעריכה, בכל תבנית. כל שינוי
+  // אין מצב עריכה (v1.39.0): כל פתק נפתח מוכן לעריכה, בכל תבנית. כל שינוי
   // עובר דרך `useNoteSync` (שמירה אוטומטית, revision, מיזוג, journal, שורת המצב).
   // לצפייה בלבד רק כשאי אפשר לשמור: בזמן התנגשות (העורך מציג את הטקסט של
   // המשתמש, קפוא, עד שיבחר), וכשהגרסה ישנה מדי (`minClientVersion`) - הטקסט
@@ -81,11 +81,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
 
+  // כל עריכה מסמנת "מקליד עכשיו" (מוגבל ל-15 שניות): רק הוא חוסם את Claude
   const handleTitleChange = (newTitle: string) => {
+    presence.typed();
     editor.edit({ title: newTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE) });
   };
 
   const handleContentChange = (newContent: string) => {
+    presence.typed();
     editor.edit({ content: newContent });
   };
 
@@ -95,6 +98,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * יחד עם כל שינוי שעוד ממתין.
    */
   const handleConvertToText = () => {
+    presence.typed();
     editor.edit({ templateType: 'plain' });
     editor.flush();
   };
@@ -297,18 +301,24 @@ export const NoteView: React.FC<NoteViewProps> = ({
   return (
     <Modal onClose={handleClose}>
       <div className="max-h-[80vh] overflow-y-auto">
-        {/* `end-4` ולא `right-4`: בעברית הסגירה שייכת לקצה שבו השורה
-            נגמרת. כפתור סגירה עדין ולא צבעוני - הוא כרום, לא פעולה. */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 end-4 z-10 h-11 w-11 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
-          title="סגור"
-        >
-          <X size={24} strokeWidth={2} />
-        </button>
+        {/* פס עליון דביק (v1.39.0): שורת המצב והסגירה תמיד על המסך, גם
+            כשגוללים לתחתית פתק ארוך. דביק בתוך אזור הגלילה של הפתק, ולכן
+            לא תופס מקום נוסף בראש המסך מעבר לשורה אחת. `end` ולא `right`:
+            בעברית הסגירה שייכת לקצה שבו השורה נגמרת. */}
+        <div className="sticky top-0 z-20 -mx-1 px-1 py-1.5 flex items-center justify-between gap-2 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur border-b border-hairline-light dark:border-hairline-dark text-body-sm">
+          <SaveStatusLine status={editor.status} />
+          <button
+            onClick={handleClose}
+            className="h-11 w-11 -me-2 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+            title="סגור"
+            aria-label="סגור"
+          >
+            <X size={24} strokeWidth={2} />
+          </button>
+        </div>
 
         {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-12">
+        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-3">
           <div className="flex-1">
             <Input
               type="text"
@@ -320,8 +330,6 @@ export const NoteView: React.FC<NoteViewProps> = ({
               placeholder="כותרת הפתק..."
             />
             <div className="flex flex-wrap items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
-              <SaveStatusLine status={editor.status} />
-              <span>•</span>
               <span className="inline-flex items-center gap-1.5">
                 <TemplateIcon size={16} strokeWidth={1.75} />
                 {getTemplateLabel(note.templateType)}
