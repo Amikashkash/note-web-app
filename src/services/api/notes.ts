@@ -10,12 +10,14 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   increment,
   onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Unsubscribe,
   updateDoc,
   where,
@@ -103,6 +105,24 @@ export const createNote = async (noteInput: NoteInput): Promise<string> => {
 };
 
 /**
+ * יצירת פתק עם מזהה שנקבע מראש: פעמיים עם אותו מזהה = פתק אחד. משמש את
+ * העותק של `draftJournal`, שכמה לשוניות או הפעלות עלולות להגיע אליו.
+ */
+export const createNoteWithId = async (noteId: string, noteInput: NoteInput): Promise<void> => {
+  await setDoc(noteRef(noteId), {
+    ...noteInput,
+    revision: 0,
+    isArchived: false,
+    createdAt: serverTimestamp(),
+    ...writeStamp(),
+  });
+};
+
+/** האם הפתק קיים בשרת. נכשל כשאין חיבור (לא מה-cache: שם הוא אולי עוד לא הגיע) */
+export const noteExistsOnServer = async (noteId: string): Promise<boolean> =>
+  (await getDocFromServer(noteRef(noteId))).exists();
+
+/**
  * עדכון פתק קיים.
  *
  * מקבל רק את השדות שהשתנו - לא אובייקט פתק שלם. שליחת אובייקט שלם
@@ -168,6 +188,8 @@ export interface LiveNoteText {
   saveId: string | null;
   /** hasPendingWrites: כתיבה מקומית שהשרת עוד לא אישר */
   pending: boolean;
+  /** מה-cache ולא מהשרת (למשל offline) */
+  fromCache: boolean;
 }
 
 /**
@@ -185,7 +207,16 @@ export const subscribeToNoteText = (
     { includeMetadataChanges: true },
     (snapshot) => {
       if (!snapshot.exists()) {
-        onChange({ exists: false, title: '', content: '', templateType: 'plain', revision: 0, saveId: null, pending: false });
+        onChange({
+          exists: false,
+          title: '',
+          content: '',
+          templateType: 'plain',
+          revision: 0,
+          saveId: null,
+          pending: false,
+          fromCache: snapshot.metadata.fromCache,
+        });
         return;
       }
       const note = toNote(snapshot);
@@ -197,6 +228,7 @@ export const subscribeToNoteText = (
         revision: note.revision,
         saveId: note.saveId ?? null,
         pending: snapshot.metadata.hasPendingWrites,
+        fromCache: snapshot.metadata.fromCache,
       });
     },
     onError

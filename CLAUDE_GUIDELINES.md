@@ -293,14 +293,25 @@ live in IndexedDB and survive closing the app. Consequences:
 - **Unconfirmed base** (`utils/noteSync.ts`): an editor opened on a write
   still pending (previous session, other tab) never adopts or merges a
   different server version silently - it shows the choice.
-- **Still open (step 5, `draftJournal`)**: a queued write from a previous
-  session that is rejected while its note is **not** open is lost silently,
-  as it was before persistence (then it was lost on close, always).
+- **`draftJournal` (v1.36.0, `utils/draftJournal.ts`)**: every editor save is
+  recorded in localStorage (one key per user and note) **before** it is sent,
+  with the confirmed base it builds on. `useDraftJournal` (mounted in `App`)
+  listens to each journaled note and decides on a server (not cache), non-
+  pending snapshot: our `saveId` → drop; same text → drop; otherwise it was
+  rejected → `mergeNote` against the base and write the merge (chained), or a
+  "טקסט שלא נשמר" copy with the fixed id `recovery-<saveId>` (one copy, even
+  across tabs and launches). It waits while the editor is open here (the
+  editor shows the choice), while the version is blocked, and for 10s on
+  another tab's fresh record. A new record invalidates the last snapshot seen
+  (it predates the write). **It never deletes text: it confirms, merges or
+  copies.** `noteRecovery` no longer copies per rejected save.
 - **Sign-out** clears the local data (`services/firebase/localData.ts`):
-  first waits for pending writes; if they do not reach the server, the user
-  chooses (stay / sign out and keep on this device / sign out and delete) -
-  never silently. Other tabs reload. A clear that did not finish is retried
-  on the next load, before Firestore starts.
+  first waits for pending writes and for the journal to empty; journal
+  records and the `minClientVersion` stash (`utils/unsavedStash.ts`) count as
+  unsent changes. If anything is left, the user chooses (stay / sign out and
+  keep on this device / sign out and delete) - never silently. Clearing also
+  removes the journal and the stash. Other tabs reload. A clear that did not
+  finish is retried on the next load, before Firestore starts.
 - "Waiting for connection" (`components/common/PendingWrites`): pending note
   writes for more than 2.5s. The full status line is step 6.
 

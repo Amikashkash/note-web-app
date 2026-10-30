@@ -1,12 +1,14 @@
 /**
  * התנתקות שלא זורקת שינויים (v1.35.0): ההחלטה. התצוגה ב-`SignOutDialog`.
- * קודם מחכים שהכתיבות הממתינות יגיעו לשרת; אם לא - המשתמש בוחר.
+ * קודם מחכים שהכתיבות הממתינות יגיעו לשרת ושה-journal יתרוקן; אם לא -
+ * המשתמש בוחר.
  */
 
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/services/firebase/config';
-import { pendingWritesSettle } from '@/services/firebase/localData';
+import { localChangesSettle } from '@/services/firebase/localData';
+import { useAuthStore } from '@/store/authStore';
 
 type Phase = 'idle' | 'checking' | 'pending' | 'leaving';
 
@@ -26,7 +28,7 @@ export const useSafeSignOut = () => {
 
   const start = async () => {
     setPhase('checking');
-    if (await pendingWritesSettle(db)) await leave(false);
+    if (await localChangesSettle(db, useAuthStore.getState().user?.uid)) await leave(false);
     else setPhase('pending');
   };
 

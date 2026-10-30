@@ -15,12 +15,19 @@
  * ב-`config.ts`). לשוניות אחרות רואות את ההתנתקות (Auth משותף), רואות את
  * הדגל, ונטענות מחדש (`authStore`).
  *
+ * מאז v1.36.0 נמחקים יחד איתם גם `draftJournal` (שמירות שעוד לא אושרו,
+ * `utils/draftJournal.ts`) והטקסט שנשמר בצד כשהגרסה נחסמה
+ * (`utils/unsavedStash.ts`). שניהם נספרים כשינויים שלא נשמרו
+ * (`localChangesSettle`), ולכן גם הם לא נמחקים בלי לשאול.
+ *
  * הערה מהתיעוד של Firebase: המחיקה לא "משמידה" את הנתונים ברמת הדיסק.
  * מספיק נגד מי שפותח את האפליקציה אחרי; לא נגד ניתוח פורנזי של המכשיר.
  */
 
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites, type Firestore } from 'firebase/firestore';
 import { logger } from '@/utils/logger';
+import { clearAllEntries, listEntries } from '@/utils/draftJournal';
+import { clearStash, hasStash } from '@/utils/unsavedStash';
 
 const CLEAR_FLAG = 'notes4me.clearLocalData';
 
@@ -43,6 +50,38 @@ export const pendingWritesSettle = async (db: Firestore, waitMs = PENDING_WRITES
     logger.warn('waitForPendingWrites failed:', error);
     return false;
   }
+};
+
+/** כמה זמן לחכות שה-journal יתרוקן אחרי שהכתיבות הגיעו (אישור, או עותק של שמירה שנדחתה) */
+export const JOURNAL_WAIT_MS = 4_000;
+const JOURNAL_POLL_MS = 200;
+
+const journalEmpties = async (uid: string, waitMs: number): Promise<boolean> => {
+  for (let waited = 0; listEntries(uid).length > 0; waited += JOURNAL_POLL_MS) {
+    if (waited >= waitMs) return false;
+    await new Promise((resolve) => setTimeout(resolve, JOURNAL_POLL_MS));
+  }
+  return true;
+};
+
+/**
+ * `true` - בטוח למחוק את הנתונים המקומיים: הכתיבות הגיעו לשרת, ה-journal
+ * ריק (כל שמירה אושרה, מוזגה או הועתקה - והעותק הגיע), ואין טקסט שנשמר
+ * בצד בגלל חסימת גרסה. אחרת - הקורא שואל את המשתמש.
+ */
+export const localChangesSettle = async (db: Firestore, uid: string | undefined): Promise<boolean> => {
+  if (hasStash()) return false;
+  if (!(await pendingWritesSettle(db))) return false;
+  if (!uid || listEntries(uid).length === 0) return true;
+  if (!(await journalEmpties(uid, JOURNAL_WAIT_MS))) return false;
+  // עותק של שמירה שנדחתה הוא כתיבה חדשה: גם הוא צריך להגיע
+  return pendingWritesSettle(db);
+};
+
+/** מה שנשמר במכשיר מחוץ ל-Firestore: נמחק יחד איתו */
+const clearAppLocalData = () => {
+  clearAllEntries();
+  clearStash();
 };
 
 export const isClearRequested = (): boolean => {
@@ -86,6 +125,7 @@ export const cancelLocalDataClear = (): void => {
  */
 export const clearLocalData = async (db: Firestore): Promise<void> => {
   setClearRequested(true);
+  clearAppLocalData();
   try {
     await terminate(db);
     const result = await Promise.race([clearIndexedDbPersistence(db).then(() => 'done' as const), timeout(CLEAR_WAIT_MS)]);
@@ -101,6 +141,7 @@ export const clearLocalData = async (db: Firestore): Promise<void> => {
  */
 export const clearLocalDataIfRequested = (db: Firestore): void => {
   if (!isClearRequested()) return;
+  clearAppLocalData();
   clearIndexedDbPersistence(db)
     .then(() => setClearRequested(false))
     .catch((error: unknown) => logger.warn('Clearing local data on load failed, will retry:', error));

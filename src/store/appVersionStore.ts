@@ -15,6 +15,7 @@
 
 import { create } from 'zustand';
 import { isBelowMinimum } from '@/utils/appVersion';
+import { stashUnsaved } from '@/utils/unsavedStash';
 
 export interface UnsavedText {
   noteId: string;
@@ -61,7 +62,11 @@ export const useAppVersionStore = create<AppVersionState>((set) => ({
 
   onWriteAttempt: () => {},
 
-  holdUnsaved: (text) => set((state) => ({ unsaved: { ...state.unsaved, [text.noteId]: text } })),
+  holdUnsaved: (text) => {
+    // גם במכשיר, מיד: אם האפליקציה תיסגר בלי רענון, הטקסט לא נעלם
+    stashUnsaved([text]);
+    set((state) => ({ unsaved: { ...state.unsaved, [text.noteId]: text } }));
+  },
 }));
 
 /** לשכבת ה-API, מחוץ ל-React */

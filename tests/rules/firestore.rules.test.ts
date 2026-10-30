@@ -29,7 +29,9 @@ import {
   doc,
   enableNetwork,
   getDoc,
+  getDocFromServer,
   getDocs,
+  onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
@@ -45,6 +47,14 @@ import {
   sanitizeNotePatch,
   type NotePatchField,
 } from '../../functions/src/notesCore/permissions';
+import {
+  getEntry,
+  recordEntry,
+  setJournalStorage,
+  type JournalEntry,
+  type JournalStorage,
+} from '../../src/utils/draftJournal';
+import { createJournalResolver, type ResolverDeps } from '../../src/utils/draftJournalResolver';
 
 const OWNER = 'owner-uid';
 const SHARED = 'shared-uid';
@@ -1133,5 +1143,255 @@ describe('known holes (current behavior, expected to change)', () => {
     await assertSucceeds(
       updateDoc(doc(as(OWNER), 'notes/note-1'), { title: 'x'.repeat(5000), unexpectedField: true, ...BUMP, updatedBy: OWNER })
     );
+  });
+});
+
+/**
+ * `draftJournal` (צעד 5 בסבב 2) מול ה-emulator, עם ה-SDK האמיתי וה-rules
+ * האמיתיים: הפער מ-PR #21. שמירה שהמתינה offline, הסשן נגמר (ה-promise שלה
+ * כבר לא מעניין אף אחד), מכשיר אחר כתב קודם, והיא נדחית. סשן חדש, שיש לו רק
+ * את הרשומה ב-journal, מכריע: מיזוג או עותק - ובלי לאבד.
+ */
+describe('draftJournal against the emulator (offline, session ends, another device writes, next session)', () => {
+  const NOTE = 'notes/j-1';
+  const store = new Map<string, string>();
+  const memoryStorage: JournalStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, value) => {
+      store.set(key, value);
+    },
+    removeItem: (key) => {
+      store.delete(key);
+    },
+    keys: () => [...store.keys()],
+  };
+
+  beforeEach(() => {
+    store.clear();
+    setJournalStorage(memoryStorage);
+  });
+
+  const seed = (data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore() as unknown as Firestore, NOTE), { ...baseNote, ...data });
+    });
+
+  const readAs = async (path: string) => {
+    let data: Record<string, unknown> | undefined;
+    await env.withSecurityRulesDisabled(async (context) => {
+      data = (await getDoc(doc(context.firestore() as unknown as Firestore, path))).data();
+    });
+    return data;
+  };
+
+  const waitFor = async (check: () => Promise<boolean> | boolean, ms = 8000) => {
+    const until = Date.now() + ms;
+    while (!(await check())) {
+      if (Date.now() > until) throw new Error('timed out');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
+  const journaled = (overrides: Partial<JournalEntry>): JournalEntry => ({
+    noteId: 'j-1',
+    saveId: 'C5',
+    revision: 5,
+    text: { title: baseNote.title, content: '' },
+    templateType: 'plain',
+    base: null,
+    meta: { categoryId: 'cat-1', tags: [], color: null, isSensitive: false, isReadOnly: false },
+    clientVersion: 'test',
+    tabId: 'previous-session',
+    at: 0,
+    ...overrides,
+  });
+
+  /** ה-deps של האפליקציה (`useDraftJournal`), על Firestore של הסשן החדש */
+  const resolverFor = (db: Firestore, overrides: Partial<ResolverDeps> = {}) =>
+    createJournalResolver({
+      uid: OWNER,
+      tabId: 'this-session',
+      clientVersion: 'test',
+      now: Date.now,
+      newSaveId: () => `M-${Math.random().toString(36).slice(2)}`,
+      subscribe: (noteId, onView) =>
+        onSnapshot(
+          doc(db, `notes/${noteId}`),
+          { includeMetadataChanges: true },
+          (snapshot) => {
+            const data = snapshot.data();
+            onView({
+              kind: 'snapshot',
+              exists: snapshot.exists(),
+              fromCache: snapshot.metadata.fromCache,
+              pending: snapshot.metadata.hasPendingWrites,
+              title: data?.title ?? '',
+              content: data?.content ?? '',
+              templateType: data?.templateType ?? 'plain',
+              revision: data?.revision ?? 0,
+              saveId: data?.saveId ?? null,
+            });
+          },
+          () => onView({ kind: 'unreadable' })
+        ),
+      isEditorOpen: () => false,
+      writesBlocked: () => false,
+      // כמו `recoveryCopyExists`: פתק שלא קיים נדחה ע"י ה-rules
+      copyExists: async (copyId) => {
+        try {
+          return (await getDocFromServer(doc(db, `notes/${copyId}`))).exists();
+        } catch (error) {
+          if ((error as { code?: string }).code === 'permission-denied') return false;
+          throw error;
+        }
+      },
+      // כמו `createRecoveryCopy` → `createNoteWithId`
+      createCopy: (copyId, entry) =>
+        setDoc(doc(db, `notes/${copyId}`), {
+          title: `טקסט שלא נשמר - ${entry.text.title}`,
+          content: entry.text.content,
+          templateType: entry.templateType,
+          categoryId: entry.meta.categoryId,
+          tags: entry.meta.tags,
+          color: entry.meta.color,
+          userId: OWNER,
+          order: 0,
+          sharedWith: [],
+          isPinned: false,
+          isSensitive: entry.meta.isSensitive,
+          isReadOnly: entry.meta.isReadOnly,
+          revision: 0,
+          isArchived: false,
+          createdAt: serverTimestamp(),
+          updatedBy: OWNER,
+          updatedAt: serverTimestamp(),
+        }),
+      // כמו `saveNoteText`
+      saveText: (noteId, text, chain) => updateDoc(doc(db, `notes/${noteId}`), { ...text, ...chain, updatedBy: OWNER }),
+      report: () => undefined,
+      setTimer: (callback, ms) => setTimeout(callback, ms),
+      onError: () => undefined,
+      ...overrides,
+    });
+
+  /** הסשן הקודם: שמירה בתור offline, ונרשמת ב-journal; ואז מכשיר אחר כותב, והחיבור חוזר */
+  const rejectedOfflineSave = async (
+    mine: Record<string, unknown>,
+    theirs: Record<string, unknown>,
+    entry: JournalEntry
+  ) => {
+    const previousSession = as(OWNER);
+    await disableNetwork(previousSession);
+    recordEntry(OWNER, entry);
+    const queued = updateDoc(doc(previousSession, NOTE), {
+      ...mine,
+      revision: 5,
+      saveId: 'C5',
+      baseSaveId: 'S4',
+      updatedBy: OWNER,
+    });
+    await assertSucceeds(
+      updateDoc(doc(as(SHARED), NOTE), { ...theirs, revision: 5, saveId: 'P5', baseSaveId: 'S4', updatedBy: SHARED })
+    );
+    await enableNetwork(previousSession);
+    await assertFails(queued);
+  };
+
+  const countCopies = async () => {
+    let copies = 0;
+    await env.withSecurityRulesDisabled(async (context) => {
+      const all = await getDocs(collection(context.firestore() as unknown as Firestore, 'notes'));
+      copies = all.docs.filter((d) => d.id.startsWith('recovery-')).length;
+    });
+    return copies;
+  };
+
+  it('plain text edited on both sides: ONE copy with the offline text, and the note keeps the other device text', async () => {
+    await seed({ templateType: 'plain', content: 'בסיס', revision: 4, saveId: 'S4' });
+    const entry = journaled({
+      text: { title: baseNote.title, content: 'מהמחשב offline' },
+      base: { title: baseNote.title, content: 'בסיס', revision: 4 },
+    });
+    await rejectedOfflineSave({ content: 'מהמחשב offline' }, { content: 'מהטלפון' }, entry);
+
+    const resolver = resolverFor(as(OWNER));
+    resolver.sync();
+    await waitFor(async () => (await readAs('notes/recovery-C5')) !== undefined);
+    await waitFor(() => getEntry(OWNER, 'j-1') === null);
+    resolver.stop();
+
+    expect(await readAs('notes/recovery-C5')).toMatchObject({ content: 'מהמחשב offline', userId: OWNER, revision: 0 });
+    expect(await readAs(NOTE)).toMatchObject({ content: 'מהטלפון', revision: 5, saveId: 'P5' });
+
+    // הפעלה נוספת עם אותה רשומה (נשארה בלשונית אחרת): אין עותק שני, והעותק לא משתנה
+    recordEntry(OWNER, entry);
+    const again = resolverFor(as(OWNER));
+    again.sync();
+    await waitFor(() => getEntry(OWNER, 'j-1') === null);
+    again.stop();
+    expect(await countCopies()).toBe(1);
+  });
+
+  it('a checklist with different items changed: the next session writes the merge, and the rules accept it', async () => {
+    const list = (a: boolean, b: string) =>
+      JSON.stringify([
+        { id: 'a', text: 'חלב', completed: a },
+        { id: 'b', text: b, completed: false },
+      ]);
+    await seed({ templateType: 'checklist', content: list(false, 'לחם'), revision: 4, saveId: 'S4' });
+    const entry = journaled({
+      templateType: 'checklist',
+      text: { title: baseNote.title, content: list(true, 'לחם') },
+      base: { title: baseNote.title, content: list(false, 'לחם'), revision: 4 },
+    });
+    await rejectedOfflineSave({ content: list(true, 'לחם') }, { content: list(false, 'לחם מלא') }, entry);
+
+    const resolver = resolverFor(as(OWNER));
+    resolver.sync();
+    await waitFor(async () => (await readAs(NOTE))?.revision === 6);
+    await waitFor(() => getEntry(OWNER, 'j-1') === null);
+    resolver.stop();
+
+    expect(await readAs(NOTE)).toMatchObject({ content: list(true, 'לחם מלא'), revision: 6, baseSaveId: 'P5' });
+    expect(await countCopies()).toBe(0);
+  });
+
+  it('the offline save landed (nobody wrote in between): the record is dropped, nothing else is written', async () => {
+    await seed({ templateType: 'plain', content: 'בסיס', revision: 4, saveId: 'S4' });
+    const previousSession = as(OWNER);
+    await disableNetwork(previousSession);
+    recordEntry(
+      OWNER,
+      journaled({ text: { title: baseNote.title, content: 'מהמחשב' }, base: { title: baseNote.title, content: 'בסיס', revision: 4 } })
+    );
+    const queued = updateDoc(doc(previousSession, NOTE), {
+      content: 'מהמחשב',
+      revision: 5,
+      saveId: 'C5',
+      baseSaveId: 'S4',
+      updatedBy: OWNER,
+    });
+    await enableNetwork(previousSession);
+    await assertSucceeds(queued);
+
+    const resolver = resolverFor(as(OWNER));
+    resolver.sync();
+    await waitFor(() => getEntry(OWNER, 'j-1') === null);
+    resolver.stop();
+    expect(await readAs(NOTE)).toMatchObject({ content: 'מהמחשב', revision: 5, saveId: 'C5' });
+    expect(await countCopies()).toBe(0);
+  });
+
+  it('the note was deleted meanwhile: the listener is refused, and the text becomes a copy', async () => {
+    await seed({ templateType: 'plain', content: 'בסיס', revision: 4, saveId: 'S4' });
+    recordEntry(OWNER, journaled({ text: { title: baseNote.title, content: 'לא נשמר' } }));
+    await env.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore() as unknown as Firestore, NOTE));
+    });
+    const resolver = resolverFor(as(OWNER));
+    resolver.sync();
+    await waitFor(async () => (await readAs('notes/recovery-C5')) !== undefined);
+    resolver.stop();
+    expect(await readAs('notes/recovery-C5')).toMatchObject({ content: 'לא נשמר' });
   });
 });

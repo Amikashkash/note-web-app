@@ -9,18 +9,22 @@
  *   ה-rules דוחים אותה, וה-snapshot שחוזר מוביל להתנגשות - לא לדריסה.
  * - שינוי מרחוק בלי עריכה מקומית: מאומץ בשקט. עם עריכה: מיזוג כשבטוח
  *   (פריטים שונים), אחרת בחירה של המשתמש.
+ * - כל שמירה נרשמת ב-`draftJournal` לפני שהיא יוצאת, ונמחקת משם כשהשרת
+ *   מאשר או כשהמשתמש הכריע בהתנגשות. שמירה שנדחית אחרי שהעורך נסגר (גם
+ *   בהפעלה הבאה) - ה-journal ממזג או מעתיק (`hooks/useDraftJournal.ts`).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useDebouncedPatch } from '@/hooks/useDebouncedPatch';
 import * as noteAPI from '@/services/api/notes';
-import { recoverRejectedText, registerOpenEditor } from '@/services/api/noteRecovery';
+import { registerOpenEditor } from '@/services/api/noteRecovery';
 import { reportConflict } from '@/services/api/conflictEvents';
 import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, LENGTH_LIMITS } from '@/utils/constants';
 import { getErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import type { NoteText } from '@/utils/noteMerge';
+import { baseForNextEntry, dropEntry, getEntry, recordEntry, TAB_ID } from '@/utils/draftJournal';
 import { useAppVersionStore, writesBlocked } from '@/store/appVersionStore';
 import {
   editDraft,
@@ -101,35 +105,64 @@ export const useNoteSync = (note: Note): NoteSync => {
     syncRef.current = sync;
   }, [sync]);
 
+  // גרסה ישנה מדי (`minClientVersion`): מה שלא יצא נשמר בצד להעתקה. מה
+  // שכבר יצא רשום ב-journal ויטופל בגרסה החדשה - לא פעמיים
+  const holdDraft = useCallback(() => {
+    const { draft } = syncRef.current;
+    const noteId = noteRef.current.id;
+    const journaled = uid ? getEntry(uid, noteId) : null;
+    if (journaled && journaled.text.title === draft.title && journaled.text.content === draft.content) return;
+    holdUnsaved({ noteId, title: draft.title, content: draft.content });
+  }, [uid, holdUnsaved]);
+
   const save = useCallback(
     (patch: noteAPI.NoteTextPatch) => {
       // גרסה ישנה מדי (`minClientVersion`): לא שולחים. הטקסט נשאר בעורך,
       // ונשמר בצד כדי שמסך "יש גרסה חדשה" יציג אותו להעתקה
       if (writesBlocked()) {
-        const { draft } = syncRef.current;
-        holdUnsaved({ noteId: noteRef.current.id, title: draft.title, content: draft.content });
+        holdDraft();
         return;
       }
-      const { state, revision, saveId, baseSaveId } = markSent(syncRef.current);
+      const before = syncRef.current;
+      const { state, revision, saveId, baseSaveId } = markSent(before);
       setSync(state);
       const current = noteRef.current;
-      noteAPI.saveNoteText(current.id, patch, { revision, saveId, baseSaveId }).catch((error: unknown) => {
-        if (getFirebaseErrorCode(error) === 'permission-denied') {
-          const text = state.sent[revision];
-          // הגרסה נחסמה בינתיים: גם עותק בפתק חדש לא ייכתב, אז הטקסט נשמר בצד להעתקה
-          if (writesBlocked()) {
-            holdUnsaved({ noteId: current.id, title: text.title, content: text.content });
-            return;
-          }
-          // מישהו כתב בינתיים. עורך פתוח יציג התנגשות; עורך שנסגר - עותק בפתק חדש
-          if (uid) recoverRejectedText({ ...current, ...text }, uid);
-          return;
-        }
-        logger.error('Note save failed:', error);
-        window.alert(getErrorMessage(error));
-      });
+      // נרשם לפני שהכתיבה יוצאת: אם תידחה כשהעורך כבר סגור (אולי רק בהפעלה
+      // הבאה), ה-journal ימזג או יעתיק במקום שהטקסט ייעלם
+      if (uid) {
+        recordEntry(uid, {
+          noteId: current.id,
+          saveId,
+          revision,
+          text: state.sent[revision],
+          templateType: patch.templateType ?? current.templateType,
+          base: baseForNextEntry(getEntry(uid, current.id), before.base, before.unconfirmedBase),
+          meta: {
+            categoryId: current.categoryId,
+            tags: current.tags,
+            color: current.color,
+            isSensitive: current.isSensitive,
+            isReadOnly: current.isReadOnly,
+          },
+          clientVersion: __APP_VERSION__,
+          tabId: TAB_ID,
+          at: Date.now(),
+        });
+      }
+      noteAPI
+        .saveNoteText(current.id, patch, { revision, saveId, baseSaveId })
+        .then(() => {
+          if (uid) dropEntry(uid, current.id, saveId);
+        })
+        .catch((error: unknown) => {
+          // נדחתה (מישהו כתב בינתיים): עורך פתוח יציג התנגשות, עורך שנסגר -
+          // ה-journal. גם אם הגרסה נחסמה בינתיים: הרשומה מחכה לגרסה החדשה
+          if (getFirebaseErrorCode(error) === 'permission-denied') return;
+          logger.error('Note save failed:', error);
+          window.alert(getErrorMessage(error));
+        });
     },
-    [setSync, uid, holdUnsaved]
+    [setSync, uid, holdDraft]
   );
 
   const debouncer = useDebouncedPatch<noteAPI.NoteTextPatch>(save, AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS);
@@ -138,9 +171,8 @@ export const useNoteSync = (note: Note): NoteSync => {
   useEffect(() => {
     if (!blocked || !hasUnconfirmedEdits(syncRef.current, debouncer.hasPending())) return;
     debouncer.cancel();
-    const { draft } = syncRef.current;
-    holdUnsaved({ noteId: noteRef.current.id, title: draft.title, content: draft.content });
-  }, [blocked, debouncer, holdUnsaved]);
+    holdDraft();
+  }, [blocked, debouncer, holdDraft]);
 
   // עורך פתוח: שמירה שנדחית מוצגת כאן ולא הופכת לעותק
   useEffect(() => registerOpenEditor(note.id), [note.id]);
@@ -182,12 +214,18 @@ export const useNoteSync = (note: Note): NoteSync => {
     [debouncer, setSync]
   );
 
+  // המשתמש הכריע בהתנגשות: מה שה-journal שמר כבר לא צריך עותק
+  const forgetJournal = useCallback(() => {
+    if (uid) dropEntry(uid, noteRef.current.id);
+  }, [uid]);
+
   const reloadRemote = useCallback(() => {
     const { state, discarded: mine } = takeRemote(syncRef.current);
+    forgetJournal();
     debouncer.cancel();
     setSync(state);
     setDiscarded(mine);
-  }, [debouncer, setSync]);
+  }, [debouncer, setSync, forgetJournal]);
 
   const saveMineAsNew = useCallback(async () => {
     const conflict = syncRef.current.conflict;
@@ -213,10 +251,11 @@ export const useNoteSync = (note: Note): NoteSync => {
       return;
     }
     const { state } = takeRemote(syncRef.current);
+    forgetJournal();
     debouncer.cancel();
     setSync(state);
     setDiscarded(null);
-  }, [debouncer, setSync, uid]);
+  }, [debouncer, setSync, uid, forgetJournal]);
 
   const onRestored = useCallback(() => {
     debouncer.cancel();
