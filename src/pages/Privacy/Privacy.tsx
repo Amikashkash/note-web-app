@@ -130,7 +130,58 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                5. שיתוף מידע עם צדדים שלישיים
+                5. חיבור ל-Claude
+              </h2>
+              <p className="leading-relaxed">
+                אפשר לחבר את האפליקציה ל-Claude (של Anthropic), כדי לבקש ממנו לקרוא ולערוך פתקים. החיבור קיים רק אם
+                חיברת אותו בעצמך, ואפשר לנתק אותו בכל רגע בהגדרות, ב&quot;אפליקציות מחוברות&quot;. ניתוק חוסם את הגישה מיד.
+              </p>
+              <ul className="list-disc list-inside space-y-2 mr-4 mt-2">
+                <li>
+                  <strong>מה Claude רואה:</strong> הפתקים והקטגוריות שלך, וגם פתקים ששותפו איתך.
+                </li>
+                <li>
+                  <strong>מה Claude לא רואה:</strong> פתקים שסימנת כרגישים, ופתקים בקטגוריה שסימנת כרגישה. הם מוסתרים
+                  ממנו לגמרי.
+                </li>
+                <li>
+                  <strong>מה Claude יכול לשנות:</strong> רק אם אישרת גישת כתיבה. הוא יכול ליצור פתקים ולערוך את הפתקים שלך.
+                  הוא לא מוחק פתקים (רק מעביר לארכיון), ולא משנה פתקים ששותפו איתך, פתקים שסימנת &quot;קריאה בלבד
+                  ל-Claude&quot; או פתק שפתוח כרגע באפליקציה.
+                </li>
+                <li>
+                  <strong>לאן המידע עובר:</strong> מה ש-Claude קורא נשלח ל-Anthropic כחלק מהשיחה שלך איתו, ונשמר אצלם לפי
+                  מדיניות הפרטיות של Anthropic.
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                6. היסטוריה, יומן פעילות ומדידה
+              </h2>
+              <ul className="list-disc list-inside space-y-2 mr-4">
+                <li>
+                  <strong>היסטוריית גרסאות:</strong> לפני שינוי בפתק נשמרת הגרסה הקודמת שלו, כדי שאפשר יהיה לשחזר. רואה
+                  אותה מי שיכול לראות את הפתק. נשמרות עד 50 גרסאות לכל פתק, וכל גרסה נמחקת אוטומטית אחרי 90 יום. מחיקה
+                  סופית של פתק מוחקת גם את ההיסטוריה שלו.
+                </li>
+                <li>
+                  <strong>פעילות Claude:</strong> כל שינוי ש-Claude עושה נרשם ביומן: מה הוא עשה, באיזה פתק (כותרת וסוג),
+                  והחלק שהשתנה - לפני ואחרי. רק את/ה רואה את היומן, ב&quot;פעילות Claude&quot; בהגדרות. כל רשומה נמחקת
+                  אוטומטית אחרי 180 יום.
+                </li>
+                <li>
+                  <strong>מדידת התנגשויות:</strong> כשאותו פתק משתנה בשני מקומות בבת אחת ואי אפשר לאחד את השינויים לבד,
+                  נשמר אירוע אנונימי: סוג ההתנגשות, שמות השדות (למשל &quot;תאריך&quot;), סוג הפתק, גרסת האפליקציה והזמן.
+                  בלי שם משתמש, בלי מזהה פתק ובלי תוכן. זה עוזר לנו להחליט אם צריך לשפר את הסנכרון.
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                7. שיתוף מידע עם צדדים שלישיים
               </h2>
               <p className="leading-relaxed">
                 <strong className="text-lg">אנחנו לא מוכרים או משתפים את המידע האישי שלך עם צדדים
@@ -144,6 +195,9 @@ export const Privacy: React.FC = () => {
                   <strong>ספקי שירות:</strong> Google Firebase (אחסון)
                 </li>
                 <li>
+                  <strong>Claude (Anthropic):</strong> רק אם חיברת אותו, ורק מה שהוא קורא (סעיף 5)
+                </li>
+                <li>
                   <strong>דרישות חוק:</strong> כאשר נדרש על פי חוק או בקשה משפטית
                 </li>
               </ul>
@@ -151,7 +205,7 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                6. הזכויות שלך
+                8. הזכויות שלך
               </h2>
               <p className="leading-relaxed">
                 בהתאם לחוק הגנת הפרטיות בישראל ולתקנות ה-GDPR, יש לך את הזכויות הבאות:
@@ -186,7 +240,7 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                7. אבטחת מידע
+                9. אבטחת מידע
               </h2>
               <p className="leading-relaxed">
                 אנו נוקטים באמצעי אבטחה סבירים להגן על המידע שלך:
@@ -201,7 +255,7 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                8. קטינים
+                10. קטינים
               </h2>
               <p className="leading-relaxed">
                 האפליקציה אינה מיועדת לשימוש ילדים מתחת לגיל 13. אנו לא אוספים במכוון מידע
@@ -211,7 +265,7 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                9. שימוש ב-Cookies ו-Local Storage
+                11. שימוש ב-Cookies ו-Local Storage
               </h2>
               <p className="leading-relaxed">
                 האפליקציה משתמשת ב-Local Storage כדי לשמור העדפות שלך (כמו מצב כהה/בהיר) ופרטי
@@ -219,14 +273,15 @@ export const Privacy: React.FC = () => {
               </p>
               <p className="leading-relaxed mt-2">
                 כדי שהאפליקציה תעבוד גם בלי חיבור לאינטרנט, עותק של הפתקים שלך ושל שינויים שעוד לא נשלחו
-                נשמר בדפדפן (IndexedDB). בהתנתקות העותק נמחק מהמכשיר. אם יש שינויים שעוד לא הגיעו לשרת,
-                תישאל/י לפני ההתנתקות אם להשאיר אותם במכשיר עד שתתחבר/י שוב או למחוק אותם.
+                נשמר בדפדפן (IndexedDB). גם שינוי שנשלח ועוד לא אושר בשרת נרשם במכשיר, כדי שלא ייעלם אם השרת ידחה
+                אותו. בהתנתקות כל אלה נמחקים מהמכשיר. אם יש שינויים שעוד לא הגיעו לשרת, תישאל/י לפני ההתנתקות אם להשאיר
+                אותם במכשיר עד שתתחבר/י שוב או למחוק אותם.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                10. שינויים במדיניות
+                12. שינויים במדיניות
               </h2>
               <p className="leading-relaxed">
                 אנו עשויים לעדכן מדיניות פרטיות זו מעת לעת. נודיע לך על שינויים מהותיים דרך
@@ -237,7 +292,7 @@ export const Privacy: React.FC = () => {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                11. יצירת קשר
+                13. יצירת קשר
               </h2>
               <p className="leading-relaxed">
                 אם יש לך שאלות או דאגות לגבי מדיניות הפרטיות שלנו, אנא צור קשר:
