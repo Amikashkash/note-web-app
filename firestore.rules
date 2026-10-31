@@ -230,6 +230,21 @@ service cloud.firestore {
       match /products/{productId} {
         allow read, write: if isOwner(userId);
       }
+
+      // העדפות מסך הבית (סבב 3, v1.40.0): היום רק הסדר האישי של הקטגוריות.
+      // הסדר נשמר כאן ולא על מסמך הקטגוריה, כדי שקטגוריה משותפת תהיה
+      // מסודרת אצל כל אחד בנפרד - ונמען שגורר לא נוגע בקטגוריה של הבעלים.
+      // רק המסמך `home`, רק השדות האלה, ורשימה חסומה בגודל (500, כמו
+      // `MAX_CATEGORY_ORDER` באפליקציה).
+      match /preferences/{prefId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && prefId == 'home'
+          && request.resource.data.keys().hasOnly(['categoryOrder', 'updatedAt'])
+          && request.resource.data.categoryOrder is list
+          && request.resource.data.categoryOrder.size() <= 500
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isOwner(userId);
+      }
     }
 
     // שם תצוגה ואימייל לפי מזהה משתמש - להצגת "משותף עם" בשמות.
