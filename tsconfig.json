@@ -26,6 +26,12 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "tests"],
+  /*
+   * הבנייה של האפליקציה (`npm run build` = `tsc && vite build`) בודקת רק קוד
+   * שהאפליקציה עצמה מריצה. `tests/rules` ו-`tests/mirrors` מייבאים מ-`functions/`,
+   * שהתלויות שלו (`firebase-admin`) מותקנות רק ב-`functions/node_modules` - ולא
+   * ב-job של הפריסה. הם נבדקים ב-`tsconfig.tests.json` (`npm run typecheck:tests`).
+   */
+  "include": ["src", "tests/hosting"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

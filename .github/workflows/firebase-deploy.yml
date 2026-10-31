@@ -72,6 +72,11 @@ jobs:
         run: npm run typecheck
         working-directory: functions
 
+      # בדיקות שמייבאות קוד של functions (`tests/rules`, `tests/mirrors`).
+      # מחוץ ל-`npm run build` בכוונה: שם אין את התלויות של functions
+      - name: Typecheck tests that import functions code
+        run: npm run typecheck:tests
+
       - name: Functions unit tests
         run: npm test
         working-directory: functions
@@ -84,9 +89,39 @@ jobs:
       - name: Functions integration tests (emulator)
         run: npm run test:functions:emulator
 
+  # הבנייה של האפליקציה בדיוק כמו ב-job של הפריסה: רק התלויות של השורש, בלי
+  # `functions/node_modules`. ה-job של הבדיקות מתקין את שתיהן, ולכן לא תפס
+  # את v1.39.0, שבה `tsc` של האפליקציה בדק בטעות קוד של functions - והפריסה
+  # נכשלה רק אחרי המיזוג.
+  build-like-deploy:
+    name: Build like the deploy (root dependencies only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (root only, as in the deploy)
+        run: npm ci
+
+      - name: functions dependencies must be absent here
+        run: test ! -d functions/node_modules
+
+      - name: Typecheck and build client
+        run: npm run build
+        env:
+          VITE_MCP_CONNECT: 'true'
+
   deploy:
     name: Deploy to Firebase
-    needs: test
+    needs: [test, build-like-deploy]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # `id-token: write` מאפשר ל-GitHub להנפיק OIDC token להרצה הזו, ש-Google
