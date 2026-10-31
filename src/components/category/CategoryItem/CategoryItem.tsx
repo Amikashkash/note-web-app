@@ -20,6 +20,7 @@ import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useAuthStore } from '@/store/authStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { NoteCardList } from '@/components/note/NoteCardList';
+import { confirmLeaveSharedNote } from '@/components/note/leaveSharedNote';
 import { NoteView } from '@/components/note/NoteView';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { filterNotesByQuery } from '@/utils/search';
@@ -226,6 +227,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
               onOpen={setViewingNote}
               onArchive={deleteNote}
               onTogglePin={pinNote}
+              onLeave={confirmLeaveSharedNote}
               // בחיפוש מוצג רק חלק מהפתקים - אין גרירה
               onReorder={hasSearch ? undefined : reorder}
               emptyText="אין פתקים בקטגוריה. ה-+ שבתחתית המסך יוצר פתק כאן."

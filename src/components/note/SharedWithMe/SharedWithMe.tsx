@@ -5,43 +5,26 @@
  * למכשיר ולא מוצגים בשום מקום, כי דף הבית בנוי סביב קטגוריות ולפתקים
  * האלה אין קטגוריה נראית.
  *
+ * אותם כרטיסים ברוחב מלא כמו בקטגוריות (v1.42.0). "הסר אותי" בתפריט ⋮
+ * של הכרטיס. אין ארכוב (הפתק לא שלי) ואין גרירה (אין כאן סדר משלי).
+ *
  * לא מוצג כשאין פתקים כאלה - מקטע ריק קבוע רק מוסיף רעש.
  */
 
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
 import { useOrphanSharedNotes } from '@/hooks/useOrphanSharedNotes';
-import { NoteCard } from '@/components/note/NoteCard';
+import { NoteCardList } from '@/components/note/NoteCardList';
 import { NoteView } from '@/components/note/NoteView';
-import { leaveSharedNote } from '@/services/api/notes';
-import { getErrorMessage } from '@/utils/errors';
+import { confirmLeaveSharedNote } from '@/components/note/leaveSharedNote';
 import type { Note } from '@/types/note';
+
+/** צבע הפס כשלפתק אין צבע משלו - אין כאן קטגוריה שלי שתיתן צבע */
+const SHARED_COLOR = '#4F46E5';
 
 export const SharedWithMe: React.FC = () => {
   const sharedNotes = useOrphanSharedNotes();
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
-
-  // הפתקים שייכים לקטגוריה של מישהו אחר, ולכן אין כאן קטגוריה משלנו
-  // להעביר. הפעולות: צפייה, עריכה, והסרה של עצמי מהשיתוף - מה שהכללים
-  // מתירים למי ששותפו איתו. (קודם היה כאן "מחק" שלא עשה כלום.)
-  // העריכה עצמה נשמרת מתוך NoteView (useNoteSync).
-
-  const handleLeave = async (note: Note) => {
-    if (
-      !window.confirm(
-        `להסיר אותך מהשיתוף של "${note.title || 'ללא כותרת'}"?
-
-הפתק יפסיק להופיע אצלך. הבעלים יוכל לשתף אותו איתך שוב.`
-      )
-    ) {
-      return;
-    }
-    try {
-      await leaveSharedNote(note.id);
-    } catch (error) {
-      window.alert(getErrorMessage(error));
-    }
-  };
 
   if (sharedNotes.length === 0) return null;
 
@@ -54,24 +37,19 @@ export const SharedWithMe: React.FC = () => {
       <div className="flex items-center gap-2 mb-3">
         <Users size={20} strokeWidth={1.75} className="text-ink-2-light dark:text-ink-2-dark" />
         <h2 className="text-h2 text-ink-light dark:text-ink-dark">שותף איתי</h2>
-        <span className="text-caption text-ink-3-light dark:text-ink-3-dark">
+        <span className="text-body-sm text-ink-3-light dark:text-ink-3-dark">
           {sharedNotes.length} פתקים
         </span>
       </div>
 
-      <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-e1 border border-hairline-light dark:border-hairline-dark p-2 sm:p-4">
-        <div className="overflow-x-auto" dir="rtl">
-          <div className="flex gap-3">
-            {sharedNotes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onView={setViewingNote}
-                onLeave={handleLeave}
-              />
-            ))}
-          </div>
-        </div>
+      <div className="paper-on-surface bg-surface-light dark:bg-surface-dark rounded-xl shadow-e1 border border-hairline-light dark:border-hairline-dark p-3 sm:p-4">
+        <NoteCardList
+          notes={sharedNotes}
+          categoryColor={SHARED_COLOR}
+          onOpen={setViewingNote}
+          onLeave={confirmLeaveSharedNote}
+          emptyText=""
+        />
       </div>
 
       {activeNote && (

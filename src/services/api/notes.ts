@@ -468,19 +468,14 @@ export const togglePinNote = (noteId: string, isPinned: boolean): Promise<void> 
   updateNote(noteId, { isPinned });
 
 /**
- * סימון/ביטול סימון פתק כרגיש (מוסתר מ-Claude). רק הבעלים - ה-rules
- * דוחים את זה משותף. לא יוצר גרסה בהיסטוריה: `isSensitive` אינו שדה
- * תוכן (ראה `VERSIONED_FIELDS` ב-`functions/src/versions.ts`).
+ * הגישה של Claude לפתק בכתיבה אחת: שני הדגלים יחד (ראה `utils/claudeAccess.ts`).
+ * רק לבעלים - ה-rules דוחים את שני הדגלים משותף. לא יוצר גרסה בהיסטוריה: הם
+ * לא שדות תוכן (ראה `VERSIONED_FIELDS` ב-`functions/src/versions.ts`).
  */
-export const setNoteSensitive = (noteId: string, isSensitive: boolean): Promise<void> =>
-  updateNote(noteId, { isSensitive });
-
-/**
- * קריאה בלבד ל-Claude: הוא רואה את הפתק, אבל כלי עריכה עתידיים יסרבו
- * לשנות אותו. רק הבעלים (rules). לא יוצר גרסה - אינו שדה תוכן.
- */
-export const setNoteReadOnly = (noteId: string, isReadOnly: boolean): Promise<void> =>
-  updateNote(noteId, { isReadOnly });
+export const setNoteClaudeFlags = (
+  noteId: string,
+  flags: { isSensitive: boolean; isReadOnly: boolean }
+): Promise<void> => updateNote(noteId, flags);
 
 /**
  * העברת פתק לארכיון (מחיקה רכה)

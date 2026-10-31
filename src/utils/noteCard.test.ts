@@ -58,6 +58,12 @@ describe('cardPreview', () => {
     expect(preview.endsWith('…')).toBe(true);
   });
 
+  it('shows nothing for an empty structured note, not raw JSON', () => {
+    expect(cardPreview({ templateType: 'accounting', content: '[]' })).toBe('');
+    expect(cardPreview({ templateType: 'recipe', content: '{}' })).toBe('');
+    expect(cardPreview({ templateType: 'workplan', content: '' })).toBe('');
+  });
+
   it('uses the existing preview for other templates, on one line', () => {
     const workplan = {
       templateType: 'workplan',

@@ -895,8 +895,15 @@ describe('every kind of note write the app makes passes phase 2', () => {
     ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
       'togglePinNote', uid, (db) => updateDoc(doc(db, NOTE), { isPinned: true, ...stamp(uid) }),
     ]),
-    ['setNoteSensitive', OWNER, (db) => updateDoc(doc(db, NOTE), { isSensitive: true, ...stamp(OWNER) })],
-    ['setNoteReadOnly', OWNER, (db) => updateDoc(doc(db, NOTE), { isReadOnly: true, ...stamp(OWNER) })],
+    // setNoteClaudeFlags (v1.42.0): שני הדגלים יחד, בכל אחת משלוש הרמות
+    ...([
+      [true, false],
+      [false, true],
+      [false, false],
+    ] as const).map(([isSensitive, isReadOnly]): [string, string, (db: Firestore) => Promise<unknown>] => [
+      `setNoteClaudeFlags (sensitive ${isSensitive}, read-only ${isReadOnly})`, OWNER, (db) =>
+        updateDoc(doc(db, NOTE), { isSensitive, isReadOnly, ...stamp(OWNER) }),
+    ]),
     ...[OWNER, SHARED].map((uid): [string, string, (db: Firestore) => Promise<unknown>] => [
       'reorderNotes (batch)', uid, (db) => {
         const batch = writeBatch(db);
