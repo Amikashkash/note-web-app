@@ -58,6 +58,18 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
   {
+    // האפליקציה לא מייבאת מ-`functions/`: התלויות שלו לא מותקנות בבנייה של
+    // הפריסה, וייבוא כזה שובר אותה (כך נשבר ה-deploy של 1.39.0). מה שצריך
+    // להיות זהה בשני הצדדים - מראה ב-functions, ובדיקת מראה ב-`tests/mirrors`.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['**/functions/**'], message: 'האפליקציה לא מייבאת מ-functions/ (ראו tests/mirrors).' }] },
+      ],
+    },
+  },
+  {
     // פונקציות הענן הן חבילת Node נפרדת: אין להן DOM, אין להן את הלוגר
     // של האפליקציה, וסקריפטים חד-פעמיים מדפיסים ל-console בכוונה.
     files: ['functions/**/*.ts'],

@@ -1,0 +1,9 @@
+{
+  /*
+   * בדיקות שמייבאות קוד של `functions/` (המראות, ובדיקות ה-emulator שמריצות
+   * את קוד השרת האמיתי). דורש `functions/node_modules`, ולכן רץ בנפרד מהבנייה
+   * של האפליקציה: `npm run typecheck:tests`, ב-CI אחרי התקנת התלויות של functions.
+   */
+  "extends": "./tsconfig.json",
+  "include": ["src", "tests"]
+}
