@@ -1221,6 +1221,48 @@ describe('MCP OAuth collections', () => {
     await assertFails(setDoc(doc(as(STRANGER), 'config/mcp'), { allowedUids: [STRANGER], openToAll: true }));
   });
 
+  // v1.43.0: מנהלים ובקשות גישה. הכל עובר דרך השרת
+  describe('admins and access requests (v1.43.0)', () => {
+    const seedAccess = () =>
+      env.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, 'config/mcp'), { allowedUids: [OWNER], adminUids: [OWNER], openToAll: false });
+        await setDoc(doc(db, `mcpAccessRequests/${STRANGER}`), { uid: STRANGER, status: 'pending' });
+        await setDoc(doc(db, 'mcpAccessAudit/a1'), { action: 'approve', adminUid: OWNER, targetUid: SHARED });
+      });
+
+    it('even an admin cannot read or change config/mcp from the app', async () => {
+      await seedAccess();
+      await assertFails(getDoc(doc(as(OWNER), 'config/mcp')));
+      await assertFails(updateDoc(doc(as(OWNER), 'config/mcp'), { allowedUids: arrayUnion(SHARED) }));
+    });
+
+    it('nobody can make themselves an admin', async () => {
+      await seedAccess();
+      await assertFails(updateDoc(doc(as(STRANGER), 'config/mcp'), { adminUids: arrayUnion(STRANGER) }));
+      await assertFails(setDoc(doc(as(STRANGER), 'config/mcp'), { adminUids: [STRANGER] }));
+    });
+
+    it.each([`mcpAccessRequests/${STRANGER}`, 'mcpAccessAudit/a1'])(
+      '%s is closed to every client, including the requester and the admin',
+      async (path) => {
+        await seedAccess();
+        for (const uid of [OWNER, STRANGER, SHARED]) {
+          await assertFails(getDoc(doc(as(uid), path)));
+          await assertFails(setDoc(doc(as(uid), path), { uid, status: 'approved' }));
+          await assertFails(deleteDoc(doc(as(uid), path)));
+        }
+      }
+    );
+
+    it('a user cannot file or approve their own request, or list requests', async () => {
+      await seedAccess();
+      await assertFails(setDoc(doc(as(SHARED), `mcpAccessRequests/${SHARED}`), { uid: SHARED, status: 'pending' }));
+      await assertFails(getDocs(collection(as(OWNER), 'mcpAccessRequests')));
+      await assertFails(getDocs(collection(as(OWNER), 'mcpAccessAudit')));
+    });
+  });
+
   it('the owner of a grant can read it and list their own grants', async () => {
     await seedOAuth();
     await assertSucceeds(getDoc(doc(as(OWNER), 'oauthGrants/g1')));

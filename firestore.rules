@@ -339,8 +339,20 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // בקשות גישה ל-Claude ויומן המנהל (v1.43.0). נכתבים ונקראים רק בשרת
+    // (`functions/src/oauth/access.ts`, Admin SDK). האפליקציה מקבלת את המצב
+    // שלה דרך `/oauth/access/status`, ולא קוראת כאן כלום.
+    match /mcpAccessRequests/{uid} {
+      allow read, write: if false;
+    }
+    match /mcpAccessAudit/{entryId} {
+      allow read, write: if false;
+    }
+
     // allowlist המשתמשים של שרת ה-MCP (`config/mcp`). נערך רק מה-console:
     // לקוח שיכול לקרוא אותו יודע מי מורשה, ולקוח שיכול לכתוב - מורשה.
+    // `adminUids` (v1.43.0) באותו מסמך: מי שיכול לכתוב כאן היה הופך את
+    // עצמו למנהל. השרת לבדו משנה את `allowedUids`, אחרי בדיקת מנהל.
     // `config/app` (D4a): `minClientVersion` - כל לקוח קורא אותו בפתיחה,
     // גם לפני התחברות, כדי לדעת אם הגרסה שלו עוד רשאית לכתוב. רק `get`:
     // אי אפשר לרשום את `config` (ו-`config/mcp` נשאר סגור). כתיבה - רק

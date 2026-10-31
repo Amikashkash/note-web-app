@@ -160,7 +160,9 @@ let productionApp: ReturnType<typeof createMcpApp> | null = null;
 export const mcpApp = async () => {
   if (!productionApp) {
     const { getAuth } = await import('firebase-admin/auth');
-    productionApp = createMcpApp({ store: OAuthStore.create(), auth: getAuth() });
+    const { createAdminNotifier } = await import('../oauth/accessPush.js');
+    const store = OAuthStore.create();
+    productionApp = createMcpApp({ store, auth: getAuth(), notifyAdmins: createAdminNotifier(store) });
   }
   return productionApp;
 };

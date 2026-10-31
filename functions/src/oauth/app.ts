@@ -16,6 +16,16 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import type { Auth } from 'firebase-admin/auth';
 import { logger } from 'firebase-functions';
+import {
+  ACCESS_REQUEST_LIMITS,
+  accessStatus,
+  adminView,
+  approveAccess,
+  rejectAccess,
+  requestAccess,
+  revokeAccess,
+  type AdminNotice,
+} from './access';
 import { authorize } from './authorize';
 import { clientIp } from './clientIp';
 import { RATE_LIMITS, type RateLimitedEndpoint, type RateLimitWindow } from './config';
@@ -37,6 +47,13 @@ export interface OAuthAppDeps {
   clock?: () => number;
   /** לבדיקות בלבד. ברירת המחדל היא `RATE_LIMITS` */
   rateLimits?: Limits;
+  /** לבדיקות בלבד. ברירת המחדל היא `ACCESS_REQUEST_LIMITS` */
+  accessRequestLimits?: readonly RateLimitWindow[];
+  /**
+   * התראה למנהלים על בקשת גישה. בפרודקשן push (`accessPush.ts`), בבדיקות
+   * רישום. בלי - לא נשלח כלום, והבקשה עדיין נשמרת.
+   */
+  notifyAdmins?: (notice: AdminNotice) => Promise<void>;
 }
 
 const BODY_LIMIT = '16kb';
@@ -73,7 +90,14 @@ const publicJson =
 const asParams = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-export const createOAuthApp = ({ store, auth, clock = Date.now, rateLimits = RATE_LIMITS }: OAuthAppDeps) => {
+export const createOAuthApp = ({
+  store,
+  auth,
+  clock = Date.now,
+  rateLimits = RATE_LIMITS,
+  accessRequestLimits = ACCESS_REQUEST_LIMITS,
+  notifyAdmins = async () => undefined,
+}: OAuthAppDeps) => {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -147,6 +171,42 @@ export const createOAuthApp = ({ store, auth, clock = Date.now, rateLimits = RAT
     logger.info('oauth.grant_revoked_by_user', { grantId });
     res.json({ revoked: true });
   });
+
+  // בקשות גישה ל-Claude ואישור שלהן (v1.43.0, `access.ts`). Firebase ID token
+  // ב-header, כמו `/oauth/decision`. פעולות המנהל נבדקות מול `adminUids` בשרת.
+  app.get('/oauth/access/status', async (req, res) => {
+    res.json(await accessStatus({ store, auth, authorization: req.headers.authorization }));
+  });
+
+  app.post('/oauth/access/request', json, async (req, res) => {
+    const status = await requestAccess({
+      store,
+      auth,
+      authorization: req.headers.authorization,
+      now: clock(),
+      limits: accessRequestLimits,
+      notify: notifyAdmins,
+    });
+    logger.info('access.requested', { pending: status.request === 'pending' });
+    res.json(status);
+  });
+
+  app.get('/oauth/access/admin', async (req, res) => {
+    res.json(await adminView({ store, auth, authorization: req.headers.authorization }));
+  });
+
+  for (const [action, run] of [
+    ['approve', approveAccess],
+    ['reject', rejectAccess],
+    ['revoke', revokeAccess],
+  ] as const) {
+    app.post(`/oauth/access/admin/${action}`, json, async (req, res) => {
+      const result = await run({ store, auth, authorization: req.headers.authorization, body: req.body, now: clock() });
+      // רק מזהים, כמו שאר הלוג: בלי שם ואימייל
+      logger.info(`access.${action}`, result);
+      res.json({ ok: true, ...result });
+    });
+  }
 
   app.post('/oauth/token', form, rateLimited('token'), async (req, res) => {
     const params = asParams(req.body);

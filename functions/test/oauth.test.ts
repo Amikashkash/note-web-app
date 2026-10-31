@@ -125,7 +125,9 @@ describe('user allowlist (config/mcp) is fail-closed', () => {
     ['a list with the user', { allowedUids: ['me'], openToAll: false }, true],
     ['openToAll', { allowedUids: [], openToAll: true }, true],
   ])('%s', (_label, config, allowed) => {
-    expect(isUserAllowed(config, 'me')).toBe(allowed);
+    // אדמין לא נותן גישה בעצמו: רק allowedUids או openToAll
+    expect(isUserAllowed({ ...config, adminUids: [] }, 'me')).toBe(allowed);
+    expect(isUserAllowed({ ...config, adminUids: ['me'] }, 'me')).toBe(allowed);
   });
 });
 
