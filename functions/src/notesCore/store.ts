@@ -28,7 +28,8 @@ import {
   type NoteCreatedSummary,
   type WriteActor,
 } from './audit';
-import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from './errors';
+import { ForbiddenError, InvalidError, NotFoundError, ReadOnlyError, UserTypingError } from './errors';
+import { typingOn } from './typing';
 import { isVerifiedIdentity, type VerifiedIdentity } from './identity';
 import { toCategoryRecord, toNoteRecord, toNoteVersion } from './mappers';
 import type { Access, Category, CategoryRecord, Note, NoteRecord, NoteVersion } from './model';
@@ -45,12 +46,6 @@ const IDEMPOTENCY = 'mcpIdempotency';
 
 /** חלון מניעת הכפילויות של `createNote` ו-`editNote` */
 export const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
-
-/**
- * סימון "הפתק פתוח" שרוענן בדקה האחרונה נחשב פתוח. זהה ל-`PRESENCE_TTL_MS`
- * באפליקציה (`src/utils/presence.ts`): העורך מרענן כל 30 שניות.
- */
-export const PRESENCE_TTL_MS = 60 * 1000;
 
 /** מספר הגרסאות המרבי שמוחזר - אותו סדר גודל כמו מה שהאפליקציה שומרת */
 const MAX_VERSIONS = 50;
@@ -380,8 +375,9 @@ export class UserScope {
    * - לא בבעלות המשתמש (שותף) - `Forbidden`: בינתיים רק פתקים שלו.
    * - קריאה בלבד ל-Claude (הפתק או הקטגוריה) - `ReadOnlyError`.
    * - מאורכב - `InvalidError`.
-   * - פתוח באפליקציה (סימון נוכחות מהדקה האחרונה) - `OpenElsewhereError`,
-   *   ולא כותבים. זו שכבת נוחות: גם בלעדיה העורך הפתוח לא דורס (C-1).
+   * - המשתמש מקליד בו באפליקציה (`typedAt` טרי, `typing.ts`) - `UserTypingError`,
+   *   ולא כותבים. פתק שרק פתוח לא חוסם (v1.39.0): העורך הפתוח מאמץ או ממזג
+   *   את השינוי, ושמירה ישנה שלו נדחית ע"י `revision` - לא דורסת (C-1).
    * - בקשה זהה בחלון של 10 דקות - מוחזר מה שכבר נעשה.
    *
    * הכתיבה: התוכן, `revision + 1` (כל עורך פתוח מזהה אותה, וכל שמירה ישנה
@@ -425,13 +421,14 @@ export class UserScope {
         throw new InvalidError('the note is archived. Restore it with unarchive_note first, if the user wants');
       }
 
-      const openOn = presence.docs
-        .filter((marker) => {
-          const refreshedAt = marker.get('refreshedAt') as Timestamp | undefined;
-          return refreshedAt instanceof Timestamp && now - refreshedAt.toMillis() < PRESENCE_TTL_MS;
-        })
-        .map((marker) => String(marker.get('device') ?? ''));
-      if (openOn.length > 0) throw new OpenElsewhereError(openOn);
+      const typing = typingOn(
+        presence.docs.map((marker) => {
+          const typedAt = marker.get('typedAt') as Timestamp | undefined;
+          return { typedAt: typedAt instanceof Timestamp ? typedAt : null, device: String(marker.get('device') ?? '') };
+        }),
+        now
+      );
+      if (typing.length > 0) throw new UserTypingError(typing);
 
       // קריאות נוספות, לפני כל הכתיבות
       const [targetSnapshot, reminders] = await Promise.all([

@@ -3,14 +3,16 @@
  * כל סעיף מכיל כותרת משנה וטקסט חופשי עם תמיכה במספור אוטומטי ועיצוב טקסט
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
 import type { WorkPlanSection } from '@/types/template';
 import { parseWorkPlan } from '@/utils/templateContent';
+import { withFirstRow } from '@/utils/firstRow';
 import { UnparseableContent } from './UnparseableContent';
+import { NoteLinks } from '@/components/note/NoteLinks/NoteLinks';
 
 export type { WorkPlanSection };
 
@@ -30,21 +32,13 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
 }) => {
   // פענוח שנכשל אינו "תכנית ריקה" - ראה `templateContent.ts`
   const parsed = useMemo(() => parseWorkPlan(value), [value]);
-  const sections = useMemo<WorkPlanSection[]>(() => (parsed.ok ? parsed.value : []), [parsed]);
-
-  /**
-   * תכנית ריקה מקבלת סעיף ראשון אוטומטית.
-   *
-   * תכנית בלי סעיף אחד לפחות היא חסרת משמעות, ולכן הלחיצה על "הוסף
-   * סעיף" רק כדי להתחיל הייתה מיותרת. בלי פוקוס בכוונה: בפתק חדש
-   * הפוקוס שייך לשדה הכותרת, ובפתק קיים הוא היה מקפיץ מקלדת בנייד.
-   */
-  useEffect(() => {
-    // רק תוכן ריק לגמרי - תוכן שלא פוענח לעולם לא נדרס
-    if (readOnly || value !== '') return;
-
-    onChange(JSON.stringify([{ id: Date.now().toString(), header: '', content: '' }]));
-  }, [readOnly, value, onChange]);
+  // תכנית חדשה (תוכן ריק לגמרי) מוצגת עם סעיף ראשון ריק - בלי לכתוב בפתיחה.
+  // הסעיף נשמר עם השינוי הראשון. תוכן שלא פוענח לעולם לא נדרס
+  const [firstSectionId] = useState(() => Date.now().toString());
+  const sections = useMemo<WorkPlanSection[]>(
+    () => withFirstRow(value, parsed, readOnly, { id: firstSectionId, header: '', content: '' }),
+    [parsed, value, readOnly, firstSectionId]
+  );
 
   const handleAddSection = () => {
     const newSection: WorkPlanSection = {
@@ -172,6 +166,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
             rows={5}
             className="text-sm"
           />
+          <NoteLinks text={section.content} />
         </div>
       ))}
 

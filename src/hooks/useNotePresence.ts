@@ -5,13 +5,22 @@
  *   ברקע לא כותבים; הסימון פג אחרי דקה, וחוזר מיד כשחוזרים לטאב).
  * - בסגירה ובעזיבת הדף: מחיקה. אם לא הספיקה - הסימון פג לבד.
  * - תקלה בכתיבה (offline, אין הרשאה) לא מפריעה לעריכה: זו שכבת נוחות.
+ * - `typed()` (v1.39.0): העורך קורא לו בכל עריכה. הסימון מקבל "מקליד עכשיו"
+ *   לכל היותר כל 15 שניות, ורק הוא חוסם את כלי העריכה של Claude.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { announcePresence, leavePresence, subscribeToPresence } from '@/services/api/notePresence';
+import { announcePresence, leavePresence, signalTyping, subscribeToPresence } from '@/services/api/notePresence';
 import { logger } from '@/utils/logger';
-import { activeOthers, deviceLabel, PRESENCE_REFRESH_MS, type PresenceEntry } from '@/utils/presence';
+import {
+  activeOthers,
+  createTypingSignal,
+  deviceLabel,
+  PRESENCE_REFRESH_MS,
+  TYPING_SIGNAL_EVERY_MS,
+  type PresenceEntry,
+} from '@/utils/presence';
 
 /**
  * מזהה הסימון: קבוע לטאב ולפתק (sessionStorage), כדי שרענון הדף יחליף את
@@ -31,7 +40,9 @@ const sessionIdFor = (noteId: string): string => {
   }
 };
 
-export const useNotePresence = (noteId: string): { others: PresenceEntry[]; myUid: string | null } => {
+export const useNotePresence = (
+  noteId: string
+): { others: PresenceEntry[]; myUid: string | null; typed: () => void } => {
   const uid = useAuthStore((state) => state.user?.uid ?? null);
   const sessionId = useMemo(() => sessionIdFor(noteId), [noteId]);
   const [entries, setEntries] = useState<PresenceEntry[]>([]);
@@ -71,6 +82,25 @@ export const useNotePresence = (noteId: string): { others: PresenceEntry[]; myUi
     };
   }, [noteId, sessionId, uid]);
 
+  // "מקליד עכשיו": מונה חדש לכל פתק ומשתמש
+  const typingRef = useRef<ReturnType<typeof createTypingSignal> | null>(null);
+  useEffect(() => {
+    if (!uid) return;
+    const device = deviceLabel(navigator.userAgent);
+    typingRef.current = createTypingSignal({
+      everyMs: TYPING_SIGNAL_EVERY_MS,
+      now: Date.now,
+      send: () =>
+        void signalTyping(noteId, sessionId, uid, device).catch((error) =>
+          logger.debug('Typing signal failed (ignored):', error)
+        ),
+    });
+    return () => {
+      typingRef.current = null;
+    };
+  }, [noteId, sessionId, uid]);
+  const typed = useCallback(() => typingRef.current?.typed(), []);
+
   // הסימונים של כולם
   useEffect(() => {
     if (!uid) return;
@@ -83,5 +113,5 @@ export const useNotePresence = (noteId: string): { others: PresenceEntry[]; myUi
     return () => clearInterval(tick);
   }, []);
 
-  return { others: activeOthers(entries, sessionId, now), myUid: uid };
+  return { others: activeOthers(entries, sessionId, now), myUid: uid, typed };
 };

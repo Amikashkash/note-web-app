@@ -15,6 +15,40 @@ export const PRESENCE_REFRESH_MS = 30_000;
 /** אחרי כמה זמן בלי רענון הסימון נחשב סגור. זהה לבדיקה בשרת */
 export const PRESENCE_TTL_MS = 60_000;
 
+/**
+ * "מקליד עכשיו" (v1.39.0): עורך שבו המשתמש ערך כותב `typedAt` (זמן השרת)
+ * על הסימון שלו. כלי העריכה של Claude נחסמים **רק** כשהוא טרי - פתק שרק
+ * פתוח (הצצה, טאב שנשכח) כבר לא חוסם. הבדיקה בשרת:
+ * `functions/src/notesCore/store.ts` (`TYPING_WINDOW_MS`).
+ *
+ * עלות: כתיבה אחת לכל היותר כל `TYPING_SIGNAL_EVERY_MS` בזמן הקלדה - דקה
+ * של הקלדה רצופה היא 4 כתיבות קטנות, ובלי הקלדה אפס.
+ */
+export const TYPING_SIGNAL_EVERY_MS = 15_000;
+
+/**
+ * כמה זמן הסימון חוסם בשרת. 60 שניות מההקלדה האחרונה, ועוד מרווח הכתיבות:
+ * ההקלדה האחרונה יכולה להיות עד 15 שניות אחרי הכתיבה האחרונה של הסימון.
+ * כך חסום **לפחות** 60 שניות אחרי ההקלדה האחרונה, ולכל היותר 75.
+ */
+export const TYPING_WINDOW_MS = 60_000 + TYPING_SIGNAL_EVERY_MS;
+
+/**
+ * מחליט מתי לכתוב "מקליד עכשיו": בהקלדה הראשונה מיד, ואחר כך לכל היותר פעם
+ * ב-`everyMs`. הקלדה בתוך המרווח לא כותבת - הסימון הקודם עוד טרי מספיק.
+ */
+export const createTypingSignal = ({ everyMs, now, send }: { everyMs: number; now: () => number; send: () => void }) => {
+  let lastSent: number | null = null;
+  return {
+    typed: () => {
+      const at = now();
+      if (lastSent !== null && at - lastSent < everyMs) return;
+      lastSent = at;
+      send();
+    },
+  };
+};
+
 export interface PresenceEntry {
   sessionId: string;
   uid: string;

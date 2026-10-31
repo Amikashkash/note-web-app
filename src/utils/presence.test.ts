@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeOthers, deviceLabel, presenceMessage, PRESENCE_TTL_MS, type PresenceEntry } from './presence';
+import { activeOthers, deviceLabel, presenceMessage, PRESENCE_TTL_MS, type PresenceEntry, createTypingSignal, TYPING_SIGNAL_EVERY_MS, TYPING_WINDOW_MS } from './presence';
 
 const NOW = Date.parse('2026-09-28T10:00:00Z');
 
@@ -53,3 +53,45 @@ describe('deviceLabel', () => {
     expect(deviceLabel(userAgent)).toBe(label);
   });
 });
+
+describe('typing signal (narrowed Claude block, v1.39.0)', () => {
+  const setup = () => {
+    let clock = 0;
+    const sent: number[] = [];
+    const signal = createTypingSignal({ everyMs: TYPING_SIGNAL_EVERY_MS, now: () => clock, send: () => sent.push(clock) });
+    return { signal, sent, at: (ms: number) => (clock = ms) };
+  };
+
+  it('the first keystroke writes at once', () => {
+    const { signal, sent } = setup();
+    signal.typed();
+    expect(sent).toEqual([0]);
+  });
+
+  it('a minute of continuous typing writes at most every 15 seconds', () => {
+    const { signal, sent, at } = setup();
+    for (let ms = 0; ms <= 60_000; ms += 200) {
+      at(ms);
+      signal.typed();
+    }
+    expect(sent).toEqual([0, 15_000, 30_000, 45_000, 60_000]);
+  });
+
+  it('no typing, no writes', () => {
+    expect(setup().sent).toEqual([]);
+  });
+
+  it('the server window covers at least 60 seconds after the LAST keystroke, whatever its timing', () => {
+    const { signal, sent, at } = setup();
+    // ההקלדה האחרונה מעט לפני שהייתה כותבת שוב: הרגע הגרוע ביותר
+    for (const ms of [0, 5_000, 14_999]) {
+      at(ms);
+      signal.typed();
+    }
+    const lastWrite = sent[sent.length - 1];
+    const lastKeystroke = 14_999;
+    expect(lastWrite + TYPING_WINDOW_MS - lastKeystroke).toBeGreaterThanOrEqual(60_000);
+    expect(TYPING_WINDOW_MS).toBeLessThanOrEqual(75_000);
+  });
+});
+

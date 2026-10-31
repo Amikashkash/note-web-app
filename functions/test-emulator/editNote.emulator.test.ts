@@ -573,27 +573,50 @@ describe('what Claude may not change', () => {
     expect((await call(clientA, 'append_text', { noteId, text: 'x' })).text).toContain('archived');
   });
 
-  it('a note open in the app is not changed; Claude is told to ask the user to close it', async () => {
+  it('the user is typing in the note: not changed; Claude is told to tell the user and try again later', async () => {
     const noteId = await seed(note(users.a, C.home, { content: 'פתוח' }));
     await db.doc(`notes/${noteId}/presence/s1`).set({
       uid: users.a,
       device: 'iPhone',
       refreshedAt: Timestamp.fromMillis(Date.now() - 20_000),
+      typedAt: Timestamp.fromMillis(Date.now() - 20_000),
       expiresAt: Timestamp.fromMillis(Date.now() + 40_000),
     });
     const result = await call(clientA, 'append_text', { noteId, text: 'x' });
     expect(result.isError).toBe(true);
-    expect(result.text).toContain('open in the app right now (on: iPhone)');
-    expect(result.text).toContain('Ask the user to close the note');
+    expect(result.text).toContain('The user is typing in this note in the app right now (on: iPhone)');
+    expect(result.text).toContain('Nothing was changed');
+    expect(result.text).toContain('Tell the user');
+    expect(result.text).toContain('try again');
     expect((await stored(noteId)).content).toBe('פתוח');
   });
 
-  it('a presence marker that stopped refreshing a minute ago does not block', async () => {
+  it('a note that is only open (no typing, or typing long ago) is changed', async () => {
+    const noteId = await seed(note(users.a, C.home, { content: 'פתוח' }));
+    await db.doc(`notes/${noteId}/presence/s1`).set({
+      uid: users.a,
+      device: 'iPhone',
+      refreshedAt: Timestamp.fromMillis(Date.now() - 5_000),
+      typedAt: Timestamp.fromMillis(Date.now() - 120_000),
+      expiresAt: Timestamp.fromMillis(Date.now() + 55_000),
+    });
+    await db.doc(`notes/${noteId}/presence/s2`).set({
+      uid: users.a,
+      device: 'מחשב',
+      refreshedAt: Timestamp.fromMillis(Date.now() - 5_000),
+      expiresAt: Timestamp.fromMillis(Date.now() + 55_000),
+    });
+    expect((await call(clientA, 'append_text', { noteId, text: 'x' })).isError).toBe(false);
+    expect((await stored(noteId)).content).toContain('x');
+  });
+
+  it('a typing signal from a tab that was closed 90 seconds ago does not block', async () => {
     const noteId = await seed(note(users.a, C.home, { content: 'סגור' }));
     await db.doc(`notes/${noteId}/presence/s1`).set({
       uid: users.a,
       device: 'iPhone',
       refreshedAt: Timestamp.fromMillis(Date.now() - 90_000),
+      typedAt: Timestamp.fromMillis(Date.now() - 90_000),
       expiresAt: Timestamp.fromMillis(Date.now() - 30_000),
     });
     expect((await call(clientA, 'append_text', { noteId, text: 'x' })).isError).toBe(false);

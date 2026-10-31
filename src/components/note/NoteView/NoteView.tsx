@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, Lock, PenOff, Pencil, Sparkles, X } from 'lucide-react';
+import { Eye, Lock, PenOff, Sparkles, X } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -31,6 +31,7 @@ import { shareViaWhatsApp, shareViaEmail, copyToClipboard, shareViaNative } from
 import { useAuthStore } from '@/store/authStore';
 import { useNoteSync } from '@/hooks/useNoteSync';
 import { SaveStatusLine } from '@/components/note/SaveStatusLine/SaveStatusLine';
+import { NoteLinks } from '@/components/note/NoteLinks/NoteLinks';
 import { useNotePresence } from '@/hooks/useNotePresence';
 import { presenceMessage } from '@/utils/presence';
 import { LENGTH_LIMITS } from '@/utils/constants';
@@ -49,9 +50,6 @@ interface NoteViewProps {
   categories?: Array<{ id: string; name: string; icon: string; isSensitive?: boolean; isReadOnly?: boolean }>;
 }
 
-/** תבניות שהתוכן שלהן נערך כטקסט ולכן יש להן מתג צפייה/עריכה */
-const TOGGLEABLE_TEMPLATES = new Set(['plain', 'checklist', 'workplan']);
-
 export const NoteView: React.FC<NoteViewProps> = ({
   note,
   onClose,
@@ -67,33 +65,30 @@ export const NoteView: React.FC<NoteViewProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [shownNoteId, setShownNoteId] = useState(note.id);
   const editor = useNoteSync(note);
   const { title, content, conflict } = editor;
   // "פתוח גם במקום אחר": נוחות בלבד. ההגנה מדריסה היא ב-useNoteSync
   const presence = useNotePresence(note.id);
   const openElsewhere = presence.myUid ? presenceMessage(presence.others, presence.myUid) : null;
 
-  // פתק אחר - חוזרים לצפייה (הטיוטה עצמה מתאפסת ב-useNoteSync)
-  if (shownNoteId !== note.id) {
-    setShownNoteId(note.id);
-    setIsEditMode(false);
-  }
-
-  // בזמן התנגשות אין עריכה: העורך מציג את הטקסט של המשתמש, קפוא, עד שיבחר.
-  // כך גם כשהגרסה ישנה מדי לשמור (`minClientVersion`) - הטקסט נשאר גלוי ואפשר להעתיק
+  // אין מצב עריכה (v1.39.0): כל פתק נפתח מוכן לעריכה, בכל תבנית. כל שינוי
+  // עובר דרך `useNoteSync` (שמירה אוטומטית, revision, מיזוג, journal, שורת המצב).
+  // לצפייה בלבד רק כשאי אפשר לשמור: בזמן התנגשות (העורך מציג את הטקסט של
+  // המשתמש, קפוא, עד שיבחר), וכשהגרסה ישנה מדי (`minClientVersion`) - הטקסט
+  // נשאר גלוי ואפשר להעתיק. (שיתוף בלי הרשאת עריכה לא קיים: כל נמען יכול לערוך)
   const frozen = Boolean(conflict) || editor.writesBlocked;
-  const editing = isEditMode && !frozen;
 
   const isOwner = user !== null && note.userId === user.uid;
   const isShared = note.sharedWith.length > 0;
 
+  // כל עריכה מסמנת "מקליד עכשיו" (מוגבל ל-15 שניות): רק הוא חוסם את Claude
   const handleTitleChange = (newTitle: string) => {
+    presence.typed();
     editor.edit({ title: newTitle.slice(0, LENGTH_LIMITS.NOTE_TITLE) });
   };
 
   const handleContentChange = (newContent: string) => {
+    presence.typed();
     editor.edit({ content: newContent });
   };
 
@@ -103,6 +98,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
    * יחד עם כל שינוי שעוד ממתין.
    */
   const handleConvertToText = () => {
+    presence.typed();
     editor.edit({ templateType: 'plain' });
     editor.flush();
   };
@@ -250,7 +246,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <ChecklistTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!editing}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
@@ -277,24 +273,27 @@ export const NoteView: React.FC<NoteViewProps> = ({
           <WorkPlanTemplate
             value={content}
             onChange={handleContentChange}
-            readOnly={!editing}
+            readOnly={frozen}
             onConvertToText={handleConvertToText}
           />
         );
       default:
-        return editing ? (
-          <EnhancedTextarea
-            value={content}
-            onChange={handleContentChange}
-            placeholder="הזן תוכן..."
-            rows={8}
-            className="min-h-[200px]"
-          />
-        ) : (
+        return frozen ? (
           <FormattedText
             content={content}
             className="p-4 bg-raised-light dark:bg-raised-dark rounded-lg min-h-[200px]"
           />
+        ) : (
+          <>
+            <EnhancedTextarea
+              value={content}
+              onChange={handleContentChange}
+              placeholder="הזן תוכן..."
+              rows={8}
+              className="min-h-[200px]"
+            />
+            <NoteLinks text={content} />
+          </>
         );
     }
   };
@@ -302,18 +301,24 @@ export const NoteView: React.FC<NoteViewProps> = ({
   return (
     <Modal onClose={handleClose}>
       <div className="max-h-[80vh] overflow-y-auto">
-        {/* `end-4` ולא `right-4`: בעברית הסגירה שייכת לקצה שבו השורה
-            נגמרת. כפתור סגירה עדין ולא צבעוני - הוא כרום, לא פעולה. */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 end-4 z-10 h-11 w-11 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
-          title="סגור"
-        >
-          <X size={24} strokeWidth={2} />
-        </button>
+        {/* פס עליון דביק (v1.39.0): שורת המצב והסגירה תמיד על המסך, גם
+            כשגוללים לתחתית פתק ארוך. דביק בתוך אזור הגלילה של הפתק, ולכן
+            לא תופס מקום נוסף בראש המסך מעבר לשורה אחת. `end` ולא `right`:
+            בעברית הסגירה שייכת לקצה שבו השורה נגמרת. */}
+        <div className="sticky top-0 z-20 -mx-1 px-1 py-1.5 flex items-center justify-between gap-2 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur border-b border-hairline-light dark:border-hairline-dark text-body-sm">
+          <SaveStatusLine status={editor.status} />
+          <button
+            onClick={handleClose}
+            className="h-11 w-11 -me-2 grid place-items-center rounded-xl text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
+            title="סגור"
+            aria-label="סגור"
+          >
+            <X size={24} strokeWidth={2} />
+          </button>
+        </div>
 
         {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-12">
+        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-3">
           <div className="flex-1">
             <Input
               type="text"
@@ -325,8 +330,6 @@ export const NoteView: React.FC<NoteViewProps> = ({
               placeholder="כותרת הפתק..."
             />
             <div className="flex flex-wrap items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
-              <SaveStatusLine status={editor.status} />
-              <span>•</span>
               <span className="inline-flex items-center gap-1.5">
                 <TemplateIcon size={16} strokeWidth={1.75} />
                 {getTemplateLabel(note.templateType)}
@@ -405,23 +408,14 @@ export const NoteView: React.FC<NoteViewProps> = ({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-ink-light dark:text-ink-dark">תוכן:</h3>
-            {TOGGLEABLE_TEMPLATES.has(note.templateType) && (
-              <button
-                onClick={() => setIsEditMode((previous) => !previous)}
-                className="inline-flex items-center gap-1.5 text-body-sm h-9 px-4 rounded-lg bg-raised-light dark:bg-raised-dark border border-hairline-light dark:border-hairline-dark text-ink-light dark:text-ink-dark hover:bg-hairline-light dark:hover:bg-hairline-dark transition-colors font-medium"
+            {editor.writesBlocked && (
+              <span
+                className="inline-flex items-center gap-1.5 text-body-sm h-9 px-3 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-800"
+                title="יש גרסה חדשה של האפליקציה. רעננו כדי לערוך"
               >
-                {editing ? (
-                  <>
-                    <Eye size={16} strokeWidth={1.75} />
-                    צפייה
-                  </>
-                ) : (
-                  <>
-                    <Pencil size={16} strokeWidth={1.75} />
-                    עריכה
-                  </>
-                )}
-              </button>
+                <Eye size={16} strokeWidth={1.75} />
+                לצפייה בלבד
+              </span>
             )}
           </div>
           {renderContent()}

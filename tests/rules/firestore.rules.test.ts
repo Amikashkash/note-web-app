@@ -55,6 +55,13 @@ import {
   type JournalStorage,
 } from '../../src/utils/draftJournal';
 import { createJournalResolver, type ResolverDeps } from '../../src/utils/draftJournalResolver';
+import { editDraft, initialSync, markSent, onSnapshot as onSnapshot_, type SyncState } from '../../src/utils/noteSync';
+import {
+  AdminTimestamp,
+  adminDb,
+  claudeMarksDone,
+  runNoteTrigger,
+} from '../../functions/test-emulator/support/claudeOnEmulator';
 
 const OWNER = 'owner-uid';
 const SHARED = 'shared-uid';
@@ -996,6 +1003,44 @@ describe('presence markers (note open elsewhere)', () => {
     );
     await assertFails(setDoc(doc(as(OWNER), 'notes/note-1/presence/s-3'), marker(OWNER, { extra: 'x' })));
   });
+
+  describe('typedAt ("typing now" - the only thing that blocks Claude, v1.39.0)', () => {
+    const ref = (id: string) => doc(as(OWNER), `notes/note-1/presence/${id}`);
+    const readTypedAt = async (id: string) => {
+      let value: unknown;
+      await env.withSecurityRulesDisabled(async (context) => {
+        value = (await getDoc(doc(context.firestore() as unknown as Firestore, `notes/note-1/presence/${id}`))).get('typedAt');
+      });
+      return value as Timestamp | undefined;
+    };
+
+    it('the app writes it as the server time', async () => {
+      await assertSucceeds(setDoc(ref('t-1'), marker(OWNER, { typedAt: serverTimestamp() }), { merge: true }));
+    });
+
+    it('a made-up time is refused - nobody can block Claude for a day, or claim to have typed earlier', async () => {
+      await assertFails(setDoc(ref('t-2'), marker(OWNER, { typedAt: Timestamp.fromMillis(Date.now() + 86_400_000) })));
+      await assertFails(setDoc(ref('t-3'), marker(OWNER, { typedAt: Timestamp.fromMillis(Date.now() - 1_000) })));
+    });
+
+    it('the periodic refresh (merge, without typedAt) keeps the signal as it was', async () => {
+      await assertSucceeds(setDoc(ref('t-4'), marker(OWNER, { typedAt: serverTimestamp() }), { merge: true }));
+      const typed = await readTypedAt('t-4');
+      await assertSucceeds(setDoc(ref('t-4'), marker(OWNER), { merge: true }));
+      expect((await readTypedAt('t-4'))?.toMillis()).toBe(typed?.toMillis());
+    });
+
+    it('an existing signal cannot be moved to another time by hand', async () => {
+      await assertSucceeds(setDoc(ref('t-5'), marker(OWNER, { typedAt: serverTimestamp() }), { merge: true }));
+      await assertFails(
+        setDoc(ref('t-5'), marker(OWNER, { typedAt: Timestamp.fromMillis(Date.now() + 3_600_000) }), { merge: true })
+      );
+    });
+
+    it('a marker of an older app version, without typedAt, is still accepted', async () => {
+      await assertSucceeds(setDoc(ref('t-6'), marker(OWNER)));
+    });
+  });
 });
 
 describe('created by Claude (createdVia)', () => {
@@ -1393,5 +1438,183 @@ describe('draftJournal against the emulator (offline, session ends, another devi
     await waitFor(async () => (await readAs('notes/recovery-C5')) !== undefined);
     resolver.stop();
     expect(await readAs('notes/recovery-C5')).toMatchObject({ content: 'לא נשמר' });
+  });
+});
+
+/**
+ * כלי העריכה של Claude מול עורך פתוח באפליקציה (v1.39.0): נחסמים **רק**
+ * כשהמשתמש מקליד (`typedAt` טרי). מקצה לקצה על ה-emulator: הסימון נכתב
+ * מהאפליקציה דרך ה-rules, העריכה היא `UserScope.editNote` האמיתי של השרת,
+ * והעורך הפתוח הוא `noteSync` של האפליקציה מעל מאזין של ה-SDK האמיתי.
+ */
+describe('Claude edits while the note is open in the app (typing signal, v1.39.0)', () => {
+  const NOTE_ID = 'typing-1';
+  const NOTE = `notes/${NOTE_ID}`;
+  const items = (a: boolean, bText = 'לחם') =>
+    JSON.stringify([
+      { id: 'a', text: 'חלב', completed: a },
+      { id: 'b', text: bText, completed: false },
+    ]);
+
+  const seedNote = () =>
+    env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore() as unknown as Firestore;
+      await setDoc(doc(db, 'categories/cat-1'), { name: 'בית', icon: null, order: 0, userId: OWNER, sharedWith: [], isSensitive: false, isReadOnly: false });
+      await setDoc(doc(db, NOTE), {
+        ...baseNote,
+        sharedWith: [],
+        isSensitive: false,
+        isReadOnly: false,
+        templateType: 'checklist',
+        content: items(false),
+        revision: 4,
+        saveId: 'S4',
+      });
+    });
+
+  const storedNote = async () => {
+    let data: Record<string, unknown> | undefined;
+    await env.withSecurityRulesDisabled(async (context) => {
+      data = (await getDoc(doc(context.firestore() as unknown as Firestore, NOTE))).data();
+    });
+    return data ?? {};
+  };
+
+  const waitFor = async (check: () => boolean, ms = 8000) => {
+    const until = Date.now() + ms;
+    while (!check()) {
+      if (Date.now() > until) throw new Error('timed out');
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  };
+
+  /** העורך הפתוח של האפליקציה: `noteSync` מעל מאזין עם metadata, כמו `useNoteSync` */
+  const openEditor = async (app: Firestore) => {
+    let state: SyncState | null = null;
+    const actions: string[] = [];
+    let pendingLocalPatch = false;
+    const stop = onSnapshot(doc(app, NOTE), { includeMetadataChanges: true }, (snapshot) => {
+      const data = snapshot.data();
+      if (!data) return;
+      const live = {
+        title: data.title,
+        content: data.content,
+        templateType: data.templateType,
+        revision: data.revision ?? 0,
+        saveId: data.saveId ?? null,
+        pending: snapshot.metadata.hasPendingWrites,
+      };
+      if (state === null) {
+        if (!live.pending) state = initialSync(live);
+        return;
+      }
+      const result = onSnapshot_(state, live, pendingLocalPatch);
+      state = result.state;
+      if (result.action.kind !== 'none') actions.push(result.action.kind);
+    });
+    await waitFor(() => state !== null);
+    return {
+      stop,
+      get state() {
+        return state as SyncState;
+      },
+      actions,
+      /** הקלדה שעוד לא נשלחה (בתוך ה-debounce) */
+      typeLocally: (content: string) => {
+        state = editDraft(state as SyncState, { content });
+        pendingLocalPatch = true;
+      },
+      /** השמירה של העורך (כמו `saveNoteText`), אחרי מיזוג */
+      save: async () => {
+        pendingLocalPatch = false;
+        const sent = markSent(state as SyncState, 'E-merged');
+        state = sent.state;
+        await updateDoc(doc(app, NOTE), {
+          content: sent.state.draft.content,
+          revision: sent.revision,
+          saveId: sent.saveId,
+          baseSaveId: sent.baseSaveId,
+          updatedBy: OWNER,
+        });
+      },
+    };
+  };
+
+  const marker = (extra: Record<string, unknown> = {}) => ({
+    uid: OWNER,
+    device: 'iPhone',
+    refreshedAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+    ...extra,
+  });
+
+  it('TYPING: the app wrote "typing now" - Claude is refused, nothing changes, and the reason names the device', async () => {
+    await seedNote();
+    const app = as(OWNER);
+    await assertSucceeds(setDoc(doc(app, `${NOTE}/presence/s1`), marker({ typedAt: serverTimestamp() }), { merge: true }));
+
+    await expect(claudeMarksDone(OWNER, NOTE_ID, 'a')).rejects.toMatchObject({ name: 'UserTypingError', devices: ['iPhone'] });
+    expect(await storedNote()).toMatchObject({ content: items(false), revision: 4 });
+  });
+
+  it('OPEN BUT IDLE: Claude applies, and the open editor adopts it silently; the version before is in the history', async () => {
+    await seedNote();
+    const app = as(OWNER);
+    // פתוח (רענון טרי), והקליד לאחרונה לפני 2 דקות - לא חוסם
+    await assertSucceeds(setDoc(doc(app, `${NOTE}/presence/s1`), marker(), { merge: true }));
+    await adminDb.doc(`${NOTE}/presence/s1`).update({ typedAt: AdminTimestamp.fromMillis(Date.now() - 120_000) });
+    const editor = await openEditor(app);
+    const before = await storedNote();
+
+    await claudeMarksDone(OWNER, NOTE_ID, 'a');
+    await waitFor(() => editor.state.base.revision === 5);
+    editor.stop();
+
+    expect(editor.actions).toEqual(['adopted']);
+    expect(editor.state.draft.content).toBe(items(true));
+    expect(editor.state.conflict).toBeNull();
+    // ההיסטוריה שומרת את מה שהיה לפני Claude
+    await runNoteTrigger(NOTE_ID, before);
+    const versions = (await adminDb.collection(`${NOTE}/versions`).get()).docs.map((version) => version.data());
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({ content: items(false) });
+  });
+
+  it('OPEN, a change not yet saved in another task: Claude applies, the editor MERGES both, and its save is accepted', async () => {
+    await seedNote();
+    const app = as(OWNER);
+    await assertSucceeds(setDoc(doc(app, `${NOTE}/presence/s1`), marker(), { merge: true }));
+    const editor = await openEditor(app);
+    // הקלדה במשימה b שעוד לא נשלחה (בלי סימון "מקליד" - כמו אחרי 75 שניות שקט)
+    editor.typeLocally(items(false, 'לחם מלא'));
+
+    await claudeMarksDone(OWNER, NOTE_ID, 'a');
+    await waitFor(() => editor.actions.length > 0);
+    expect(editor.actions).toEqual(['merged']);
+    expect(editor.state.draft.content).toBe(items(true, 'לחם מלא'));
+
+    await editor.save();
+    editor.stop();
+    expect(await storedNote()).toMatchObject({ content: items(true, 'לחם מלא'), revision: 6, baseSaveId: 'S4' });
+  });
+
+  it('A STALE SIGNAL from a closed tab (typed 90 seconds ago, never refreshed): Claude applies', async () => {
+    await seedNote();
+    await adminDb.doc(`${NOTE}/presence/old-tab`).set({
+      uid: OWNER,
+      device: 'מחשב Windows',
+      refreshedAt: AdminTimestamp.fromMillis(Date.now() - 90_000),
+      typedAt: AdminTimestamp.fromMillis(Date.now() - 90_000),
+      expiresAt: AdminTimestamp.fromMillis(Date.now() - 30_000),
+    });
+    await claudeMarksDone(OWNER, NOTE_ID, 'a');
+    expect(await storedNote()).toMatchObject({ content: items(true), revision: 5 });
+  });
+
+  it('a marker of an older app version (open, no typedAt) no longer blocks', async () => {
+    await seedNote();
+    await assertSucceeds(setDoc(doc(as(OWNER), `${NOTE}/presence/s1`), marker()));
+    await claudeMarksDone(OWNER, NOTE_ID, 'a');
+    expect(await storedNote()).toMatchObject({ content: items(true), revision: 5 });
   });
 });

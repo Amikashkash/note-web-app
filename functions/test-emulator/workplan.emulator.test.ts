@@ -325,15 +325,18 @@ describe('what the new tools refuse', () => {
     expect(await stored(noteId)).toMatchObject({ revision: 7, content: JSON.stringify(plan) });
   };
 
-  it('a note open in the app', async () => {
+  it('a note the user is typing in', async () => {
     const noteId = await seed(note(users.a, C.home));
     await db.doc(`notes/${noteId}/presence/s1`).set({
       uid: users.a,
       device: 'טלפון Android',
       refreshedAt: Timestamp.fromMillis(Date.now() - 10_000),
+      typedAt: Timestamp.fromMillis(Date.now() - 10_000),
       expiresAt: Timestamp.fromMillis(Date.now() + 50_000),
     });
-    await expectAll(noteId, (result) => expect(result.text).toContain('open in the app right now (on: טלפון Android)'));
+    await expectAll(noteId, (result) =>
+      expect(result.text).toContain('typing in this note in the app right now (on: טלפון Android)')
+    );
   });
 
   it('a read-only note and a note in a read-only category', async () => {

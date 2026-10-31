@@ -19,7 +19,7 @@
 import { logger } from 'firebase-functions';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { ForbiddenError, InvalidError, NotFoundError, OpenElsewhereError, ReadOnlyError } from '../notesCore/errors';
+import { ForbiddenError, InvalidError, NotFoundError, ReadOnlyError, UserTypingError } from '../notesCore/errors';
 import type { Category, Note } from '../notesCore/model';
 import { TargetCategoryNotFoundError, type UserScope } from '../notesCore/store';
 import { EDIT_CONSENT_VERSION, ORGANIZE_CONSENT_VERSION, REWRITE_CONSENT_VERSION } from '../oauth/config';
@@ -507,7 +507,7 @@ const updateChecklistItem = defineTool({
     'get_note first. Only change what the user asked for in this conversation. All dates and times are Israel local time ' +
     '(Asia/Jerusalem); a task with a date and a time gets a push reminder, and changing or clearing them moves or cancels ' +
     'the reminder. Marking a repeating task done makes it come back as not done with its next due date. It works on the user\'s own notes only, not on notes shared with them, not on notes marked read-only for ' +
-    'Claude, and not while the note is open in the app (then ask the user to close it). It cannot add or delete tasks.',
+    'Claude, and not while the user is typing in that note in the app. It cannot add or delete tasks.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
@@ -545,7 +545,7 @@ const updateChecklistItems = defineTool({
     'the note history: if any one of them is invalid (an unknown id, a time in the past, an empty text), NOTHING is ' +
     'changed and the result says which update to fix. Give each task at most once. Only change what the user asked for. ' +
     "Israel local time. It works on the user's own notes only, not on notes marked read-only for Claude, and not while " +
-    'the note is open in the app. For a single task, update_checklist_item is enough.',
+    'the user is typing in that note in the app. For a single task, update_checklist_item is enough.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
@@ -586,7 +586,7 @@ const appendText = defineTool({
     'Existing text is never changed or replaced. Use it to grow a note over time - for example to add what the user said ' +
     'in a new recording to the right section of their existing work plan. Only add what the user asked for in this ' +
     `conversation, in their language (usually Hebrew). ${READ_FIRST} It works on the user's own notes only, not on notes ` +
-    'marked read-only for Claude, and not while the note is open in the app (then ask the user to close it). Sending ' +
+    'marked read-only for Claude, and not while the user is typing in that note in the app. Sending ' +
     'exactly the same text to the same place again within 10 minutes is ignored, so a retry does not add it twice.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -623,8 +623,8 @@ const addWorkplanSection = defineTool({
     "Add a new section (header + content) to one of the user's work plans: at the end, or right after a given section. " +
     'Use it to grow an existing plan for a project instead of creating a new note - for example a new topic from a ' +
     `recording the user dictated. Only add what the user asked for in this conversation, in their language. ${READ_FIRST} ` +
-    "It works on the user's own notes only, not on notes marked read-only for Claude, and not while the note is open in " +
-    'the app. The same section added again within 10 minutes is ignored.',
+    "It works on the user's own notes only, not on notes marked read-only for Claude, and not while the user is typing " +
+    'in that note in the app. The same section added again within 10 minutes is ignored.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
@@ -668,7 +668,7 @@ const editNoteText = defineTool({
     'only when the user explicitly asked to delete it. Line endings, invisible direction marks and the order of Hebrew ' +
     'vowel points do not matter when matching; if there is no exact match, differences in spaces and Hebrew/ASCII quotes ' +
     "or dashes are tolerated, still only if the result is a single match. It works on the user's own notes only, not on " +
-    'notes marked read-only for Claude, and not while the note is open in the app. For checklist tasks use ' +
+    'notes marked read-only for Claude, and not while the user is typing in that note in the app. For checklist tasks use ' +
     'update_checklist_item. The previous version stays in the note history.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
@@ -704,7 +704,7 @@ const removeWorkplanSection = defineTool({
   description:
     'Remove ONE whole section (header and content) from a work plan. Only when the user explicitly asked in this ' +
     `conversation to remove that section. ${READ_FIRST} Identify it by its section id from get_note. It works on the ` +
-    "user's own notes only, not on notes marked read-only for Claude, and not while the note is open in the app. The " +
+    "user's own notes only, not on notes marked read-only for Claude, and not while the user is typing in that note in the app. The " +
     'removed section stays in the note history and can be restored from there.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
@@ -741,7 +741,7 @@ const archiveNote = defineTool({
   description:
     'Move a note to the archive. When the user asks to "delete" or "remove" a note, this is what they mean: there is no ' +
     'delete tool, and archived notes can be restored with unarchive_note. Its reminders stop. Only when the user asked. ' +
-    "User's own notes only; not read-only notes, and not while the note is open in the app.",
+    "User's own notes only; not read-only notes, and not while the user is typing in that note in the app.",
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({ noteId: noteIdSchema }),
@@ -838,7 +838,7 @@ const moveNoteToCategory = defineTool({
   description:
     "Move a note to another of the user's own categories (id from list_categories). Not into a category marked read-only " +
     'for Claude. Sensitive categories are hidden from Claude, so moving into them is done by the user in the app. Only ' +
-    'when the user asked. Not while the note is open in the app.',
+    'when the user asked. Not while the user is typing in that note in the app.',
   scope: 'notes.write',
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   inputSchema: z.object({
@@ -880,7 +880,7 @@ type Outcome =
   | 'not_found'
   | 'invalid'
   | 'read_only'
-  | 'open_elsewhere'
+  | 'user_typing'
   | 'not_owner'
   | 'old_consent'
   | 'forbidden_scope'
@@ -917,12 +917,13 @@ const runTool = async <Schema extends z.ZodObject>(
     } else if (error instanceof NotFoundError) {
       outcome = 'not_found';
       text = NOT_FOUND_TEXT;
-    } else if (error instanceof OpenElsewhereError) {
-      outcome = 'open_elsewhere';
+    } else if (error instanceof UserTypingError) {
+      outcome = 'user_typing';
       const where = [...new Set(error.devices.filter(Boolean))].join(', ');
       text =
-        `The note is open in the app right now${where ? ` (on: ${where})` : ''}. To avoid clashing with the open editor, ` +
-        'nothing was changed. Ask the user to close the note in the app, then try again.';
+        `The user is typing in this note in the app right now${where ? ` (on: ${where})` : ''}. Nothing was changed. ` +
+        'Tell the user that you did not change the note because they are editing it, and try again in a minute or two, ' +
+        'once they have stopped typing (or ask them to tell you when they are done).';
     } else if (error instanceof ForbiddenError) {
       outcome = 'not_owner';
       text =
