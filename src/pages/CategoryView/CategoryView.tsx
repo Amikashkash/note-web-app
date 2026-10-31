@@ -1,5 +1,5 @@
 /**
- * דף תצוגה מלאה של קטגוריה - כל הפתקים ברשת אנכית
+ * דף תצוגה מלאה של קטגוריה - כרטיסי נייר ברוחב מלא, אחד בשורה (סבב 3, v1.41.0)
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -9,7 +9,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { LoadError } from '@/components/common/LoadError';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { Button } from '@/components/common';
-import { NoteCard } from '@/components/note/NoteCard';
+import { NoteCardList } from '@/components/note/NoteCardList';
 import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
 import { filterNotesByQuery } from '@/utils/search';
@@ -31,6 +31,7 @@ export const CategoryView: React.FC = () => {
     moveToCategory,
     deleteNote,
     pinNote,
+    reorder,
   } = useNoteEditor(categoryId);
 
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -231,19 +232,19 @@ export const CategoryView: React.FC = () => {
             )}
           </div>
         ) : (
-          // שתי עמודות כבר בנייד. קודם היה כאן `grid-cols-1 sm:grid-cols-2`,
-          // ו-`sm:` מתחיל ב-640px - כלומר בטלפון התקבלה עמודה אחת.
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {visibleNotes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onView={setViewingNote}
-                onDelete={deleteNote}
-                onTogglePin={pinNote}
-                fluid
-              />
-            ))}
+          // עמודה אחת בכל רוחב: שתי עמודות בטלפון חתכו כותרות וכפתורים. במסך
+          // רחב הרוחב מוגבל, כדי ששורת התקציר לא תהיה ארוכה מדי לקריאה
+          <div className="max-w-3xl mx-auto">
+            <NoteCardList
+              notes={visibleNotes}
+              categoryColor={category.color}
+              onOpen={setViewingNote}
+              onArchive={deleteNote}
+              onTogglePin={pinNote}
+              // בחיפוש מוצג רק חלק מהפתקים - אין גרירה
+              onReorder={searchQuery ? undefined : reorder}
+              emptyText=""
+            />
           </div>
         )}
       </main>
