@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, Lock, PenOff, Sparkles, X } from 'lucide-react';
+import { Archive, Eye, FolderInput, History, LogOut, Pin, Share2, Sparkles, Users, X } from 'lucide-react';
 import { Note } from '@/types/note';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
@@ -39,6 +39,8 @@ import { DiscardedTextPanel, NoteConflictPanel } from './NoteConflict';
 import { getTemplateLabel, getTemplateMeta } from '@/utils/templates';
 import * as noteAPI from '@/services/api/notes';
 import { getErrorMessage } from '@/utils/errors';
+import { ClaudeAccessChip } from '@/components/note/ClaudeAccessChip/ClaudeAccessChip';
+import { NoteTips } from '@/components/note/NoteTips/NoteTips';
 
 interface NoteViewProps {
   note: Note;
@@ -176,32 +178,19 @@ export const NoteView: React.FC<NoteViewProps> = ({
     }
   };
 
-  /** הקטגוריה של הפתק רגישה - ואז הפתק מוסתר מ-Claude גם בלי דגל משלו */
-  const categoryIsSensitive =
-    categories.find((category) => category.id === note.categoryId)?.isSensitive === true;
+  const noteCategory = categories.find((category) => category.id === note.categoryId);
 
-  /** הקטגוריה של הפתק לקריאה בלבד ל-Claude - ואז גם הפתק, בלי דגל משלו */
-  const categoryIsReadOnly =
-    categories.find((category) => category.id === note.categoryId)?.isReadOnly === true;
+  /** הקטגוריה של הפתק רגישה - ואז הפתק מוסתר מ-Claude גם בלי דגל משלו */
+  const categoryIsSensitive = noteCategory?.isSensitive === true;
 
   /**
-   * סימון רגיש (C6). רק לבעלים - ה-rules דוחים את זה משותף. לא יוצר
-   * גרסה בהיסטוריה, כי זה לא שינוי תוכן.
+   * הגישה של Claude (C6, קריאה בלבד): רק לבעלים - ה-rules דוחים את שני
+   * הדגלים משותף. כתיבה אחת לשניהם, ולא יוצרת גרסה בהיסטוריה (לא תוכן).
    */
-  const handleToggleSensitive = async () => {
+  const handleClaudeAccess = async (flags: { isSensitive: boolean; isReadOnly: boolean }) => {
     editor.flush();
     try {
-      await noteAPI.setNoteSensitive(note.id, !note.isSensitive);
-    } catch (error) {
-      window.alert(getErrorMessage(error));
-    }
-  };
-
-  /** קריאה בלבד ל-Claude. רק לבעלים (rules), ולא יוצר גרסה */
-  const handleToggleReadOnly = async () => {
-    editor.flush();
-    try {
-      await noteAPI.setNoteReadOnly(note.id, !note.isReadOnly);
+      await noteAPI.setNoteClaudeFlags(note.id, flags);
     } catch (error) {
       window.alert(getErrorMessage(error));
     }
@@ -239,6 +228,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
             onChange={handleContentChange}
             readOnly={frozen}
             onConvertToText={handleConvertToText}
+            hints={false}
           />
         );
       case 'checklist':
@@ -275,6 +265,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
             onChange={handleContentChange}
             readOnly={frozen}
             onConvertToText={handleConvertToText}
+            hints={false}
           />
         );
       default:
@@ -291,6 +282,7 @@ export const NoteView: React.FC<NoteViewProps> = ({
               placeholder="הזן תוכן..."
               rows={8}
               className="min-h-[200px]"
+              hints={false}
             />
             <NoteLinks text={content} />
           </>
@@ -317,71 +309,63 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </button>
         </div>
 
-        {/* כותרת */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-3">
-          <div className="flex-1">
-            <Input
-              type="text"
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              readOnly={editor.writesBlocked}
-              maxLength={LENGTH_LIMITS.NOTE_TITLE}
-              className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-2 border-none focus:ring-2 focus:ring-brand/40 dark:focus:ring-brand-dark/40 rounded px-2 dark:bg-surface-dark"
-              placeholder="כותרת הפתק..."
-            />
-            <div className="flex flex-wrap items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
-              <span className="inline-flex items-center gap-1.5">
-                <TemplateIcon size={16} strokeWidth={1.75} />
-                {getTemplateLabel(note.templateType)}
-              </span>
-              {(note.isSensitive || categoryIsSensitive) && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1" title="מוסתר מ-Claude">
-                    <Lock size={14} strokeWidth={2} />
-                    רגיש
-                  </span>
-                </>
-              )}
-              {(note.isReadOnly || categoryIsReadOnly) && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1" title="Claude יכול לקרוא, לא לשנות">
-                    <PenOff size={14} strokeWidth={2} />
-                    קריאה בלבד ל-Claude
-                  </span>
-                </>
-              )}
-              {note.createdVia === 'mcp' && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1 text-brand dark:text-brand-dark">
-                    <Sparkles size={14} strokeWidth={2} />
-                    נוצר ע״י Claude
-                  </span>
-                </>
-              )}
-              <span>•</span>
-              <span>
-                {note.updatedAt.toDate().toLocaleDateString('he-IL', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
-          </div>
+        {/* Claude וטיפים (v1.42.0): צ'יפ במקום שתי תיבות ההסבר שהיו בתחתית,
+            וכל ההסברים מאחורי "טיפים" */}
+        <div className="flex flex-wrap items-center gap-2 pt-3">
+          <ClaudeAccessChip
+            note={note}
+            category={
+              noteCategory && {
+                name: noteCategory.name,
+                isSensitive: noteCategory.isSensitive === true,
+                isReadOnly: noteCategory.isReadOnly === true,
+              }
+            }
+            canChange={isOwner}
+            onChange={handleClaudeAccess}
+          />
+          <NoteTips templateType={note.templateType} />
           {onTogglePin && (
             <button
               onClick={() => onTogglePin(note.id, !note.isPinned)}
-              className="text-2xl hover:scale-110 transition-transform"
-              title={note.isPinned ? 'ביטול הצמדה' : 'הצמדה'}
+              className={`ms-auto h-9 w-9 grid place-items-center rounded-full transition-colors hover:bg-raised-light dark:hover:bg-raised-dark ${
+                note.isPinned ? 'text-cat-orange dark:text-cat-orange-dark' : 'text-ink-3-light dark:text-ink-3-dark'
+              }`}
+              title={note.isPinned ? 'ביטול נעיצה' : 'נעיצה למעלה'}
+              aria-label={note.isPinned ? 'ביטול נעיצה' : 'נעיצה למעלה'}
+              aria-pressed={note.isPinned}
             >
-              {note.isPinned ? '📌' : '📍'}
+              <Pin size={20} strokeWidth={1.75} fill={note.isPinned ? 'currentColor' : 'none'} />
             </button>
           )}
+        </div>
+
+        {/* כותרת */}
+        <div className="mb-4 pb-4 border-b border-hairline-light dark:border-hairline-dark pt-3">
+          <Input
+            type="text"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            readOnly={editor.writesBlocked}
+            maxLength={LENGTH_LIMITS.NOTE_TITLE}
+            className="text-2xl font-bold text-ink-light dark:text-ink-dark mb-2 border-none focus:ring-2 focus:ring-brand/40 dark:focus:ring-brand-dark/40 rounded px-2 dark:bg-surface-dark"
+            placeholder="כותרת הפתק..."
+          />
+          <div className="flex flex-wrap items-center gap-2 text-body-sm text-ink-3-light dark:text-ink-3-dark px-2">
+            <span className="inline-flex items-center gap-1.5">
+              <TemplateIcon size={16} strokeWidth={1.75} />
+              {getTemplateLabel(note.templateType)}
+            </span>
+            {note.createdVia === 'mcp' && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 text-brand dark:text-brand-dark">
+                  <Sparkles size={14} strokeWidth={2} />
+                  נוצר ע״י Claude
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {openElsewhere && (
@@ -389,8 +373,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
             role="status"
             className="mb-4 rounded-lg bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark p-3 text-sm"
           >
-            👥 {openElsewhere} שינויים של כל צד יופיעו אצל השני. אם שניכם תשנו את אותו מקום, תתבקשו לבחור איזו גרסה
-            לשמור.
+            {/* ההסבר (מה קורה כששניכם משנים) עבר ל"טיפים" */}
+            👥 {openElsewhere}
           </div>
         )}
 
@@ -436,59 +420,6 @@ export const NoteView: React.FC<NoteViewProps> = ({
               ))}
             </div>
           </div>
-        )}
-
-        {/* רגיש - רק הבעלים מסמן (C6) */}
-        {isOwner && (
-          <label className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-raised-light dark:bg-raised-dark cursor-pointer">
-            <input
-              type="checkbox"
-              checked={note.isSensitive}
-              onChange={handleToggleSensitive}
-              className="mt-1 h-4 w-4 accent-brand"
-            />
-            <span className="text-body-sm text-ink-light dark:text-ink-dark">
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Lock size={14} strokeWidth={2} />
-                רגיש - מוסתר מ-Claude
-              </span>
-              <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
-                Claude לא יראה את הפתק הזה בכלל. מה שכבר נקרא בשיחה קודמת לא נמחק ממנה, וזו לא
-                הצפנה - הפתק נשמר כרגיל.
-              </span>
-              {!note.isSensitive && categoryIsSensitive && (
-                <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
-                  הפתק כבר מוסתר, כי הקטגוריה שלו מסומנת כרגישה.
-                </span>
-              )}
-            </span>
-          </label>
-        )}
-
-        {/* קריאה בלבד ל-Claude - רק הבעלים מסמן */}
-        {isOwner && (
-          <label className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-raised-light dark:bg-raised-dark cursor-pointer">
-            <input
-              type="checkbox"
-              checked={note.isReadOnly}
-              onChange={handleToggleReadOnly}
-              className="mt-1 h-4 w-4 accent-brand"
-            />
-            <span className="text-body-sm text-ink-light dark:text-ink-dark">
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <PenOff size={14} strokeWidth={2} />
-                קריאה בלבד ל-Claude
-              </span>
-              <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
-                Claude יכול לקרוא את הפתק אבל לא לשנות אותו. באפליקציה הוא נשאר ניתן לעריכה.
-              </span>
-              {!note.isReadOnly && categoryIsReadOnly && (
-                <span className="block text-caption text-ink-3-light dark:text-ink-3-dark mt-1">
-                  הפתק כבר לקריאה בלבד, כי הקטגוריה שלו מסומנת כך.
-                </span>
-              )}
-            </span>
-          </label>
         )}
 
         {/* תפריט שיתוף חיצוני */}
@@ -553,55 +484,39 @@ export const NoteView: React.FC<NoteViewProps> = ({
           </div>
         )}
 
-        {/* פעולות */}
-        <div className="flex flex-col gap-2 pt-4 border-t border-hairline-light dark:border-hairline-dark">
-          <div className="flex gap-2">
-            <Button onClick={handleShare} variant="outline" className="flex-1">
-              🔗 שתף
-            </Button>
+        {/* פעולות משניות (v1.42.0): שורה שקטה בתחתית, בלי כפתורים אדומים גדולים.
+            "מחיקה" היא תמיד העברה לארכיון, וכך גם כתוב. הסגירה ב-X שבפס העליון */}
+        <footer className="pt-3 mt-2 border-t border-hairline-light dark:border-hairline-dark">
+          <div className="flex flex-wrap items-center gap-1 -mx-2">
+            <FooterAction icon={Share2} label="שליחה" onClick={handleShare} />
             {isOwner && (
-              <Button
+              <FooterAction
+                icon={Users}
+                label={isShared ? `משותף (${note.sharedWith.length})` : 'שיתוף'}
                 onClick={() => setShowShareManagement(true)}
-                variant="outline"
-                className={`flex-1 ${
-                  isShared ? 'bg-success/10 text-success dark:text-success-dark' : ''
-                }`}
-              >
-                {isShared ? `👥 ${note.sharedWith.length}` : '👥 שיתוף'}
-              </Button>
-            )}
-            {!isOwner && isShared && (
-              <span className="flex-1 px-3 py-2 text-xs sm:text-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded font-medium flex items-center justify-center">
-                👥 משותף
-              </span>
+              />
             )}
             {/* העברה - רק לבעלים. ה-rules דוחים העברה משותף (C6 / SH-2) */}
             {isOwner && onMoveToCategory && categories.length > 1 && (
-              <Button
-                onClick={() => setShowMoveMenu((previous) => !previous)}
-                variant="outline"
-                className="flex-1"
-              >
-                📁 העבר
-              </Button>
+              <FooterAction icon={FolderInput} label="העבר לקטגוריה" onClick={() => setShowMoveMenu((previous) => !previous)} />
             )}
-            {isOwner ? (
-              <Button variant="danger" onClick={handleDelete} className="flex-1">
-                🗑 מחק
-              </Button>
-            ) : (
-              <Button variant="danger" onClick={handleLeave} className="flex-1">
-                🚪 הסר אותי
-              </Button>
-            )}
+            <FooterAction icon={History} label="היסטוריה" onClick={handleOpenHistory} />
+            {isOwner
+              ? onDelete && <FooterAction icon={Archive} label="העבר לארכיון" onClick={handleDelete} />
+              : <FooterAction icon={LogOut} label="הסר אותי" onClick={handleLeave} />}
           </div>
-          <Button variant="outline" onClick={handleOpenHistory} className="w-full">
-            🕘 היסטוריה
-          </Button>
-          <Button variant="secondary" onClick={handleClose} className="w-full">
-            ✕ סגור
-          </Button>
-        </div>
+          <p className="mt-2 text-body-sm text-ink-3-light dark:text-ink-3-dark">
+            {!isOwner && isShared && <span>משותף איתך · </span>}
+            עודכן{' '}
+            {note.updatedAt.toDate().toLocaleDateString('he-IL', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+        </footer>
       </div>
 
       {showHistory && (
@@ -622,3 +537,19 @@ export const NoteView: React.FC<NoteViewProps> = ({
     </Modal>
   );
 };
+
+/** פעולה בשורת התחתית: טקסט קטן עם אייקון, בלי מסגרת ובלי צבע אזהרה */
+const FooterAction: React.FC<{ icon: typeof Archive; label: string; onClick: () => void }> = ({
+  icon: Icon,
+  label,
+  onClick,
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="inline-flex items-center gap-1.5 h-10 px-2 rounded-lg text-body-sm text-ink-2-light dark:text-ink-2-dark hover:bg-raised-light dark:hover:bg-raised-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
+  >
+    <Icon size={16} strokeWidth={1.75} />
+    {label}
+  </button>
+);

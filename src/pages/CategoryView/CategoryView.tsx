@@ -10,6 +10,7 @@ import { LoadError } from '@/components/common/LoadError';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { Button } from '@/components/common';
 import { NoteCardList } from '@/components/note/NoteCardList';
+import { confirmLeaveSharedNote } from '@/components/note/leaveSharedNote';
 import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
 import { filterNotesByQuery } from '@/utils/search';
@@ -241,6 +242,7 @@ export const CategoryView: React.FC = () => {
               onOpen={setViewingNote}
               onArchive={deleteNote}
               onTogglePin={pinNote}
+              onLeave={confirmLeaveSharedNote}
               // בחיפוש מוצג רק חלק מהפתקים - אין גרירה
               onReorder={searchQuery ? undefined : reorder}
               emptyText=""

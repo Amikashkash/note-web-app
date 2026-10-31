@@ -56,5 +56,7 @@ export const cardPreview = (note: CardSource): string => {
     return limit(open.map((item) => collapse(item.text)).join(' · '));
   }
   if (note.templateType === 'plain') return limit(collapse(note.content));
+  // תבנית מובנית ריקה: אין מה להציג (קודם הכרטיס הציג "[]" גולמי)
+  if (/^\s*(\[\s*\]|\{\s*\})?\s*$/.test(note.content)) return '';
   return limit(collapse(getNotePreview(note.content).replace(/\n/g, ' · ')));
 };

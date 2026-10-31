@@ -3,7 +3,7 @@
  * Reusable modal dialog
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { Portal } from '../Portal/Portal';
 import { useModalHistory } from '@/hooks/useModalHistory';
 
@@ -13,17 +13,33 @@ interface ModalProps {
   children: React.ReactNode;
 }
 
+/**
+ * החלוניות הפתוחות, מהתחתונה לעליונה. Escape סוגר רק את העליונה - כמו "חזור"
+ * (`useModalHistory`). קודם כל חלונית האזינה ל-Escape בעצמה, וחלונית מעל
+ * פתק (טיפים, שיתוף, היסטוריה) סגרה גם את הפתק שמתחתיה.
+ */
+const openModals: string[] = [];
+
 export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
+  const modalId = useId();
   // כאן ולא בכל חלונית בנפרד: כל החלוניות באפליקציה עוברות דרך הרכיב
   // הזה, ואף אחת לא עוקפת אותו. חיבור במקום אחד מבטיח שגם חלונית
   // שתיווצר בעתיד תתנהג נכון מול כפתור "חזור" בלי לזכור לחבר אותה.
   // הרכיב מרונדר רק כשהחלונית פתוחה, ולכן `isOpen` תמיד אמת.
   useModalHistory(true, onClose);
 
-  // Close on Escape key
+  useEffect(() => {
+    openModals.push(modalId);
+    return () => {
+      const index = openModals.lastIndexOf(modalId);
+      if (index !== -1) openModals.splice(index, 1);
+    };
+  }, [modalId]);
+
+  // Close on Escape key - רק החלונית העליונה
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === modalId) {
         onClose();
       }
     };
@@ -34,9 +50,11 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      // חלונית פנימית שנסגרת לא משחררת את הגלילה מתחת לחלונית שעדיין פתוחה.
+      // בלי תלות בסדר ה-cleanup: "אין אחרת פתוחה", בין אם זו כבר הוסרה ובין אם לא
+      if (openModals.every((id) => id === modalId)) document.body.style.overflow = 'unset';
     };
-  }, [onClose]);
+  }, [onClose, modalId]);
 
   return (
     <Portal>

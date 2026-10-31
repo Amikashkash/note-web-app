@@ -27,6 +27,11 @@ interface AccountingTemplateProps {
   readOnly?: boolean;
   /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
   onConvertToText?: () => void;
+  /**
+   * טיפים מוצגים בגוף העורך. בתוך פתק פתוח הם כבויים: הם עברו לחלון "טיפים"
+   * (`NoteTips`, v1.42.0). בטופס פתק חדש ובדף השיתוף הם נשארים.
+   */
+  hints?: boolean;
 }
 
 export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
@@ -34,6 +39,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   onChange,
   readOnly = false,
   onConvertToText,
+  hints = true,
 }) => {
   const [showAll, setShowAll] = useState(false);
 
@@ -290,7 +296,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
       )}
 
       {/* הסבר */}
-      {!readOnly && displayedRows.length === 0 && (
+      {hints && !readOnly && displayedRows.length === 0 && (
         <div className="text-sm text-ink-3-light dark:text-ink-3-dark text-center p-4 bg-raised-light dark:bg-raised-dark rounded">
           <p className="mb-2">💡 כיצד להשתמש:</p>
           <ul className="text-right space-y-1">

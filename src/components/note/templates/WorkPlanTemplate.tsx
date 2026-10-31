@@ -22,6 +22,11 @@ interface WorkPlanTemplateProps {
   readOnly?: boolean;
   /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
   onConvertToText?: () => void;
+  /**
+   * טיפים מוצגים בגוף העורך. בתוך פתק פתוח הם כבויים: הם עברו לחלון "טיפים"
+   * (`NoteTips`, v1.42.0). בטופס פתק חדש ובדף השיתוף הם נשארים.
+   */
+  hints?: boolean;
 }
 
 export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
@@ -29,6 +34,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
   onChange,
   readOnly = false,
   onConvertToText,
+  hints = true,
 }) => {
   // פענוח שנכשל אינו "תכנית ריקה" - ראה `templateContent.ts`
   const parsed = useMemo(() => parseWorkPlan(value), [value]);
@@ -165,6 +171,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
             placeholder="הזן תוכן הסעיף... (1. למספור, * לנקודות)"
             rows={5}
             className="text-sm"
+            hints={hints}
           />
           <NoteLinks text={section.content} />
         </div>
@@ -181,7 +188,7 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
         + הוסף סעיף
       </Button>
 
-      {sections.length === 0 && (
+      {hints && sections.length === 0 && (
         <p className="text-ink-3-light dark:text-ink-3-dark text-center text-sm py-4">
           לחץ על "הוסף סעיף" כדי להתחיל לבנות את תכנית העבודה
         </p>

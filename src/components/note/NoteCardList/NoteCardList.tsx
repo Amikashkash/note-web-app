@@ -4,6 +4,8 @@
  *
  * - לחיצה בכל מקום בכרטיס פותחת את הפתק. אין "הצג" ואין "מחק".
  * - "⋮" קטן: נעיצה, ו"העבר לארכיון" (לא "מחק" - הפתק נשמר ואפשר להחזיר).
+ *   בפתק של מישהו אחר: "הסר אותי" במקום הארכיון (v1.42.0) - ארכוב פתק של
+ *   מישהו אחר הוא לא ההחלטה שלך, כמו בתוך הפתק.
  * - גרירה לשינוי הסדר כמו בקטגוריות: במגע רק בלחיצה ארוכה, כך שגלילה לא
  *   מזיזה כרטיס. נעוצים ולא-נעוצים הם שתי קבוצות: גוררים בתוך קבוצה.
  * - סימנים רק למצב אמיתי: נעוץ, רגיש, קריאה בלבד ל-Claude, משותף, נוצר
@@ -29,7 +31,7 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
-import { Archive, Lock, MoreVertical, PenOff, Pin, PinOff, Sparkles, Users } from 'lucide-react';
+import { Archive, Lock, LogOut, MoreVertical, PenOff, Pin, PinOff, Sparkles, Users } from 'lucide-react';
 import type { Note } from '@/types/note';
 import { useAuthStore } from '@/store/authStore';
 import { byPinnedThenOrder } from '@/services/api/mappers';
@@ -40,8 +42,11 @@ interface NoteCardListProps {
   /** צבע הפס כשלפתק אין צבע משלו */
   categoryColor: string;
   onOpen: (note: Note) => void;
-  onArchive: (noteId: string) => void;
-  onTogglePin: (noteId: string, isPinned: boolean) => void;
+  /** רק לפתקים שלי */
+  onArchive?: (noteId: string) => void;
+  onTogglePin?: (noteId: string, isPinned: boolean) => void;
+  /** פתק של מישהו אחר: הסרה של עצמי מהשיתוף (עם אישור, אצל הקורא) */
+  onLeave?: (note: Note) => void;
   /** הסדר החדש של כל הפתקים בקטגוריה. בלי זה (למשל בחיפוש) אין גרירה */
   onReorder?: (orderedIds: string[]) => void;
   /** טקסט כשאין פתקים */
@@ -80,9 +85,11 @@ export const NoteCardList: React.FC<NoteCardListProps> = ({
   onOpen,
   onArchive,
   onTogglePin,
+  onLeave,
   onReorder,
   emptyText,
 }) => {
+  const userId = useAuthStore((state) => state.user?.uid);
   const ignoreClicks = useRef(false);
 
   const sensors = useSensors(
@@ -133,9 +140,11 @@ export const NoteCardList: React.FC<NoteCardListProps> = ({
           note={note}
           categoryColor={categoryColor}
           dragDisabled={!onReorder}
+          isMine={userId !== undefined && note.userId === userId}
           onOpen={() => open(note)}
-          onArchive={() => onArchive(note.id)}
-          onTogglePin={() => onTogglePin(note.id, !note.isPinned)}
+          onArchive={onArchive && (() => onArchive(note.id))}
+          onTogglePin={onTogglePin && (() => onTogglePin(note.id, !note.isPinned))}
+          onLeave={onLeave && (() => onLeave(note))}
         />
       ))}
     </SortableContext>
@@ -165,9 +174,11 @@ interface PaperCardProps {
   note: Note;
   categoryColor: string;
   dragDisabled: boolean;
+  isMine: boolean;
   onOpen: () => void;
-  onArchive: () => void;
-  onTogglePin: () => void;
+  onArchive?: () => void;
+  onTogglePin?: () => void;
+  onLeave?: () => void;
 }
 
 /** מונע מהלחיצה על "⋮" ועל התפריט להתחיל גרירה או לפתוח את הפתק */
@@ -179,11 +190,12 @@ const PaperCard: React.FC<PaperCardProps> = ({
   note,
   categoryColor,
   dragDisabled,
+  isMine,
   onOpen,
   onArchive,
   onTogglePin,
+  onLeave,
 }) => {
-  const userId = useAuthStore((state) => state.user?.uid);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +203,9 @@ const PaperCard: React.FC<PaperCardProps> = ({
     id: note.id,
     disabled: dragDisabled,
   });
+  // בלי גרירה (חיפוש, "שותף איתי") dnd-kit מסמן את הכרטיס `aria-disabled`, וקורא
+  // מסך היה אומר "לא זמין" על כרטיס שנפתח בלחיצה. אז רק "כפתור" רגיל
+  const cardAttributes = dragDisabled ? { role: 'button', tabIndex: 0 } : attributes;
 
   // סגירת התפריט בלחיצה מחוץ לו
   useEffect(() => {
@@ -208,19 +223,23 @@ const PaperCard: React.FC<PaperCardProps> = ({
 
   const progress = listProgress(note);
   const preview = cardPreview(note);
-  const isShared = note.sharedWith.length > 0 || (userId !== undefined && note.userId !== userId);
+  const isShared = note.sharedWith.length > 0 || !isMine;
+  // ארכוב רק לפתק שלי; בפתק של אחר - "הסר אותי"
+  const archive = isMine ? onArchive : undefined;
+  const leave = isMine ? undefined : onLeave;
+  const hasMenu = Boolean(onTogglePin || archive || leave);
 
   const handleArchive = () => {
     setMenuOpen(false);
-    if (window.confirm(`להעביר את "${note.title || 'ללא כותרת'}" לארכיון?\n\nאפשר להחזיר אותו מהארכיון בכל זמן.`)) {
-      onArchive();
+    if (archive && window.confirm(`להעביר את "${note.title || 'ללא כותרת'}" לארכיון?\n\nאפשר להחזיר אותו מהארכיון בכל זמן.`)) {
+      archive();
     }
   };
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
+      {...cardAttributes}
       {...listeners}
       onClick={onOpen}
       onKeyDown={(event) => {
@@ -279,48 +298,73 @@ const PaperCard: React.FC<PaperCardProps> = ({
           </span>
         )}
 
-        {/* תפריט משני. עד שלב מסך הפתק, זה המקום של "העבר לארכיון" */}
-        <div className="relative flex-shrink-0 -me-1 -mt-1" ref={menuRef} onClick={stop} onMouseDown={stop} onTouchStart={stop} onKeyDown={stop}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((value) => !value)}
-            className="h-9 w-9 grid place-items-center rounded-lg text-ink-3-light dark:text-ink-3-dark hover:bg-raised-light dark:hover:bg-raised-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
-            aria-label={`פעולות על ${note.title || 'הפתק'}`}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
+        {/* תפריט משני: נעיצה, "העבר לארכיון" (שלי) או "הסר אותי" (של אחר) */}
+        {hasMenu && (
+          <div
+            className="relative flex-shrink-0 -me-1 -mt-1"
+            ref={menuRef}
+            onClick={stop}
+            onMouseDown={stop}
+            onTouchStart={stop}
+            onKeyDown={stop}
           >
-            <MoreVertical size={18} strokeWidth={2} />
-          </button>
-          {menuOpen && (
-            <div
-              role="menu"
-              className="absolute end-0 top-10 z-30 w-48 py-1 rounded-xl bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark shadow-e3"
+            <button
+              type="button"
+              onClick={() => setMenuOpen((value) => !value)}
+              className="h-9 w-9 grid place-items-center rounded-lg text-ink-3-light dark:text-ink-3-dark hover:bg-raised-light dark:hover:bg-raised-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
+              aria-label={`פעולות על ${note.title || 'הפתק'}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onTogglePin();
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-body-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark text-start"
+              <MoreVertical size={18} strokeWidth={2} />
+            </button>
+            {menuOpen && (
+              <div
+                role="menu"
+                className="absolute end-0 top-10 z-30 w-48 py-1 rounded-xl bg-surface-light dark:bg-surface-dark border border-hairline-light dark:border-hairline-dark shadow-e3"
               >
-                {note.isPinned ? <PinOff size={16} strokeWidth={1.75} /> : <Pin size={16} strokeWidth={1.75} />}
-                {note.isPinned ? 'ביטול נעיצה' : 'נעיצה למעלה'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleArchive}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-body-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark text-start"
-              >
-                <Archive size={16} strokeWidth={1.75} />
-                העבר לארכיון
-              </button>
-            </div>
-          )}
-        </div>
+                {onTogglePin && (
+                  <MenuItem
+                    icon={note.isPinned ? PinOff : Pin}
+                    label={note.isPinned ? 'ביטול נעיצה' : 'נעיצה למעלה'}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onTogglePin();
+                    }}
+                  />
+                )}
+                {archive && <MenuItem icon={Archive} label="העבר לארכיון" onClick={handleArchive} />}
+                {leave && (
+                  <MenuItem
+                    icon={LogOut}
+                    label="הסר אותי"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      leave();
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+const MenuItem: React.FC<{ icon: typeof Archive; label: string; onClick: () => void }> = ({
+  icon: Icon,
+  label,
+  onClick,
+}) => (
+  <button
+    type="button"
+    role="menuitem"
+    onClick={onClick}
+    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-body-sm text-ink-light dark:text-ink-dark hover:bg-raised-light dark:hover:bg-raised-dark text-start"
+  >
+    <Icon size={16} strokeWidth={1.75} />
+    {label}
+  </button>
+);

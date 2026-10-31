@@ -17,6 +17,11 @@ interface EnhancedTextareaProps {
   className?: string;
   disabled?: boolean;
   rows?: number;
+  /**
+   * טיפים מוצגים בגוף העורך. בתוך פתק פתוח הם כבויים: הם עברו לחלון "טיפים"
+   * (`NoteTips`, v1.42.0). בטופס פתק חדש ובדף השיתוף הם נשארים.
+   */
+  hints?: boolean;
 }
 
 export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
@@ -26,6 +31,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   className = '',
   disabled = false,
   rows = 10,
+  hints = true,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -271,10 +277,14 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
             title="טקסט נטוי"
           />
         </div>
-        <div className="hidden sm:block h-6 w-px bg-hairline-light dark:bg-hairline-dark"></div>
-        <span className="text-xs text-ink-3-light dark:text-ink-3-dark">
-          טיפים: 1. למספור | * לנקודות
-        </span>
+        {hints && (
+          <>
+            <div className="hidden sm:block h-6 w-px bg-hairline-light dark:bg-hairline-dark"></div>
+            <span className="text-xs text-ink-3-light dark:text-ink-3-dark">
+              טיפים: 1. למספור | * לנקודות
+            </span>
+          </>
+        )}
       </div>
 
       {/* Textarea */}
@@ -300,11 +310,13 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       />
 
       {/* הסבר קצר */}
-      <div className="mt-2 text-xs text-ink-3-light dark:text-ink-3-dark space-y-1">
-        <p>💡 מספור אוטומטי: התחל שורה עם "1. " ולחץ Enter</p>
-        <p>💡 נקודות: התחל שורה עם "* " ולחץ Enter</p>
-        <p>💡 הדגשה: סמן טקסט ולחץ על כפתור "מודגש"</p>
-      </div>
+      {hints && (
+        <div className="mt-2 text-xs text-ink-3-light dark:text-ink-3-dark space-y-1">
+          <p>💡 מספור אוטומטי: התחל שורה עם "1. " ולחץ Enter</p>
+          <p>💡 נקודות: התחל שורה עם "* " ולחץ Enter</p>
+          <p>💡 הדגשה: סמן טקסט ולחץ על כפתור "מודגש"</p>
+        </div>
+      )}
     </div>
   );
 };
