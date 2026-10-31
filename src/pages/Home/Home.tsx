@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from "react-router-dom";
-import { Archive, Search, Settings, X } from "lucide-react";
+import { Archive, FolderPlus, Search, Settings, X } from "lucide-react";
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common';
 import { CategoryList } from '@/components/category/CategoryList/CategoryList';
@@ -21,7 +21,7 @@ export const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-app-light dark:bg-app-dark overflow-x-hidden transition-colors">
       {/* Header */}
-      <header className={`bg-surface-light dark:bg-surface-dark border-b border-hairline-light dark:border-hairline-dark mb-5`}>
+      <header className={`bg-surface-light dark:bg-surface-dark border-b border-hairline-light dark:border-hairline-dark mb-2 sm:mb-5`}>
         <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-5">
           {/* שורה ראשונה - לוגו, חיפוש ופרופיל */}
           <div className="flex items-center justify-between gap-3 mb-3">
@@ -101,33 +101,34 @@ export const Home: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
+      {/* ריווח בתחתית: ה-"+" הצף לא מסתיר את הקטגוריה האחרונה */}
+      <main className="container mx-auto px-2 sm:px-4 pt-2 sm:pt-8 pb-28 overflow-x-hidden">
         {/* לפני הקטגוריות: פתק ששותף איתך זה עתה הוא הדבר שסביר שחיפשת,
             ומקטע שמופיע רק כשיש בו תוכן לא דוחף כלום כשהוא ריק. */}
         <SharedWithMe />
 
         <div className="flex items-center justify-between mb-3 sm:mb-6 gap-2">
-          <h2 className="text-base sm:text-xl md:text-2xl font-bold text-ink-light dark:text-ink-dark truncate">הקטגוריות שלי</h2>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Button onClick={() => navigate('/archive')} size="sm" variant="outline" className="text-xs sm:text-sm whitespace-nowrap">
+          {/* בטלפון הכותרת נחתכה ליד שלושת הכפתורים, והיא לא מוסיפה שם מידע (v1.40.0) */}
+          <h2 className="hidden sm:block sm:text-2xl font-bold text-ink-light dark:text-ink-dark truncate">הקטגוריות שלי</h2>
+          <div className="flex items-center gap-1 flex-shrink-0 ms-auto">
+            <Button onClick={() => navigate('/archive')} size="sm" variant="outline" className="text-body-sm whitespace-nowrap">
               <Archive size={18} strokeWidth={1.75} />ארכיון
             </Button>
-            <Button onClick={() => navigate('/categories')} size="sm" variant="outline" className="text-xs sm:text-sm whitespace-nowrap">
+            <Button onClick={() => navigate('/categories')} size="sm" variant="outline" className="text-body-sm whitespace-nowrap">
               <Settings size={18} strokeWidth={1.75} />ניהול
             </Button>
-            <Button onClick={() => setShowCategoryForm(true)} size="sm" className="text-xs sm:text-sm whitespace-nowrap">
-              + חדש
+            {/* קטגוריה חדשה - בלי "+", כדי שה-"+" היחיד במסך יהיה של פתק חדש (v1.40.0) */}
+            <Button onClick={() => setShowCategoryForm(true)} size="sm" variant="outline" className="text-body-sm whitespace-nowrap">
+              <FolderPlus size={18} strokeWidth={1.75} />קטגוריה
             </Button>
           </div>
         </div>
 
         {/* Categories List */}
-        <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-e2 p-2 sm:p-6 transition-colors">
-          <CategoryList
-            onCreateFirstCategory={() => setShowCategoryForm(true)}
-            searchQuery={searchQuery}
-          />
-        </div>
+        <CategoryList
+          onCreateFirstCategory={() => setShowCategoryForm(true)}
+          searchQuery={searchQuery}
+        />
 
         {/* Category Form Modal */}
         {showCategoryForm && (

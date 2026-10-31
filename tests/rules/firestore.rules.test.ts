@@ -352,6 +352,78 @@ describe('users and their subcollections', () => {
   });
 });
 
+describe('personal category order (users/{uid}/preferences/home, v1.40.0)', () => {
+  const homeOf = (db: Firestore, uid: string) => doc(db, `users/${uid}/preferences/home`);
+  const order = (...ids: string[]) => ({ categoryOrder: ids, updatedAt: serverTimestamp() });
+
+  it('the owner writes, reads, rewrites and deletes their order', async () => {
+    const db = as(OWNER);
+    await assertSucceeds(setDoc(homeOf(db, OWNER), order('cat-1', 'cat-2')));
+    await assertSucceeds(getDoc(homeOf(db, OWNER)));
+    await assertSucceeds(setDoc(homeOf(db, OWNER), order('cat-2', 'cat-1')));
+    await assertSucceeds(deleteDoc(homeOf(db, OWNER)));
+  });
+
+  it('nobody else reads or writes it, and signed-out users neither', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/${OWNER}/preferences/home`), {
+        categoryOrder: ['cat-1'],
+        updatedAt: Timestamp.now(),
+      });
+    });
+    await assertFails(getDoc(homeOf(as(STRANGER), OWNER)));
+    await assertFails(getDoc(homeOf(as(SHARED), OWNER)));
+    await assertFails(setDoc(homeOf(as(STRANGER), OWNER), order('cat-1')));
+    await assertFails(deleteDoc(homeOf(as(STRANGER), OWNER)));
+    await assertFails(getDoc(homeOf(anonymous(), OWNER)));
+  });
+
+  it('a shared category is ordered per user: the recipient orders it without touching the category or the owner', async () => {
+    // הנמען מסדר את הקטגוריה המשותפת אצלו
+    await assertSucceeds(setDoc(homeOf(as(SHARED), SHARED), order('cat-1')));
+    await assertSucceeds(setDoc(homeOf(as(OWNER), OWNER), order('cat-other', 'cat-1')));
+
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      // מסמך הקטגוריה לא השתנה, והסדר של כל אחד נשאר שלו
+      const category = (await getDoc(doc(db, 'categories/cat-1'))).data();
+      expect(category?.order).toBe(baseCategory.order);
+      expect(category?.updatedAt).toBeUndefined();
+      expect((await getDoc(doc(db, `users/${SHARED}/preferences/home`))).data()?.categoryOrder).toEqual(['cat-1']);
+      expect((await getDoc(doc(db, `users/${OWNER}/preferences/home`))).data()?.categoryOrder).toEqual([
+        'cat-other',
+        'cat-1',
+      ]);
+    });
+  });
+
+  it('only the home document', async () => {
+    await assertFails(setDoc(doc(as(OWNER), `users/${OWNER}/preferences/other`), order('cat-1')));
+  });
+
+  it('only categoryOrder and updatedAt', async () => {
+    await assertFails(setDoc(homeOf(as(OWNER), OWNER), { ...order('cat-1'), theme: 'dark' }));
+    await assertFails(setDoc(homeOf(as(OWNER), OWNER), { updatedAt: serverTimestamp(), extra: 1 }));
+  });
+
+  it('categoryOrder is a list of at most 500', async () => {
+    await assertFails(setDoc(homeOf(as(OWNER), OWNER), { categoryOrder: 'cat-1', updatedAt: serverTimestamp() }));
+    await assertFails(
+      setDoc(homeOf(as(OWNER), OWNER), { categoryOrder: { a: 'cat-1' }, updatedAt: serverTimestamp() })
+    );
+    const ids = Array.from({ length: 500 }, (_, index) => `c${index}`);
+    await assertSucceeds(setDoc(homeOf(as(OWNER), OWNER), order(...ids)));
+    await assertFails(setDoc(homeOf(as(OWNER), OWNER), order(...ids, 'c500')));
+  });
+
+  it('updatedAt is the server time of the write', async () => {
+    await assertFails(setDoc(homeOf(as(OWNER), OWNER), { categoryOrder: ['cat-1'] }));
+    await assertFails(
+      setDoc(homeOf(as(OWNER), OWNER), { categoryOrder: ['cat-1'], updatedAt: Timestamp.fromMillis(0) })
+    );
+  });
+});
+
 describe('userLookup (C1 / S-1)', () => {
   it('a signed-in user can get an entry by id; an anonymous user cannot', async () => {
     await assertSucceeds(getDoc(doc(as(STRANGER), `userLookup/${OWNER}`)));

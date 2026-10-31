@@ -4,14 +4,12 @@
 
 import { Note } from '@/types/note';
 import { NoteCard } from '../NoteCard';
-import { Button } from '@/components/common/Button';
 
 interface NotesListProps {
   notes: Note[];
   onView: (note: Note) => void;
   onDelete: (noteId: string) => void;
   onTogglePin?: (noteId: string, isPinned: boolean) => void;
-  onAddNote: () => void;
   onDragStart?: (note: Note) => void;
   onDragEnd?: () => void;
   onDragOver?: (note: Note) => void;
@@ -25,7 +23,6 @@ export const NotesList: React.FC<NotesListProps> = ({
   onView,
   onDelete,
   onTogglePin,
-  onAddNote,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -47,14 +44,10 @@ export const NotesList: React.FC<NotesListProps> = ({
 
   if (notes.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <p className="text-ink-3-light dark:text-ink-3-dark mb-4">אין פתקים בקטגוריה זו</p>
-          <Button onClick={onAddNote} size="sm">
-            + פתק ראשון
-          </Button>
-        </div>
-      </div>
+      // בלי כפתור משלו: יש "+" אחד במסך הבית, והוא יוצר בקטגוריה הפתוחה (v1.40.0)
+      <p className="py-6 text-center text-body text-ink-3-light dark:text-ink-3-dark">
+        אין פתקים בקטגוריה. ה-+ שבתחתית המסך יוצר פתק כאן.
+      </p>
     );
   }
 

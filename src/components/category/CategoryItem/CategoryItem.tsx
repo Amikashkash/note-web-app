@@ -1,57 +1,65 @@
 /**
- * שורת קטגוריה בדף הבית - מציגה את פתקי הקטגוריה בגלילה אופקית
+ * שורת קטגוריה באקורדיון של מסך הבית (סבב 3, v1.40.0).
+ *
+ * מקופלת: שם, מספר הפתקים, ושורה שנייה עם כותרת הפתק שעודכן אחרון.
+ * פתוחה: שורת פעולות (שיתוף / יציאה משיתוף, דף מלא) ורשימת הפתקים.
+ * כפתור "+ פתק" לכל קטגוריה הוסר - יש "+" אחד במסך (`CategoryList`).
+ *
+ * גרירה לשינוי הסדר: בכל השורה העליונה. במגע רק אחרי לחיצה ארוכה, ולכן
+ * `touch-manipulation` ולא `touch-none` - גלילה שמתחילה על שורה גוללת.
  */
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Lock, LogOut, PenOff, Pin, Plus, Share2, Users } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ChevronDown, ChevronLeft, Lock, LogOut, Maximize2, PenOff, Share2, Users } from 'lucide-react';
 import type { Category } from '@/types';
 import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useAuthStore } from '@/store/authStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { NotesList } from '@/components/note/NotesList';
-import { NoteForm } from '@/components/note/NoteForm';
 import { NoteView } from '@/components/note/NoteView';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { filterNotesByQuery } from '@/utils/search';
 import { getErrorMessage } from '@/utils/errors';
+import { latestNote } from '@/utils/homeAccordion';
 import * as categoryAPI from '@/services/api/categories';
 
 interface CategoryItemProps {
   category: Category;
   searchQuery?: string;
+  /** פתוחה באקורדיון. בזמן חיפוש מתעלמים מזה: כל קטגוריה עם תוצאות פתוחה */
+  isOpen: boolean;
+  onToggle: () => void;
+  /** בזמן חיפוש (ובקטגוריה יחידה) אין גרירה */
+  dragDisabled: boolean;
 }
 
-/** כמה כותרות פתקים מוצגות בתצוגה המקופלת */
-const COLLAPSED_PREVIEW_COUNT = 10;
-
-export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuery = '' }) => {
+export const CategoryItem: React.FC<CategoryItemProps> = ({
+  category,
+  searchQuery = '',
+  isOpen,
+  onToggle,
+  dragDisabled,
+}) => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const categories = useCategoryStore((state) => state.categories);
 
-  const {
-    notes,
-    saveNote,
-    moveToCategory,
-    deleteNote,
-    pinNote,
-    moveNoteBefore,
-  } = useNoteEditor(category.id);
+  const { notes, moveToCategory, deleteNote, pinNote, moveNoteBefore } = useNoteEditor(category.id);
 
-  const [manuallyExpanded, setManuallyExpanded] = useState(false);
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: category.id, disabled: dragDisabled });
+
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
   const [showShareManagement, setShowShareManagement] = useState(false);
   const [draggingNote, setDraggingNote] = useState<Note | null>(null);
   const [dragOverNote, setDragOverNote] = useState<Note | null>(null);
 
-  const categoryNotes = useMemo(
-    () => filterNotesByQuery(notes, searchQuery),
-    [notes, searchQuery]
-  );
+  const categoryNotes = useMemo(() => filterNotesByQuery(notes, searchQuery), [notes, searchQuery]);
+  const latest = useMemo(() => latestNote(categoryNotes), [categoryNotes]);
 
   const categoriesForMove = useMemo(
     () =>
@@ -66,17 +74,10 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
   );
 
   const hasSearch = searchQuery.trim().length > 0;
-  const matchCount = categoryNotes.length;
-
-  // בזמן חיפוש הקטגוריה נפתחת אוטומטית אם יש בה תוצאות, ומחוץ לחיפוש
-  // נשמר מה שהמשתמש בחר. הערך נגזר ברינדור ולא מסונכרן דרך effect,
-  // כדי למנוע רינדור כפול בכל הקלדה בשדה החיפוש.
-  const isExpanded = hasSearch ? matchCount > 0 : manuallyExpanded;
+  const expanded = hasSearch ? categoryNotes.length > 0 : isOpen;
 
   // הפתק המוצג במודאל נלקח מהרשימה החיה, כדי שיתעדכן בזמן אמת
-  const activeNote = viewingNote
-    ? notes.find((note) => note.id === viewingNote.id) ?? viewingNote
-    : null;
+  const activeNote = viewingNote ? notes.find((note) => note.id === viewingNote.id) ?? viewingNote : null;
 
   const isOwner = user !== null && category.userId === user.uid;
   const isShared = category.sharedWith.length > 0;
@@ -109,173 +110,129 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
     setDragOverNote(null);
   };
 
-  const handleSubmitNote = async (data: Parameters<typeof saveNote>[0]) => {
-    const saved = await saveNote(data, editingNote);
-    if (saved) {
-      setShowNoteForm(false);
-      setEditingNote(null);
-    }
-  };
-
   // בחיפוש ללא תוצאות - הקטגוריה לא מוצגת כלל
-  if (hasSearch && matchCount === 0) {
+  if (hasSearch && categoryNotes.length === 0) {
     return null;
   }
 
-  const collapsedPreview = [...categoryNotes].slice(0, COLLAPSED_PREVIEW_COUNT);
-  const hiddenCount = categoryNotes.length - collapsedPreview.length;
+  const countLabel = hasSearch ? `${categoryNotes.length} תוצאות` : `${categoryNotes.length} פתקים`;
 
   return (
     <div
-      className="mb-4 bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-hairline-light dark:border-hairline-dark border-s-4 shadow-e1 hover:shadow-e2 transition-smooth overflow-visible"
-      // תכונה לוגית: בעברית `borderRight` צייר את הפס בקצה שבו השורה
-      // נגמרת, במקום בקצה שבו היא מתחילה.
-      style={{ borderInlineStartColor: category.color }}
+      ref={setNodeRef}
+      style={{
+        // תכונה לוגית: בעברית `borderRight` צייר את הפס בקצה שבו השורה נגמרת
+        borderInlineStartColor: category.color,
+        transform: CSS.Translate.toString(transform),
+        transition,
+        position: 'relative',
+        zIndex: isDragging ? 20 : undefined,
+      }}
+      className={`bg-surface-light dark:bg-surface-dark rounded-xl border border-hairline-light dark:border-hairline-dark border-s-4 transition-shadow ${
+        isDragging ? 'shadow-e3' : expanded ? 'shadow-e2' : 'shadow-e1'
+      }`}
     >
-      {/* כותרת הקטגוריה */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3 flex-1">
-          <button
-            onClick={() => setManuallyExpanded((previous) => !previous)}
-            className="text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark transition-colors"
-            title={isExpanded ? 'קפל' : 'הרחב'}
-          >
-            {/* מקופל מצביע שמאלה ולא ימינה: ב-RTL כיוון ההמשך הוא שמאלה,
-                וחץ ימינה היה קורא כ"חזור". */}
-            {isExpanded ? (
-              <ChevronDown size={18} strokeWidth={1.75} />
-            ) : (
-              <ChevronLeft size={18} strokeWidth={1.75} />
+      {/* השורה העליונה: לחיצה פותחת/סוגרת, לחיצה ארוכה גוררת */}
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        onClick={onToggle}
+        aria-expanded={expanded}
+        // `attributes` של dnd-kit נותנים role="button" ותיאור לקורא מסך; הכותרת היא
+        // גם כפתור הפתיחה, ולכן התיאור מזכיר את שניהם
+        className="w-full flex items-center gap-3 px-4 py-3 min-h-[4.5rem] text-start rounded-xl touch-manipulation select-none [-webkit-touch-callout:none] hover:bg-raised-light/60 dark:hover:bg-raised-dark/60 transition-colors"
+      >
+        {category.icon && (
+          <span className="text-2xl leading-none flex-shrink-0" aria-hidden="true">
+            {category.icon}
+          </span>
+        )}
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-h2 text-ink-light dark:text-ink-dark truncate">{category.name}</span>
+            {/* סימני מצב - רק מה שנכון עכשיו */}
+            {category.isSensitive && (
+              <Lock
+                size={16}
+                strokeWidth={2}
+                className="flex-shrink-0 text-ink-3-light dark:text-ink-3-dark"
+                aria-label="רגישה - מוסתרת מ-Claude"
+              />
             )}
-          </button>
-          {category.icon && <span className="text-2xl">{category.icon}</span>}
-          {/* הקטגוריה עצמה נפתחת בתצוגה מלאה - זו פעולת המגע המצופה,
-              והרשת שם מציגה שתי עמודות עם חיפוש. קודם היה כאן קישור
-              "הצג הכל" בגודל caption עם אייקון זכוכית מגדלת: הוא נקרא
-              כחיפוש ולא כפתיחה, ובפועל אף אחד לא מצא את המסך המלא.
-              ה-chevron ליד ממשיך להרחיב בתוך הדף. */}
-          <button
-            onClick={() => navigate(`/category/${category.id}`)}
-            className="flex-1 min-w-0 min-h-11 text-start rounded-lg px-2 -mx-2 hover:bg-raised-light dark:hover:bg-raised-dark transition-colors"
-            title="פתח בתצוגה מלאה"
-          >
-            <h3 className="text-h2 text-ink-light dark:text-ink-dark truncate">
-              {category.isSensitive && (
-                <Lock
-                  size={16}
-                  strokeWidth={2}
-                  className="inline-block me-1.5 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
-                  aria-label="רגישה - הקטגוריה והפתקים שבה מוסתרים מ-Claude"
-                />
-              )}
-              {category.isReadOnly && (
-                <PenOff
-                  size={16}
-                  strokeWidth={2}
-                  className="inline-block me-1.5 -mt-0.5 text-ink-3-light dark:text-ink-3-dark"
-                  aria-label="קריאה בלבד ל-Claude - הוא לא יוצר בה פתקים"
-                />
-              )}
-              {category.name}
-            </h3>
-            <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">
-              {categoryNotes.length} פתקים
-            </p>
-          </button>
-        </div>
+            {category.isReadOnly && (
+              <PenOff
+                size={16}
+                strokeWidth={2}
+                className="flex-shrink-0 text-ink-3-light dark:text-ink-3-dark"
+                aria-label="קריאה בלבד ל-Claude"
+              />
+            )}
+            {isShared && (
+              <Users
+                size={16}
+                strokeWidth={2}
+                className="flex-shrink-0 text-ink-3-light dark:text-ink-3-dark"
+                aria-label={isOwner ? `משותפת עם ${category.sharedWith.length}` : 'שותפה איתך'}
+              />
+            )}
+            <span className="ms-auto flex-shrink-0 text-body-sm text-ink-3-light dark:text-ink-3-dark">
+              {countLabel}
+            </span>
+          </span>
+          <span className="block mt-0.5 text-body-sm text-ink-2-light dark:text-ink-2-dark truncate">
+            {latest ? latest.title || 'ללא כותרת' : 'אין פתקים עדיין'}
+          </span>
+        </span>
+        {/* מקופל מצביע שמאלה: ב-RTL כיוון ההמשך הוא שמאלה, וחץ ימינה היה קורא כ"חזור" */}
+        {expanded ? (
+          <ChevronDown size={20} strokeWidth={1.75} className="flex-shrink-0 text-ink-3-light dark:text-ink-3-dark" />
+        ) : (
+          <ChevronLeft size={20} strokeWidth={1.75} className="flex-shrink-0 text-ink-3-light dark:text-ink-3-dark" />
+        )}
+      </button>
 
-        <div className="flex items-center gap-2">
-          {isOwner && (
-            <button
-              onClick={() => setShowShareManagement(true)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm rounded-lg transition-smooth font-medium ${
-                isShared
-                  ? 'bg-success/10 text-success dark:text-success-dark hover:bg-success/20'
-                  : 'bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-hairline-light dark:hover:bg-hairline-dark'
-              }`}
-              title={isShared ? `משותף עם ${category.sharedWith.length} משתמשים` : 'שתף קטגוריה'}
-            >
-              <Share2 size={16} strokeWidth={1.75} />
-              {isShared && category.sharedWith.length}
-            </button>
-          )}
-          {!isOwner && isShared && (
-            <>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm bg-brand-soft dark:bg-brand-soft-dark text-brand-text dark:text-brand-text-dark rounded-lg font-medium">
-                <Users size={16} strokeWidth={1.75} />
-                משותף
-              </span>
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-hairline-light dark:border-hairline-dark">
+          <div className="flex flex-wrap items-center gap-2 pt-3">
+            {isOwner && (
+              <button
+                onClick={() => setShowShareManagement(true)}
+                className={`inline-flex items-center gap-1.5 h-10 px-3 text-body-sm rounded-lg transition-smooth font-medium ${
+                  isShared
+                    ? 'bg-success/10 text-success dark:text-success-dark hover:bg-success/20'
+                    : 'bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-hairline-light dark:hover:bg-hairline-dark'
+                }`}
+              >
+                <Share2 size={16} strokeWidth={1.75} />
+                {isShared ? `משותפת (${category.sharedWith.length})` : 'שיתוף'}
+              </button>
+            )}
+            {!isOwner && isShared && (
               <button
                 onClick={handleLeaveCategory}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-body-sm rounded-lg font-medium bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-danger-soft dark:hover:bg-danger-soft-dark hover:text-danger dark:hover:text-danger-dark transition-smooth"
+                className="inline-flex items-center gap-1.5 h-10 px-3 text-body-sm rounded-lg font-medium bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-danger-soft dark:hover:bg-danger-soft-dark hover:text-danger dark:hover:text-danger-dark transition-smooth"
                 title="הסר אותי מהקטגוריה המשותפת"
               >
                 <LogOut size={16} strokeWidth={1.75} />
                 הסר אותי
               </button>
-            </>
-          )}
-          <button
-            onClick={() => {
-              setEditingNote(null);
-              setShowNoteForm(true);
-            }}
-            className="inline-flex items-center gap-1 h-11 px-4 text-body-sm bg-brand dark:bg-brand-dark text-white rounded-lg font-medium shadow-e1 hover:bg-brand-2 dark:hover:bg-brand-2-dark transition-smooth"
-          >
-            <Plus size={18} strokeWidth={2} />
-            פתק
-          </button>
-        </div>
-      </div>
-
-      {/* תצוגה מקופלת - כותרות בלבד */}
-      {!isExpanded && categoryNotes.length > 0 && (
-        <div className="pb-2 border-t border-hairline-light dark:border-hairline-dark mt-3 pt-3">
-          <div className="overflow-x-auto notes-scroll" dir="rtl">
-            <div className="flex gap-3">
-              {collapsedPreview.map((note) => (
-                <button
-                  key={note.id}
-                  onClick={() => setViewingNote(note)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-raised-light dark:bg-raised-dark hover:shadow-e1 rounded-lg text-body-sm text-ink-2-light dark:text-ink-2-dark transition-smooth border-s-[3px] flex-shrink-0 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
-                  style={{ borderInlineStartColor: note.color || category.color }}
-                >
-                  {note.isPinned && (
-                    <Pin
-                      size={12}
-                      strokeWidth={1.75}
-                      fill="currentColor"
-                      className="flex-shrink-0 text-cat-orange dark:text-cat-orange-dark"
-                    />
-                  )}
-                  {note.title}
-                </button>
-              ))}
-              {hiddenCount > 0 && (
-                <button
-                  onClick={() => setManuallyExpanded(true)}
-                  className="px-4 py-2 text-body-sm text-ink-3-light dark:text-ink-3-dark hover:text-ink-light dark:hover:text-ink-dark flex items-center whitespace-nowrap transition-smooth flex-shrink-0"
-                >
-                  +{hiddenCount} עוד...
-                </button>
-              )}
-            </div>
+            )}
+            <button
+              onClick={() => navigate(`/category/${category.id}`)}
+              className="inline-flex items-center gap-1.5 h-10 px-3 text-body-sm rounded-lg font-medium bg-raised-light dark:bg-raised-dark text-ink-2-light dark:text-ink-2-dark hover:bg-hairline-light dark:hover:bg-hairline-dark transition-smooth"
+            >
+              <Maximize2 size={16} strokeWidth={1.75} />
+              דף מלא
+            </button>
           </div>
-        </div>
-      )}
 
-      {/* תצוגה מורחבת */}
-      {isExpanded && (
-        <div className="border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
           <NotesList
             notes={categoryNotes}
             onView={setViewingNote}
             onDelete={deleteNote}
             onTogglePin={pinNote}
-            onAddNote={() => {
-              setEditingNote(null);
-              setShowNoteForm(true);
-            }}
             onDragStart={setDraggingNote}
             onDragEnd={() => {
               setDraggingNote(null);
@@ -302,19 +259,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({ category, searchQuer
           onTogglePin={pinNote}
           onMoveToCategory={moveToCategory}
           categories={categoriesForMove}
-        />
-      )}
-
-      {/* טופס פתק */}
-      {showNoteForm && (
-        <NoteForm
-          categoryId={category.id}
-          note={editingNote}
-          onClose={() => {
-            setShowNoteForm(false);
-            setEditingNote(null);
-          }}
-          onSubmit={handleSubmitNote}
         />
       )}
 
