@@ -2,7 +2,7 @@
  * שורת קטגוריה באקורדיון של מסך הבית (סבב 3, v1.40.0).
  *
  * מקופלת: שם, מספר הפתקים, ושורה שנייה עם כותרת הפתק שעודכן אחרון.
- * פתוחה: שורת פעולות (שיתוף / יציאה משיתוף, דף מלא) ורשימת הפתקים.
+ * פתוחה: שורת פעולות (שיתוף / יציאה משיתוף, דף מלא) וכרטיסי הפתקים (`NoteCardList`).
  * כפתור "+ פתק" לכל קטגוריה הוסר - יש "+" אחד במסך (`CategoryList`).
  *
  * גרירה לשינוי הסדר: בכל השורה העליונה. במגע רק אחרי לחיצה ארוכה, ולכן
@@ -19,7 +19,7 @@ import type { Note } from '@/types/note';
 import { useNoteEditor } from '@/hooks/useNoteEditor';
 import { useAuthStore } from '@/store/authStore';
 import { useCategoryStore } from '@/store/categoryStore';
-import { NotesList } from '@/components/note/NotesList';
+import { NoteCardList } from '@/components/note/NoteCardList';
 import { NoteView } from '@/components/note/NoteView';
 import { ShareManagement } from '@/components/common/ShareManagement';
 import { filterNotesByQuery } from '@/utils/search';
@@ -48,15 +48,13 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
   const user = useAuthStore((state) => state.user);
   const categories = useCategoryStore((state) => state.categories);
 
-  const { notes, moveToCategory, deleteNote, pinNote, moveNoteBefore } = useNoteEditor(category.id);
+  const { notes, moveToCategory, deleteNote, pinNote, reorder } = useNoteEditor(category.id);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: category.id, disabled: dragDisabled });
 
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
   const [showShareManagement, setShowShareManagement] = useState(false);
-  const [draggingNote, setDraggingNote] = useState<Note | null>(null);
-  const [dragOverNote, setDragOverNote] = useState<Note | null>(null);
 
   const categoryNotes = useMemo(() => filterNotesByQuery(notes, searchQuery), [notes, searchQuery]);
   const latest = useMemo(() => latestNote(categoryNotes), [categoryNotes]);
@@ -101,13 +99,6 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
     } catch (error) {
       window.alert(getErrorMessage(error));
     }
-  };
-
-  const handleDrop = async (targetNote: Note) => {
-    if (draggingNote) {
-      await moveNoteBefore(draggingNote.id, targetNote.id);
-    }
-    setDragOverNote(null);
   };
 
   // בחיפוש ללא תוצאות - הקטגוריה לא מוצגת כלל
@@ -194,7 +185,7 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-hairline-light dark:border-hairline-dark">
+        <div className="paper-on-surface px-4 pb-4 border-t border-hairline-light dark:border-hairline-dark">
           <div className="flex flex-wrap items-center gap-2 pt-3">
             {isOwner && (
               <button
@@ -228,25 +219,18 @@ export const CategoryItem: React.FC<CategoryItemProps> = ({
             </button>
           </div>
 
-          <NotesList
-            notes={categoryNotes}
-            onView={setViewingNote}
-            onDelete={deleteNote}
-            onTogglePin={pinNote}
-            onDragStart={setDraggingNote}
-            onDragEnd={() => {
-              setDraggingNote(null);
-              setDragOverNote(null);
-            }}
-            onDragOver={(note) => {
-              if (draggingNote && draggingNote.id !== note.id) {
-                setDragOverNote(note);
-              }
-            }}
-            onDrop={handleDrop}
-            draggingNoteId={draggingNote?.id}
-            dragOverNoteId={dragOverNote?.id}
-          />
+          <div className="pt-3">
+            <NoteCardList
+              notes={categoryNotes}
+              categoryColor={category.color}
+              onOpen={setViewingNote}
+              onArchive={deleteNote}
+              onTogglePin={pinNote}
+              // בחיפוש מוצג רק חלק מהפתקים - אין גרירה
+              onReorder={hasSearch ? undefined : reorder}
+              emptyText="אין פתקים בקטגוריה. ה-+ שבתחתית המסך יוצר פתק כאן."
+            />
+          </div>
         </div>
       )}
 

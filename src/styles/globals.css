@@ -202,3 +202,44 @@ body {
 .dark .notes-scroll::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/*
+ * כרטיס פתק "נייר" (סבב 3, v1.41.0). השראה מהמפרט של Gemini, עם גרסה כהה
+ * מתוכננת: נייר חם ובהיר ביום, ונייר כהה וחם (לא שחור) בלילה, כך שהכרטיס
+ * עדיין נבדל מהרקע.
+ *
+ * הפינה המקופלת בקצה שבו השורה נגמרת (שמאל-למעלה ב-RTL). היא מצוירת בתוך
+ * הכרטיס, בלי `overflow: hidden`, כדי שתפריט "⋮" לא ייחתך.
+ */
+.paper-card {
+  background-color: #fffdf9;
+  box-shadow: 0 2px 6px -1px rgba(28, 25, 23, 0.08), 0 1px 2px -1px rgba(28, 25, 23, 0.05);
+}
+.dark .paper-card {
+  background-color: #24201c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 6px -1px rgba(0, 0, 0, 0.5);
+}
+.paper-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 16px 16px;
+  /* החלק ה"חתוך" בצבע של מה שמאחורי הכרטיס: רקע האפליקציה, או המשטח של
+     קטגוריה פתוחה (`paper-on-surface`) */
+  border-color: transparent transparent rgba(28, 25, 23, 0.1) var(--paper-behind, #fafaf9);
+  border-bottom-right-radius: 3px;
+  pointer-events: none;
+}
+.dark .paper-card::before {
+  border-color: transparent transparent rgba(0, 0, 0, 0.45) var(--paper-behind, #0c0a09);
+}
+.paper-on-surface {
+  --paper-behind: #ffffff;
+}
+.dark .paper-on-surface {
+  --paper-behind: #1c1917;
+}

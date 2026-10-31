@@ -86,25 +86,12 @@ export const useNoteEditor = (categoryId: string) => {
   );
 
   /**
-   * שינוי סדר בגרירה: מזיז את הפתק הנגרר למקומו של פתק היעד
-   * וכותב את הסדר החדש בכתיבה אטומית אחת.
+   * שינוי סדר בגרירה: הסדר החדש של כל הפתקים בקטגוריה (כפי שהם מוצגים),
+   * בכתיבה אטומית אחת.
    */
-  const moveNoteBefore = useCallback(
-    (draggedNoteId: string, targetNoteId: string): Promise<boolean> => {
-      if (draggedNoteId === targetNoteId) return Promise.resolve(false);
-
-      const ordered = [...notes].sort((a, b) => a.order - b.order).map((note) => note.id);
-      const fromIndex = ordered.indexOf(draggedNoteId);
-      const toIndex = ordered.indexOf(targetNoteId);
-
-      if (fromIndex === -1 || toIndex === -1) return Promise.resolve(false);
-
-      const [moved] = ordered.splice(fromIndex, 1);
-      ordered.splice(toIndex, 0, moved);
-
-      return run(() => reorderNotes(ordered));
-    },
-    [notes, reorderNotes, run]
+  const reorder = useCallback(
+    (orderedIds: string[]): Promise<boolean> => run(() => reorderNotes(orderedIds)),
+    [reorderNotes, run]
   );
 
   return {
@@ -114,6 +101,6 @@ export const useNoteEditor = (categoryId: string) => {
     moveToCategory,
     deleteNote,
     pinNote,
-    moveNoteBefore,
+    reorder,
   };
 };
