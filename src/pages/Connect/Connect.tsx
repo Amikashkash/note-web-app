@@ -22,6 +22,7 @@ import { useAuthStore } from '@/store/authStore';
 import { loadConnectRequest, sendConnectDecision } from '@/services/api/mcpConnect';
 import { isFramed, requestsWrite, scopeLabel, type ConnectProblem, type ConnectRequest } from '@/utils/mcpConnect';
 import { loginRedirectState } from '@/utils/returnTo';
+import { AccessRequestPanel } from './AccessRequestPanel';
 
 type State =
   | { kind: 'loading' }
@@ -35,8 +36,9 @@ const PROBLEMS: Record<ConnectProblem, { title: string; text: string }> = {
     title: 'בקשת החיבור לא בתוקף',
     text: 'הבקשה פגה, כבר טופלה, או נפתחה בחשבון אחר. חזרו ל-Claude והתחילו את החיבור מחדש.',
   },
+  // v1.43.0: לא רק שגיאה - `AccessRequestPanel` מציע לבקש גישה
   not_allowed: {
-    title: 'החיבור ל-Claude עדיין לא פתוח לחשבון שלך',
+    title: 'אין לך עדיין גישה',
     text: 'לא ניתנה גישה ולא נשלח דבר ל-Claude.',
   },
   login_required: {
@@ -121,7 +123,11 @@ export const Connect: React.FC = () => {
     return (
       <Card>
         <h1 className="text-xl font-bold">{title}</h1>
-        <p className="text-gray-600 dark:text-gray-300">{text}</p>
+        {state.problem === 'not_allowed' ? (
+          <AccessRequestPanel />
+        ) : (
+          <p className="text-gray-600 dark:text-gray-300">{text}</p>
+        )}
         {state.problem === 'login_required' ? (
           <Button fullWidth onClick={signInAgain}>
             התחברות מחדש

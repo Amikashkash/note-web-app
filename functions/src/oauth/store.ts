@@ -12,6 +12,9 @@
  * - `oauthTokens/{sha256}`, `oauthCodes/{sha256}`: המפתח הוא hash של הערך,
  *   והערך עצמו לא נשמר בשום מקום.
  * - `oauthRequests/{reqId}`: ה-nonce של ההסכמה נשמר כ-hash בלבד.
+ * - `mcpAccessRequests/{uid}`: בקשת גישה של משתמש (v1.43.0). המזהה הוא ה-uid,
+ *   ולכן יש לכל משתמש בקשה אחת לכל היותר.
+ * - `mcpAccessAudit/{auto}`: כל אישור, דחייה וביטול של מנהל.
  */
 
 import { FieldValue, getFirestore, Timestamp, type DocumentData, type Firestore, type Transaction } from 'firebase-admin/firestore';
@@ -24,6 +27,8 @@ const COLLECTIONS = {
   grants: 'oauthGrants',
   tokens: 'oauthTokens',
   rateLimits: 'rateLimits',
+  accessRequests: 'mcpAccessRequests',
+  accessAudit: 'mcpAccessAudit',
 } as const;
 
 const CONFIG_DOC = 'config/mcp';
@@ -108,6 +113,35 @@ export interface TokenRecord {
 export interface AccessConfig {
   allowedUids: string[];
   openToAll: boolean;
+  /**
+   * מי מאשר בקשות גישה (v1.43.0). נקבע ידנית ב-console ולא משתנה מהקוד.
+   * רק הבדיקה בשרת מול הרשימה הזו נותנת הרשאות מנהל.
+   */
+  adminUids: string[];
+}
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
+
+/** `mcpAccessRequests/{uid}`. השם והאימייל מה-ID token המאומת, לא מהלקוח */
+export interface AccessRequestRecord {
+  uid: string;
+  name: string;
+  email: string;
+  status: AccessRequestStatus;
+  requestedAt: number;
+  decidedAt: number | null;
+  decidedBy: string | null;
+}
+
+export type AccessAuditAction = 'approve' | 'reject' | 'revoke';
+
+export interface AccessAuditEntry {
+  action: AccessAuditAction;
+  adminUid: string;
+  targetUid: string;
+  /** לקריאה של היומן בלי לחפש את המשתמש. מהבקשה או מ-Firebase Auth */
+  targetEmail: string;
+  at: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,14 +168,43 @@ const fromStored = <T>(data: DocumentData | undefined): T | null => {
   return record as T;
 };
 
-const readAccessConfig = (data: DocumentData | undefined): AccessConfig => {
-  const allowed = data?.allowedUids;
+/**
+ * בקשות גישה ויומן המנהל: זמנים משלהם. לא דרך `TIME_FIELDS`, כדי שרשומות
+ * ה-OAuth הקיימות (grants, tokens) לא יקבלו שדות `null` חדשים בקריאה.
+ */
+const ACCESS_TIME_FIELDS = ['requestedAt', 'decidedAt', 'at'] as const;
+
+const toStoredAccess = (record: object): DocumentData => {
+  const data: DocumentData = { ...record };
+  for (const field of ACCESS_TIME_FIELDS) {
+    if (typeof data[field] === 'number') data[field] = Timestamp.fromMillis(data[field]);
+  }
+  return data;
+};
+
+const fromStoredRequest = (data: DocumentData | undefined): AccessRequestRecord | null => {
+  if (!data || typeof data.uid !== 'string') return null;
+  const millis = (value: unknown) => (value instanceof Timestamp ? value.toMillis() : null);
   return {
-    allowedUids: Array.isArray(allowed) ? allowed.filter((uid): uid is string => typeof uid === 'string' && uid !== '') : [],
-    // רק `true` ממש. מחרוזת 'true' או כל ערך אחר לא פותחים את הגישה
-    openToAll: data?.openToAll === true,
+    uid: data.uid,
+    name: typeof data.name === 'string' ? data.name : '',
+    email: typeof data.email === 'string' ? data.email : '',
+    status: ['pending', 'approved', 'rejected', 'revoked'].includes(data.status) ? data.status : 'pending',
+    requestedAt: millis(data.requestedAt) ?? 0,
+    decidedAt: millis(data.decidedAt),
+    decidedBy: typeof data.decidedBy === 'string' ? data.decidedBy : null,
   };
 };
+
+const uidList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((uid): uid is string => typeof uid === 'string' && uid !== '') : [];
+
+const readAccessConfig = (data: DocumentData | undefined): AccessConfig => ({
+  allowedUids: uidList(data?.allowedUids),
+  // רק `true` ממש. מחרוזת 'true' או כל ערך אחר לא פותחים את הגישה
+  openToAll: data?.openToAll === true,
+  adminUids: uidList(data?.adminUids),
+});
 
 // ---------------------------------------------------------------------------
 // transaction
@@ -218,6 +281,37 @@ export class OAuthTransaction {
   markClientUsed(clientId: string): void {
     this.#tx.update(this.#doc(COLLECTIONS.clients, clientId), { expiresAt: FieldValue.delete() });
   }
+
+  // --- בקשות גישה (v1.43.0) ---
+
+  async getAccessRequest(uid: string): Promise<AccessRequestRecord | null> {
+    return fromStoredRequest((await this.#tx.get(this.#doc(COLLECTIONS.accessRequests, uid))).data());
+  }
+
+  setAccessRequest(record: AccessRequestRecord): void {
+    this.#tx.set(this.#doc(COLLECTIONS.accessRequests, record.uid), toStoredAccess(record));
+  }
+
+  updateAccessRequest(uid: string, patch: Partial<AccessRequestRecord>): void {
+    this.#tx.update(this.#doc(COLLECTIONS.accessRequests, uid), toStoredAccess(patch));
+  }
+
+  /**
+   * הוספה ל-`allowedUids` בלבד: `arrayUnion` על השדה הזה, בלי לגעת ב-`openToAll`
+   * או ב-`adminUids`, ובלי לדרוס אישור מקביל של משתמש אחר.
+   */
+  allowUid(uid: string): void {
+    this.#tx.update(this.#db.doc(CONFIG_DOC), { allowedUids: FieldValue.arrayUnion(uid) });
+  }
+
+  /** הסרה מ-`allowedUids` בלבד (`arrayRemove`), כמו `allowUid` */
+  disallowUid(uid: string): void {
+    this.#tx.update(this.#db.doc(CONFIG_DOC), { allowedUids: FieldValue.arrayRemove(uid) });
+  }
+
+  addAccessAudit(entry: AccessAuditEntry): void {
+    this.#tx.create(this.#db.collection(COLLECTIONS.accessAudit).doc(), toStoredAccess(entry));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +363,40 @@ export class OAuthStore {
   /** "שימוש אחרון" לרשימת האפליקציות המחוברות. מחוץ ל-transaction: לא קריטי */
   async touchGrant(grantId: string, now: number): Promise<void> {
     await this.#db.collection(COLLECTIONS.grants).doc(grantId).update({ lastUsedAt: Timestamp.fromMillis(now) });
+  }
+
+  /** בקשות הגישה שממתינות, מהישנה לחדשה */
+  async listPendingAccessRequests(): Promise<AccessRequestRecord[]> {
+    const snapshot = await this.#db.collection(COLLECTIONS.accessRequests).where('status', '==', 'pending').get();
+    return snapshot.docs
+      .map((doc) => fromStoredRequest(doc.data()))
+      .filter((record): record is AccessRequestRecord => record !== null)
+      .sort((a, b) => a.requestedAt - b.requestedAt);
+  }
+
+  async getAccessRequest(uid: string): Promise<AccessRequestRecord | null> {
+    return fromStoredRequest((await this.#db.collection(COLLECTIONS.accessRequests).doc(uid).get()).data());
+  }
+
+  /**
+   * החיבורים של משתמש שעוד לא בוטלו. שאילתת שוויון אחת (`uid`) וסינון
+   * בזיכרון, בלי אינדקס מורכב. משתמש מחזיק חיבורים בודדים.
+   */
+  async listActiveGrantIds(uid: string): Promise<string[]> {
+    const snapshot = await this.#db.collection(COLLECTIONS.grants).where('uid', '==', uid).get();
+    return snapshot.docs.filter((doc) => doc.get('revoked') !== true).map((doc) => doc.id);
+  }
+
+  /** ה-tokens של התראות push של משתמש (`users/{uid}/fcmTokens`), עם הנתיב למחיקה */
+  async getPushTokens(uid: string): Promise<{ token: string; path: string }[]> {
+    const snapshot = await this.#db.collection('users').doc(uid).collection('fcmTokens').get();
+    return snapshot.docs
+      .map((doc) => ({ token: doc.get('token') as unknown, path: doc.ref.path }))
+      .filter((entry): entry is { token: string; path: string } => typeof entry.token === 'string' && entry.token !== '');
+  }
+
+  async deletePushToken(path: string): Promise<void> {
+    await this.#db.doc(path).delete();
   }
 
   /**

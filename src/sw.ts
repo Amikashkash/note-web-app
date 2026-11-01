@@ -161,12 +161,35 @@ const showReminderNotification = async (data: ReminderPushData): Promise<void> =
   }
 };
 
+/**
+ * בקשת גישה ל-Claude, למנהל (v1.43.0, `functions/src/oauth/accessPush.ts`).
+ * בלי `noteId`, ולכן גרסה ישנה של ה-SW מתעלמת ממנה. הקשה פותחת את מסך
+ * המנהל בהגדרות.
+ */
+const ACCESS_REQUEST_KIND = 'mcp_access_request';
+const ACCESS_REQUEST_URL = '/settings#claude-access';
+
+const showAccessRequestNotification = async (title: string, body: string): Promise<void> => {
+  try {
+    await self.registration.showNotification(title || 'בקשת גישה ל-Claude', {
+      body,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      // כמה בקשות ברצף: התראה אחת שמתעדכנת, לא ערימה
+      tag: 'mcp-access-request',
+      data: { kind: ACCESS_REQUEST_KIND },
+    } as NotificationOptions);
+  } catch (error) {
+    console.error('SW: Error showing access request notification:', error);
+  }
+};
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
   event.waitUntil(
     (async () => {
-      let payload: FcmPushEnvelope & Partial<ReminderPushData>;
+      let payload: FcmPushEnvelope & Partial<ReminderPushData> & { kind?: string };
 
       try {
         payload = event.data!.json();
@@ -177,7 +200,12 @@ self.addEventListener('push', (event) => {
 
       // FCM עוטף הודעות data-only ב-`{ data: {...} }`. הנפילה לאובייקט
       // עצמו מכסה שליחה ידנית בבדיקות, שבה אין מעטפת.
-      const data = payload.data ?? payload;
+      const data = (payload.data ?? payload) as Partial<ReminderPushData> & { kind?: string };
+
+      if (data.kind === ACCESS_REQUEST_KIND) {
+        await showAccessRequestNotification(data.title ?? '', data.body ?? '');
+        return;
+      }
 
       if (!data.noteId) {
         console.warn('SW: Push received without noteId, ignoring');
@@ -203,11 +231,14 @@ self.addEventListener('notificationclick', (event) => {
   // ועדיין מציגות "סגור". הבדיקה נשארת כדי שלחיצה עליהן לא תפתח את הפתק.
   if (event.action === 'close') return;
 
-  const data = event.notification.data as ReminderPushData | undefined;
+  const data = event.notification.data as (ReminderPushData & { kind?: string }) | undefined;
 
   // הפתק מועבר כפרמטר ולא כנתיב: אין מסלול ייעודי לפתק בודד, והוא נפתח
   // כחלונית בתוך תצוגת הקטגוריה. בלי קטגוריה אין לאן לנווט חוץ מהבית.
-  const targetPath = data?.categoryId
+  // בקשת גישה - קבוע, ולא מה-payload: ה-SW לא מנווט לכתובת שהגיעה מבחוץ
+  const targetPath = data?.kind === ACCESS_REQUEST_KIND
+    ? ACCESS_REQUEST_URL
+    : data?.categoryId
     ? `/category/${data.categoryId}` +
       (data.noteId ? `?note=${encodeURIComponent(data.noteId)}` : '')
     : '/';
