@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import {
   getDateStatus,
   formatDueLabel,
@@ -200,6 +201,12 @@ const SortableRow: React.FC<SortableRowProps> = ({ id, disabled, className, chil
   );
 };
 
+/**
+ * מעל האורך הזה הכפתורים של המשימה יורדים לשורה משלהם (v1.43.1). בערך 6-7
+ * מילים: מה שנכנס לשתי שורות ליד הכפתורים ברוחב של טלפון.
+ */
+const LONG_TASK_CHARS = 40;
+
 /** הודעות לקורא מסך, בעברית (ברירת המחדל של הספרייה באנגלית) */
 const DRAG_ACCESSIBILITY = {
   screenReaderInstructions: {
@@ -223,7 +230,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
   // ref ולא state: זו פעולת DOM בלבד ואינה משפיעה על מה שמוצג,
   // ולכן אין סיבה לגרור בגללה רינדור נוסף.
   const pendingFocusIdRef = useRef<string | null>(null);
-  const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const inputRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
   const { warning: notificationWarning, ensureEnabled } = useNotificationOptIn();
 
   // פענוח שנכשל אינו "רשימה ריקה" - ראה `templateContent.ts`
@@ -388,7 +395,10 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
       >
         {(handle) => (
           <>
-            <div className="flex items-center gap-3">
+            {/* `items-start`: משימה ארוכה נשברת לכמה שורות (v1.43.1), והתיבה
+                והאייקונים נשארים ליד השורה הראשונה ולא באמצע.
+                `flex-wrap`: במשימה ארוכה הכפתורים יורדים לשורה משלהם (ראו למטה) */}
+            <div className="flex flex-wrap items-start gap-3">
               {handle}
 
               {/* Checkbox */}
@@ -407,7 +417,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
               </button>
 
               {/* טקסט המשימה */}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 {readOnly ? (
                   <span
                     className={
@@ -419,19 +429,14 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                     {item.text}
                   </span>
                 ) : (
-                  <input
+                  // נשבר לשורות וגדל (v1.43.1). Enter - משימה חדשה, כמו קודם
+                  <AutoGrowTextarea
                     ref={(el) => {
                       inputRefs.current[item.id] = el;
                     }}
-                    type="text"
                     value={item.text}
-                    onChange={(e) => handleUpdateText(item.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleAddItem();
-                      }
-                    }}
+                    onChange={(text) => handleUpdateText(item.id, text)}
+                    onEnter={handleAddItem}
                     placeholder="הזן משימה..."
                     className={`w-full px-2 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
                       item.completed
@@ -442,6 +447,14 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                 )}
               </div>
 
+              {/* הכפתורים (תאריך, שעה, עדיפות, מחיקה) בקבוצה אחת. במשימה ארוכה היא
+                  יורדת לשורה משלה, בקצה: אחרת בטלפון, עם תאריך ושעה, לטקסט נשארו
+                  כ-100px והוא נשבר לעשרות שורות. משימה קצרה נשארת בשורה אחת, כמו קודם */}
+              <div
+                className={`flex items-center gap-3 ${
+                  item.text.length > LONG_TASK_CHARS ? 'basis-full justify-end' : 'flex-shrink-0'
+                }`}
+              >
               {/* תאריך */}
               {readOnly
                 ? item.dueDate && (
@@ -532,6 +545,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                   <Trash2 size={18} strokeWidth={1.75} />
                 </button>
               )}
+              </div>
             </div>
 
             {/* חזרה תקופתית - שורה שנייה, ורק כשיש תאריך ושעה.

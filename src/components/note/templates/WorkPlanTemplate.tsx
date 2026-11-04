@@ -10,6 +10,7 @@ import { EnhancedTextarea } from '@/components/common/EnhancedTextarea';
 import { FormattedText } from '@/components/common/FormattedText';
 import type { WorkPlanSection } from '@/types/template';
 import { parseWorkPlan } from '@/utils/templateContent';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import { withFirstRow } from '@/utils/firstRow';
 import { UnparseableContent } from './UnparseableContent';
 import { NoteLinks } from '@/components/note/NoteLinks/NoteLinks';
@@ -149,16 +150,11 @@ export const WorkPlanTemplate: React.FC<WorkPlanTemplateProps> = ({
           </div>
 
           {/* כותרת הסעיף */}
-          <input
-            type="text"
+          {/* נשבר לשורות וגדל (v1.43.1). Enter - סעיף חדש, כמו קודם */}
+          <AutoGrowTextarea
             value={section.header}
-            onChange={(e) => handleUpdateSection(section.id, 'header', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleAddSection();
-              }
-            }}
+            onChange={(header) => handleUpdateSection(section.id, 'header', header)}
+            onEnter={handleAddSection}
             placeholder="הזן כותרת סעיף..."
             className="w-full px-3 py-2 mb-2 text-lg font-bold border border-hairline-light dark:border-hairline-dark dark:bg-surface-dark dark:text-ink-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
             style={{ direction: 'rtl', textAlign: 'right' }}
