@@ -17,6 +17,7 @@ import { normalizeProductName } from '@/services/api/productMatching';
 
 import type { ShoppingItem } from '@/types/template';
 import { parseShopping } from '@/utils/templateContent';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { ShoppingItem };
@@ -273,10 +274,10 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
                   {item.name}
                 </span>
               ) : (
-                <input
-                  type="text"
+                // נשבר לשורות וגדל (v1.43.1)
+                <AutoGrowTextarea
                   value={item.name}
-                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                  onChange={(name) => updateItem(item.id, { name })}
                   placeholder="פריט..."
                   className={`flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand/40 rounded ${
                     item.checked

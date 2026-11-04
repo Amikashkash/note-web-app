@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import type { AccountingRow } from '@/types/template';
 import { parseAccounting } from '@/utils/templateContent';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { AccountingRow };
@@ -46,7 +47,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   // מזהה השורה שצריכה לקבל פוקוס אחרי הרינדור הבא.
   // ref ולא state: זו פעולת DOM בלבד ואינה משפיעה על מה שמוצג.
   const pendingFocusIdRef = useRef<string | null>(null);
-  const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const descriptionRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   // פענוח שנכשל אינו "טבלה ריקה". בגרסה קודמת JSON שאינו מערך (למשל
   // מתכון) הגיע כמו שהוא ל-`reduce` והפיל את כל המסך.
@@ -94,7 +95,7 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
   };
 
   /** Enter מוסיף תנועה חדשה, כדי לא לחייב סגירת מקלדת ולחיצה על הכפתור */
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleAddRow();
@@ -192,13 +193,13 @@ export const AccountingTemplate: React.FC<AccountingTemplateProps> = ({
                     {readOnly ? (
                       <span className="text-sm text-ink-light dark:text-ink-dark">{row.description}</span>
                     ) : (
-                      <input
-                        type="text"
+                      // נשבר לשורות וגדל (v1.43.1). Enter - שורה חדשה בטבלה, כמו קודם
+                      <AutoGrowTextarea
                         value={row.description}
                         ref={(element) => {
                           descriptionRefs.current[row.id] = element;
                         }}
-                        onChange={(e) => handleUpdateRow(row.id, 'description', e.target.value)}
+                        onChange={(text) => handleUpdateRow(row.id, 'description', text)}
                         onKeyDown={handleKeyDown}
                         placeholder="תיאור..."
                         className="w-full px-1 py-1 text-sm text-ink-light dark:text-ink-dark border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-brand/40 rounded"

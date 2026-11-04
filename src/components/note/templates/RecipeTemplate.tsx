@@ -7,6 +7,7 @@ import { X } from 'lucide-react';
 
 import type { RecipeData } from '@/types/template';
 import { EMPTY_RECIPE, parseRecipe } from '@/utils/templateContent';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import { UnparseableContent } from './UnparseableContent';
 
 export type { RecipeData };
@@ -127,12 +128,12 @@ export const RecipeTemplate: React.FC<RecipeTemplateProps> = ({
                 <span className="flex-1 text-sm text-ink-light dark:text-ink-dark">{ingredient || '-'}</span>
               ) : (
                 <>
-                  <input
-                    type="text"
+                  {/* נשבר לשורות וגדל (v1.43.1) */}
+                  <AutoGrowTextarea
                     value={ingredient}
-                    onChange={(e) => updateIngredient(index, e.target.value)}
+                    onChange={(text) => updateIngredient(index, text)}
                     placeholder="מרכיב..."
-                    className="flex-1 px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
+                    className="flex-1 min-w-0 px-3 py-2 text-sm border border-hairline-light dark:border-hairline-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                   {data.ingredients.length > 1 && (
                     <button
