@@ -183,3 +183,24 @@ describe('clientIp', () => {
     });
   });
 });
+
+describe('get_note on a work plan used as a log (v1.44.0)', () => {
+  const content = JSON.stringify([
+    { id: 't1', header: 'אקווריום 1', state: '2 זכרים, 5 נקבות', content: '10/11 העברה אחת', status: 'done', updatedAt: Date.UTC(2026, 10, 13) },
+    { id: 't2', header: 'אקווריום 2', content: 'יומן ישן בלי מצב' },
+  ]);
+
+  it('shows the state apart from the log, the update day, and the status only when status is on', () => {
+    const off = formatNote(note({ templateType: 'workplan', content }), 'בית');
+    expect(off).toContain('Section status: off');
+    expect(off).toContain('## אקווריום 1  (section id: t1)\nUpdated: 2026-11-13\nState and insights:\n2 זכרים, 5 נקבות\nLog:\n10/11 העברה אחת');
+    expect(off).not.toContain('Status: done');
+    // סעיף ישן: בדיוק כמו קודם - הכותרת והתוכן
+    expect(off).toContain('## אקווריום 2  (section id: t2)\nיומן ישן בלי מצב');
+
+    const on = formatNote(note({ templateType: 'workplan', content, workplanStatus: true }), 'בית');
+    expect(on).toContain('Section status: on');
+    expect(on).toContain('## אקווריום 1  (section id: t1)\nStatus: done');
+    expect(on).toContain('## אקווריום 2  (section id: t2)\nStatus: open');
+  });
+});

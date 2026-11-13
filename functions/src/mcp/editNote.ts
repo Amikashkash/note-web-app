@@ -15,6 +15,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { APP_TIME_ZONE } from '../timezone';
 import { InvalidError, ReadOnlyError } from '../notesCore/errors';
 import { TargetCategoryNotFoundError, type NoteEdit } from '../notesCore/store';
 import { validateTiming } from './dates';
@@ -25,6 +26,10 @@ type Row = Record<string, unknown>;
 
 export const EDIT_LIMITS = {
   itemText: 500,
+  /** רשומה אחת ביומן של סעיף: שורה אחת */
+  logEntry: 1_000,
+  /** "מצב ותובנות" של סעיף */
+  sectionState: 5_000,
   appendText: 10_000,
   replaceText: 20_000,
   sectionHeader: 200,
@@ -301,6 +306,19 @@ const findSection = (rows: Row[], sectionId: string): { index: number; withIds: 
   return { index: matches[0], withIds };
 };
 
+/**
+ * סעיף שהשתנה מקבל `updatedAt` (v1.44.0): ממנו האפליקציה מציגה "לפני כמה זמן".
+ * בלי `now` (בדיקות ישנות) - בלי חותמת.
+ */
+const touched = (row: Row, now?: Date): Row => (now ? { ...row, updatedAt: now.getTime() } : row);
+
+/** התאריך של רשומת יומן כמו שהמשתמש כותב: "13/11", לפי השעון של האפליקציה */
+export const logDate = (now: Date): string => {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: APP_TIME_ZONE, day: 'numeric', month: 'numeric' }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('day')}/${part('month')}`;
+};
+
 const sectionLabel = (row: Row): string => {
   const header = oneLine(String(row.header ?? ''));
   return header ? `"${header}"` : 'ללא כותרת';
@@ -326,7 +344,7 @@ const appendAfter = (existing: string, text: string): string =>
  * `append_text`: הוספה בסוף פתק טקסט, או בסוף התוכן של סעיף בתכנית עבודה.
  * אותו טקסט לאותו מקום בתוך 10 דקות לא נוסף פעמיים (retry אחרי timeout).
  */
-export const buildAppendEdit = (rawText: string, sectionId?: string): NoteEdit => {
+export const buildAppendEdit = (rawText: string, sectionId?: string, now?: Date): NoteEdit => {
   const text = cleanAddition(rawText);
 
   return {
@@ -339,7 +357,7 @@ export const buildAppendEdit = (rawText: string, sectionId?: string): NoteEdit =
         }
         const { index, withIds } = findSection(workplanSections(note.content, note.templateType), sectionId);
         const before = withIds[index];
-        const after = { ...before, content: appendAfter(String(before.content ?? ''), text) };
+        const after = touched({ ...before, content: appendAfter(String(before.content ?? ''), text) }, now);
         const content = JSON.stringify(withIds.map((row, position) => (position === index ? after : row)));
         if (content.length > EDIT_LIMITS.noteContent) throw tooLong();
         return {
@@ -400,7 +418,7 @@ export const buildAddSectionEdit = (input: AddSectionInput, now: Date): NoteEdit
         withIds = found.withIds;
         at = found.index + 1;
       }
-      const section = { id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`, header, content };
+      const section = { id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`, header, content, updatedAt: now.getTime() };
       const next = [...withIds.slice(0, at), section, ...withIds.slice(at)];
       const serialized = JSON.stringify(next);
       if (serialized.length > EDIT_LIMITS.noteContent) throw tooLong();
@@ -429,6 +447,133 @@ export const buildRemoveSectionEdit = (sectionId: string): NoteEdit => ({
   },
 });
 
+// ---------------------------------------------------------------------------
+// יומן, מצב, סדר וסטטוס (v1.44.0)
+// ---------------------------------------------------------------------------
+
+/** הסעיף אחרי השינוי במקומו, כמחרוזת, עם בדיקת גודל */
+const withSection = (withIds: Row[], index: number, after: Row): string => {
+  const content = JSON.stringify(withIds.map((row, position) => (position === index ? after : row)));
+  if (content.length > EDIT_LIMITS.noteContent) throw tooLong();
+  return content;
+};
+
+/**
+ * `add_workplan_log_entry`: שורה חדשה בסוף היומן של סעיף, עם התאריך של היום
+ * ("13/11 ניקוי מסנן") - כמו "+ רשומה היום" באפליקציה. הקיים לא משתנה.
+ */
+export const buildLogEntryEdit = (input: { sectionId: string; text: string }, now: Date): NoteEdit => {
+  const text = oneLine(input.text);
+  if (!text) throw new InvalidError('text is empty');
+  if (text.length > EDIT_LIMITS.logEntry) {
+    throw new InvalidError(`text is ${text.length} characters; a log entry is at most ${EDIT_LIMITS.logEntry}. Split it`);
+  }
+  const line = `${logDate(now)} ${text}`;
+
+  return {
+    action: 'workplan_section.log',
+    fingerprint: createHash('sha256').update(`log\n${input.sectionId}\n${line}`).digest('hex'),
+    apply: (note) => {
+      const { index, withIds } = findSection(workplanSections(note.content, note.templateType), input.sectionId);
+      const before = withIds[index];
+      const after = touched({ ...before, content: appendAfter(String(before.content ?? ''), line) }, now);
+      return {
+        content: withSection(withIds, index, after),
+        description: `נוספה רשומה ליומן של הסעיף ${sectionLabel(before)}`,
+        before: { sectionId: input.sectionId, contentLength: String(before.content ?? '').length },
+        after: { sectionId: input.sectionId, entry: line },
+      };
+    },
+  };
+};
+
+/**
+ * `set_workplan_section_state`: הטקסט של "מצב ותובנות" בסעיף, כולו. ריק -
+ * השדה יורד. אותו ערך - אין שינוי. הקודם נשמר בהיסטוריה וביומן הפעולות.
+ */
+export const buildSectionStateEdit = (input: { sectionId: string; state: string }, now: Date): NoteEdit => {
+  const state = input.state.replace(/\s+$/, '');
+  if (state.length > EDIT_LIMITS.sectionState) {
+    throw new InvalidError(`state is ${state.length} characters; the limit is ${EDIT_LIMITS.sectionState}`);
+  }
+
+  return {
+    action: 'workplan_section.state',
+    apply: (note) => {
+      const { index, withIds } = findSection(workplanSections(note.content, note.templateType), input.sectionId);
+      const before = withIds[index];
+      const previous = typeof before.state === 'string' ? before.state : '';
+      if (previous === state) return null;
+      const { state: _dropped, ...rest } = before;
+      const after = touched(state ? { ...rest, state } : rest, now);
+      return {
+        content: withSection(withIds, index, after),
+        description: `עודכנו המצב והתובנות של הסעיף ${sectionLabel(before)}`,
+        before: { sectionId: input.sectionId, state: previous },
+        after: { sectionId: input.sectionId, state },
+      };
+    },
+  };
+};
+
+/**
+ * `reorder_workplan_sections`: הסדר המלא של הסעיפים. כל מזהה בדיוק פעם אחת,
+ * כדי שסידור לא יוכל להשמיט סעיף. סדר לא משנה את `updatedAt` של אף סעיף.
+ */
+export const buildReorderSectionsEdit = (sectionIds: string[]): NoteEdit => ({
+  action: 'workplan.reorder',
+  apply: (note) => {
+    const rows = workplanSections(note.content, note.templateType);
+    const ids = rows.map(shownItemId);
+    const withIds = rows.map((row, position) => (row.id === ids[position] ? row : { ...row, id: ids[position] }));
+    const unique = new Set(sectionIds);
+    if (unique.size !== sectionIds.length || sectionIds.length !== ids.length || !ids.every((id) => unique.has(id))) {
+      throw new InvalidError(
+        `sectionIds must list every section id of this note exactly once (it has ${ids.length} sections). ` +
+          'Call get_note to see the current section ids'
+      );
+    }
+    if (sectionIds.every((id, position) => id === ids[position])) return null;
+    return {
+      content: JSON.stringify(sectionIds.map((id) => withIds[ids.indexOf(id)])),
+      description: `סודרו מחדש ${ids.length} סעיפים`,
+      before: { order: ids },
+      after: { order: sectionIds },
+    };
+  },
+});
+
+export type SectionStatusInput = 'open' | 'active' | 'done';
+
+const STATUS_HEBREW: Record<SectionStatusInput, string> = { open: 'פתוח', active: 'בעבודה', done: 'הושלם' };
+
+/**
+ * `set_workplan_section_status`: רק בתכנית שהמשתמש הדליק בה סטטוס לסעיפים
+ * (`workplanStatus`). בלי זה הסטטוס לא היה מוצג, וזה היה מצב נסתר.
+ */
+export const buildSectionStatusEdit = (input: { sectionId: string; status: SectionStatusInput }, now: Date): NoteEdit => ({
+  action: 'workplan_section.status',
+  apply: (note) => {
+    if (note.templateType === 'workplan' && note.workplanStatus !== true) {
+      throw new InvalidError(
+        'section status is turned off in this work plan, so it would not be shown. The user can turn it on at the bottom ' +
+          'of the note in the app ("סטטוס לכל סעיף"). Nothing was changed'
+      );
+    }
+    const { index, withIds } = findSection(workplanSections(note.content, note.templateType), input.sectionId);
+    const before = withIds[index];
+    const previous = typeof before.status === 'string' ? before.status : 'open';
+    if (previous === input.status) return null;
+    const after = touched({ ...before, status: input.status }, now);
+    return {
+      content: withSection(withIds, index, after),
+      description: `סטטוס הסעיף ${sectionLabel(before)}: ${STATUS_HEBREW[input.status]}`,
+      before: { sectionId: input.sectionId, status: previous },
+      after: { sectionId: input.sectionId, status: input.status },
+    };
+  },
+});
+
 export interface ReplaceInput {
   oldText: string;
   newText: string;
@@ -447,7 +592,7 @@ const whereLabel = (sectionId: string | undefined, field: 'header' | 'content') 
  * ההשוואה (סופי שורה, סימני כיוון, ניקוד, רווחים) ב-`textMatch.ts`.
  * `newText` ריק מוחק את הקטע.
  */
-export const buildReplaceEdit = (input: ReplaceInput): NoteEdit => {
+export const buildReplaceEdit = (input: ReplaceInput, now?: Date): NoteEdit => {
   const field = input.field ?? 'content';
   if (!input.oldText.trim()) throw new InvalidError('oldText is empty. Copy the exact text to replace from get_note');
   if (input.oldText.length > EDIT_LIMITS.replaceText || input.newText.length > EDIT_LIMITS.replaceText) {
@@ -486,7 +631,7 @@ export const buildReplaceEdit = (input: ReplaceInput): NoteEdit => {
         const original = String(before[field] ?? '');
         const replaced = replaceIn(original);
         if (replaced.text === original) return null;
-        const after = { ...before, [field]: replaced.text };
+        const after = touched({ ...before, [field]: replaced.text }, now);
         const content = JSON.stringify(withIds.map((row, position) => (position === index ? after : row)));
         if (content.length > EDIT_LIMITS.noteContent) throw tooLong();
         return {

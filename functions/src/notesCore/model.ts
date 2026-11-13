@@ -29,6 +29,8 @@ export interface NoteRecord {
   isReadOnly: boolean;
   /** `'mcp'` כשהפתק נוצר ע"י Claude */
   createdVia: 'mcp' | null;
+  /** תכנית עבודה: סטטוס לכל סעיף פעיל בפתק (v1.44.0). חסר = כבוי */
+  workplanStatus?: boolean;
   /** מונה גרסאות התוכן (C-1). כל כותב מעלה ב-1. חסר = 0 */
   revision: number;
   createdAt: string | null;

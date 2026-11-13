@@ -7,8 +7,12 @@ import { buildNote } from '../src/mcp/createNote';
 import {
   buildAddSectionEdit,
   buildAppendEdit,
+  buildLogEntryEdit,
   buildRemoveSectionEdit,
+  buildReorderSectionsEdit,
   buildReplaceEdit,
+  buildSectionStateEdit,
+  buildSectionStatusEdit,
 } from '../src/mcp/editNote';
 import { InvalidError } from '../src/notesCore/errors';
 import type { NoteRecord } from '../src/notesCore/model';
@@ -193,5 +197,83 @@ describe('remove_workplan_section', () => {
   it('old sections without ids are found by the item-<n> id get_note shows', () => {
     const old = [{ header: 'א', content: '' }, { header: 'ב', content: '' }];
     expect(rowsOf(buildRemoveSectionEdit('item-1').apply(record(old)))).toEqual([{ header: 'א', content: '', id: 'item-0' }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.44.0: יומן, מצב ותובנות, סדר, סטטוס
+// ---------------------------------------------------------------------------
+
+describe('work plan as a log (v1.44.0)', () => {
+  const tanks = [
+    { id: 't1', header: 'אקווריום 1', content: '2 זכרים, 5 נקבות\n10/11 העברה אחת', future: 'kept' },
+    { id: 't2', header: 'אקווריום 2', content: '', state: 'שקט', status: 'active', updatedAt: 1 },
+    { header: 'אקווריום 3', content: 'ישן בלי מזהה' },
+  ];
+  const at = new Date('2026-11-13T21:30:00Z'); // 23:30 בישראל - עדיין 13/11
+  const late = new Date('2026-11-13T22:30:00Z'); // 00:30 בישראל - כבר 14/11
+  const rowsOfOutcome = (outcome: { content?: string } | null) => JSON.parse(outcome?.content ?? 'null');
+
+  it('add_workplan_log_entry: a dated line at the end of the log, in Israel time, existing text untouched', () => {
+    const outcome = buildLogEntryEdit({ sectionId: 't1', text: '  ניקוי\n מסנן ' }, at).apply(record(tanks));
+    const rows = rowsOfOutcome(outcome);
+    expect(rows[0]).toEqual({ ...tanks[0], content: '2 זכרים, 5 נקבות\n10/11 העברה אחת\n13/11 ניקוי מסנן', updatedAt: at.getTime() });
+    expect(rows[1]).toEqual(tanks[1]);
+    expect(rowsOfOutcome(buildLogEntryEdit({ sectionId: 't1', text: 'x' }, late).apply(record(tanks)))[0].content).toMatch(/\n14\/11 x$/);
+  });
+
+  it('add_workplan_log_entry: the first entry of an empty log has no leading newline; empty or too long is refused', () => {
+    expect(rowsOfOutcome(buildLogEntryEdit({ sectionId: 't2', text: 'האכלה' }, at).apply(record(tanks)))[1].content).toBe('13/11 האכלה');
+    expect(() => buildLogEntryEdit({ sectionId: 't1', text: '  ' }, at)).toThrow('text is empty');
+    expect(() => buildLogEntryEdit({ sectionId: 't1', text: 'x'.repeat(1_001) }, at)).toThrow('a log entry is at most 1000');
+  });
+
+  it('add_workplan_log_entry: the same entry twice in a day has the same fingerprint (a retry is not added again)', () => {
+    expect(buildLogEntryEdit({ sectionId: 't1', text: 'a' }, at).fingerprint).toBe(buildLogEntryEdit({ sectionId: 't1', text: 'a ' }, at).fingerprint);
+    expect(buildLogEntryEdit({ sectionId: 't1', text: 'a' }, at).fingerprint).not.toBe(buildLogEntryEdit({ sectionId: 't2', text: 'a' }, at).fingerprint);
+  });
+
+  it('set_workplan_section_state: replaces the state, clears it when empty, and is a no-op when unchanged', () => {
+    const set = rowsOfOutcome(buildSectionStateEdit({ sectionId: 't1', state: '3 זכרים' }, at).apply(record(tanks)));
+    expect(set[0]).toEqual({ ...tanks[0], state: '3 זכרים', updatedAt: at.getTime() });
+    const cleared = rowsOfOutcome(buildSectionStateEdit({ sectionId: 't2', state: '' }, at).apply(record(tanks)));
+    expect(cleared[1]).not.toHaveProperty('state');
+    expect(buildSectionStateEdit({ sectionId: 't2', state: 'שקט  ' }, at).apply(record(tanks))).toBeNull();
+    expect(() => buildSectionStateEdit({ sectionId: 't1', state: 'x'.repeat(5_001) }, at)).toThrow('the limit is 5000');
+  });
+
+  it('reorder_workplan_sections: every id exactly once; keeps fields; persists the shown id; no updatedAt stamps', () => {
+    const rows = rowsOfOutcome(buildReorderSectionsEdit(['item-2', 't1', 't2']).apply(record(tanks)));
+    expect(rows.map((row: { id: string }) => row.id)).toEqual(['item-2', 't1', 't2']);
+    expect(rows[1]).toEqual(tanks[0]);
+    expect(rows[0]).toEqual({ ...tanks[2], id: 'item-2' });
+    expect(buildReorderSectionsEdit(['t1', 't2', 'item-2']).apply(record(tanks))).toBeNull();
+    for (const ids of [['t1', 't2'], ['t1', 't2', 't2'], ['t1', 't2', 'nope'], ['t1', 't2', 'item-2', 'x']]) {
+      expect(() => buildReorderSectionsEdit(ids).apply(record(tanks))).toThrow('every section id of this note exactly once');
+    }
+  });
+
+  it('set_workplan_section_status: refused while status is off in the note; with it on, sets and stamps', () => {
+    expect(() => buildSectionStatusEdit({ sectionId: 't1', status: 'done' }, at).apply(record(tanks))).toThrow(
+      'section status is turned off'
+    );
+    const on = { ...record(tanks), workplanStatus: true };
+    expect(rowsOfOutcome(buildSectionStatusEdit({ sectionId: 't1', status: 'done' }, at).apply(on))[0]).toEqual({
+      ...tanks[0],
+      status: 'done',
+      updatedAt: at.getTime(),
+    });
+    expect(buildSectionStatusEdit({ sectionId: 't2', status: 'active' }, at).apply(on)).toBeNull();
+    // סעיף בלי סטטוס הוא "פתוח"
+    expect(buildSectionStatusEdit({ sectionId: 'item-2', status: 'open' }, at).apply(on)).toBeNull();
+  });
+
+  it('the existing section edits stamp updatedAt when given the time, and keep unknown fields', () => {
+    const appended = rowsOfOutcome(buildAppendEdit('עוד', 't1', at).apply(record(tanks)));
+    expect(appended[0]).toMatchObject({ future: 'kept', updatedAt: at.getTime() });
+    const replaced = rowsOfOutcome(buildReplaceEdit({ oldText: 'אחת', newText: 'שתיים', sectionId: 't1' }, at).apply(record(tanks)));
+    expect(replaced[0]).toMatchObject({ future: 'kept', updatedAt: at.getTime(), content: '2 זכרים, 5 נקבות\n10/11 העברה שתיים' });
+    const added = rowsOfOutcome(buildAddSectionEdit({ header: 'אקווריום 4', content: '' }, at).apply(record(tanks)));
+    expect(added.at(-1)).toMatchObject({ header: 'אקווריום 4', updatedAt: at.getTime() });
   });
 });
