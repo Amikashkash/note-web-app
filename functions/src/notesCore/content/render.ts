@@ -84,7 +84,12 @@ const renderWorkPlan: Renderer = (parsed) => {
   return parsed
     .map((section) => {
       const header = singleLine(asText(section.header)) || 'סעיף';
-      return `#### ${header}\n\n${asText(section.content)}`;
+      // v1.44.0: מצב ותובנות וסטטוס, כשיש. סעיף ישן יוצא בדיוק כמו קודם
+      const state = asText(section.state).trim();
+      const status = ({ open: 'פתוח', active: 'בעבודה', done: 'הושלם' } as Record<string, string>)[asText(section.status)];
+      return [`#### ${header}${status ? ` (${status})` : ''}`, state ? `**מצב ותובנות:** ${state}` : null, asText(section.content)]
+        .filter((part) => part !== null)
+        .join('\n\n');
     })
     .join('\n\n');
 };

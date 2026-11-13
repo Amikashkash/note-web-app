@@ -82,6 +82,12 @@ const SAMPLES: Record<string, string> = {
     { id: 'w1', header: 'שלב א', content: 'לתכנן\nלבצע' },
     { id: 'w2', header: '', content: 'בלי כותרת' },
   ]),
+  // v1.44.0: מצב ותובנות, סטטוס וזמן עדכון; וגם ערכים שגויים שהמפענח מדלג עליהם
+  workplanWithState: json([
+    { id: 't1', header: 'אקווריום 1', state: '2 זכרים, 5 נקבות', content: '10/11 העברה אחת', status: 'active', updatedAt: 1763000000000 },
+    { id: 't2', header: 'אקווריום 2', state: '', content: 'ישן', status: 'maybe', updatedAt: -5 },
+    { id: 't3', header: 'אקווריום 3', state: 7, content: '', status: 'done', updatedAt: 'yesterday' },
+  ]),
   accounting: json([
     { id: 'a1', description: 'שכירות | דירה', amount: 4500, date: '2026-09-01' },
     { id: 'a2', description: 'ישן', amount: '120.5', date: '' },

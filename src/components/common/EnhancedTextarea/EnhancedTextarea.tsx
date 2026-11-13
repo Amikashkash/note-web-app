@@ -7,7 +7,7 @@
  * - טקסט נטוי (Ctrl+I)
  */
 
-import React, { useRef, KeyboardEvent } from 'react';
+import React, { forwardRef, useImperativeHandle, useLayoutEffect, useRef, KeyboardEvent } from 'react';
 import { logger } from '@/utils/logger';
 
 interface EnhancedTextareaProps {
@@ -22,9 +22,27 @@ interface EnhancedTextareaProps {
    * (`NoteTips`, v1.42.0). בטופס פתק חדש ובדף השיתוף הם נשארים.
    */
   hints?: boolean;
+  /**
+   * שורת הכפתורים (הדבקה, מודגש, נטוי). בגיליון של סעיף בתכנית עבודה היא
+   * כבויה, והפעולות זמינות בתפריט דרך ה-ref (v1.44.0).
+   */
+  toolbar?: boolean;
+  /** גדל לגובה הטקסט, בלי פס גלילה פנימי. `rows` הוא הגובה ההתחלתי */
+  autoGrow?: boolean;
+  onFocus?: () => void;
+  'aria-label'?: string;
 }
 
-export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
+/** פעולות העיצוב, לתפריט חיצוני (`toolbar={false}`) */
+export interface EnhancedTextareaHandle {
+  bold: () => void;
+  italic: () => void;
+  paste: () => Promise<void>;
+  /** פוקוס, והסמן במקום נתון (למשל אחרי "+ רשומה היום") */
+  focusAt: (position: number) => void;
+}
+
+export const EnhancedTextarea = forwardRef<EnhancedTextareaHandle, EnhancedTextareaProps>(({
   value,
   onChange,
   placeholder = 'התחל לכתוב...',
@@ -32,8 +50,21 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
   disabled = false,
   rows = 10,
   hints = true,
-}) => {
+  toolbar = true,
+  autoGrow = false,
+  onFocus,
+  'aria-label': ariaLabel,
+}, ref) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // גובה לפי התוכן, לפני הציור (בלי הבהוב)
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!autoGrow || !textarea) return;
+    textarea.style.height = 'auto';
+    // `scrollHeight` בלי המסגרת; ב-border-box הגובה כולל אותה
+    textarea.style.height = `${textarea.scrollHeight + textarea.offsetHeight - textarea.clientHeight}px`;
+  }, [autoGrow, value]);
 
   /**
    * נרמול מספור - מתקן את המספרים ברשימה ממוספרת
@@ -256,9 +287,22 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
     </button>
   );
 
+  useImperativeHandle(ref, () => ({
+    bold: () => insertFormatting('**', '**'),
+    italic: () => insertFormatting('*', '*'),
+    paste: handlePaste,
+    focusAt: (position: number) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(position, position);
+    },
+  }));
+
   return (
     <div className="w-full">
       {/* סרגל כלים */}
+      {toolbar && (
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2 pb-2 border-b border-hairline-light dark:border-hairline-dark">
         <div className="flex gap-2 flex-wrap">
           <FormatButton
@@ -286,6 +330,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
           </>
         )}
       </div>
+      )}
 
       {/* Textarea */}
       <textarea
@@ -293,6 +338,8 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
+        onFocus={onFocus}
+        aria-label={ariaLabel}
         placeholder={placeholder}
         disabled={disabled}
         rows={rows}
@@ -302,7 +349,7 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
           bg-surface-light dark:bg-surface-dark text-ink-light dark:text-ink-dark
           focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
           disabled:bg-raised-light dark:bg-raised-dark dark:disabled:bg-raised-dark disabled:cursor-not-allowed
-          resize-y
+          ${autoGrow ? 'resize-none overflow-hidden' : 'resize-y'}
           font-sans
           ${className}
         `}
@@ -319,4 +366,6 @@ export const EnhancedTextarea: React.FC<EnhancedTextareaProps> = ({
       )}
     </div>
   );
-};
+});
+
+EnhancedTextarea.displayName = 'EnhancedTextarea';

@@ -40,6 +40,10 @@ export const Modal: React.FC<ModalProps> = ({ onClose, title, children }) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && openModals[openModals.length - 1] === modalId) {
+        // אותה הקשה לא מגיעה לחלונית שמתחת. בלי זה: React מרנדר בין שני
+        // המאזינים (microtask), החלונית העליונה כבר יצאה מהמחסנית, וזו שמתחת
+        // "הופכת לעליונה" ונסגרת גם היא (נמצא בגיליון הסעיף, v1.44.0)
+        e.stopImmediatePropagation();
         onClose();
       }
     };

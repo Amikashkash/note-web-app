@@ -21,11 +21,25 @@ export interface AccountingRow {
   date: string;
 }
 
-/** סעיף בתכנית עבודה */
+/** סטטוס של סעיף (v1.44.0). מוצג רק כשהמעקב פעיל בפתק (`workplanStatus`) */
+export type SectionStatus = 'open' | 'active' | 'done';
+
+/**
+ * סעיף בתכנית עבודה.
+ *
+ * v1.44.0 - שדות אופציונליים, בלי מיגרציה: סעיף ישן (`id`, `header`,
+ * `content`) נשאר כמו שהוא, והתוכן הקיים שלו הוא היומן.
+ */
 export interface WorkPlanSection {
   id: string;
   header: string;
+  /** היומן: שורות מתוארכות ("10/11 העברה אחת") וכל טקסט חופשי */
   content: string;
+  /** "מצב ותובנות": המצב הקבוע ("2 זכרים, 5 נקבות"), מוצמד מעל היומן */
+  state?: string;
+  status?: SectionStatus;
+  /** מתי הסעיף השתנה לאחרונה (מילישניות). "לפני כמה זמן" - מכאן, לא מפענוח תאריכים בטקסט */
+  updatedAt?: number;
 }
 
 /** מרווחי חזרה נתמכים לתזכורת. חסר = תזכורת חד-פעמית. */

@@ -106,6 +106,9 @@ const reportable = (fields: string[]): string[] => [
 // פריט אחד, לפי שדה
 // ---------------------------------------------------------------------------
 
+/** זמנים שנלקחים מהצד המאוחר ולא מתנגשים (ראו `mergeItem`) */
+const LATEST_WINS = ['updatedAt'];
+
 /** שדות התזמון של משימה: נקבעים יחד, ולכן ממוזגים כיחידה אחת */
 const SCHEDULE_FIELDS = ['dueDate', 'dueTime', 'repeat', 'repeatBase'];
 
@@ -130,7 +133,11 @@ export type ItemMerge = { item: Row } | { conflict: MergeConflict };
  *   היה מקדם **שוב**, ומדלג על מופע. לכן: בחירה. איפוס שמגיע כשהצד השני
  *   שינה רק טקסט או עדיפות - ממוזג, כרגיל.
  * - כל השאר עצמאי: `text`, `priority`, `completed` של משימה רגילה; `name`,
- *   `quantity`, `checked`; `header`, `content`; `description`, `amount`, `date`.
+ *   `quantity`, `checked`; `header`, `content`, `state`, `status`; `description`,
+ *   `amount`, `date`.
+ * - **`updatedAt` של סעיף** (v1.44.0) לא מתנגש לעולם: המאוחר מבין השניים.
+ *   שני מכשירים שערכו שדות שונים באותו סעיף (מצב ויומן) מחתימים שניהם זמן,
+ *   וזו לא סיבה לשאול את המשתמש.
  *
  * סדר המפתחות: של השרת, ואחריו שדות שנוספו בצד המקומי.
  */
@@ -144,6 +151,12 @@ export const mergeItem = (base: Row, local: Row, remote: Row): ItemMerge => {
 
   const merged: Row = {};
   for (const unit of units) {
+    if (unit.length === 1 && LATEST_WINS.includes(unit[0])) {
+      const key = unit[0];
+      const times = [local[key], remote[key], base[key]].filter((value): value is number => typeof value === 'number');
+      if (times.length > 0) merged[key] = Math.max(...times);
+      continue;
+    }
     const localChanged = unit.filter((key) => !equal(local[key], base[key]));
     const remoteChanged = unit.filter((key) => !equal(remote[key], base[key]));
     const bothChanged = localChanged.length > 0 && remoteChanged.length > 0;

@@ -46,7 +46,9 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowTextarea
       const element = innerRef.current;
       if (!element) return;
       element.style.height = 'auto';
-      element.style.height = `${element.scrollHeight}px`;
+      // `scrollHeight` בלי המסגרת; ב-border-box הגובה כולל אותה. בלי התוספת,
+      // שדה עם מסגרת (מרכיב במתכון) נגלל ב-2px
+      element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
     }, []);
 
     // לפני הציור: בלי הבהוב של שורה אחת שקופצת לגובה המלא
