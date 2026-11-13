@@ -282,3 +282,30 @@ describe('mergeNote: conflict reasons outside items', () => {
     });
   });
 });
+
+describe('work plan sections (v1.44.0): state, log, status, updatedAt', () => {
+  const note = (sections: object[]) => ({ title: 'אקווריומים', content: JSON.stringify(sections) });
+  const base = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה', updatedAt: 100 }]);
+
+  it('one device edits the state, the other adds a log line: both kept, the later time wins, no conflict', () => {
+    const local = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה', state: '2 זכרים', updatedAt: 300 }]);
+    const remote = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה\n13/11 ניקוי', updatedAt: 200 }]);
+    const result = mergeNote(base, local, remote, 'workplan');
+    expect('merged' in result && JSON.parse(result.merged.content)).toEqual([
+      { id: 'a', header: 'טנק 1', content: '10/11 העברה\n13/11 ניקוי', updatedAt: 300, state: '2 זכרים' },
+    ]);
+  });
+
+  it('the same state edited differently on both sides is still a conflict', () => {
+    const local = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה', state: 'א', updatedAt: 300 }]);
+    const remote = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה', state: 'ב', updatedAt: 200 }]);
+    expect(mergeNote(base, local, remote, 'workplan')).toEqual({ conflict: { reason: 'same-field', fields: ['other'] } });
+  });
+
+  it('a status set on one side and a log line on the other merge', () => {
+    const local = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה', status: 'done', updatedAt: 150 }]);
+    const remote = note([{ id: 'a', header: 'טנק 1', content: '10/11 העברה\nעוד', updatedAt: 400 }]);
+    const result = mergeNote(base, local, remote, 'workplan');
+    expect('merged' in result && JSON.parse(result.merged.content)[0]).toMatchObject({ status: 'done', content: '10/11 העברה\nעוד', updatedAt: 400 });
+  });
+});

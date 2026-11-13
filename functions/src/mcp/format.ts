@@ -176,18 +176,31 @@ export interface FormatNoteOptions {
   includeDone?: boolean;
 }
 
+const SECTION_STATUS_LABELS: Record<string, string> = { open: 'open', active: 'active (in progress)', done: 'done' };
+
 /**
  * תכנית עבודה עם המזהה של כל סעיף - מה שכלי העריכה של תכניות עבודה צריכים.
  * הכותרת והתוכן מוצגים כפי שהם שמורים, כדי ש-`edit_note_text` יוכל להעתיק מהם.
+ *
+ * v1.44.0: סעיף עם "מצב ותובנות" מציג אותו בנפרד מהיומן (`content`). סטטוס -
+ * רק כשהוא פעיל בפתק. "Updated" - מתי הסעיף השתנה (`updatedAt`), כשידוע.
  */
-const workplanWithIds = (content: string): string | null => {
+const workplanWithIds = (content: string, statusOn: boolean): string | null => {
   const rows = checklistRows(content);
   if (!rows || rows.length === 0) return null;
   return rows
     .map((row, index) => {
       const header = String(row.header ?? '');
-      const body = String(row.content ?? '');
-      return `## ${header || '(no header)'}  (section id: ${shownItemId(row, index)})${body ? `\n${body}` : ''}`;
+      const log = String(row.content ?? '');
+      const state = typeof row.state === 'string' ? row.state.trim() : '';
+      const status = typeof row.status === 'string' && row.status in SECTION_STATUS_LABELS ? row.status : 'open';
+      const updated = typeof row.updatedAt === 'number' && row.updatedAt > 0 ? day(new Date(row.updatedAt).toISOString()) : null;
+      const lines = [`## ${header || '(no header)'}  (section id: ${shownItemId(row, index)})`];
+      if (statusOn) lines.push(`Status: ${SECTION_STATUS_LABELS[status]}`);
+      if (updated) lines.push(`Updated: ${updated}`);
+      if (state) lines.push(`State and insights:\n${state}`);
+      if (log) lines.push(state ? `Log:\n${log}` : log);
+      return lines.join('\n');
     })
     .join('\n\n');
 };
@@ -200,7 +213,7 @@ export const formatNote = (note: Note, categoryName: string, options: FormatNote
   const text = !note.content.trim()
     ? '(this note is empty)'
     : checklist?.text ||
-      (note.templateType === 'workplan' && workplanWithIds(note.content)) ||
+      (note.templateType === 'workplan' && workplanWithIds(note.content, note.workplanStatus === true)) ||
       parseContent(note.templateType, note.content).text;
   const hiddenDone = checklist?.hiddenDone ?? 0;
 
@@ -212,6 +225,7 @@ export const formatNote = (note: Note, categoryName: string, options: FormatNote
     note.tags.length > 0 ? `Tags: ${note.tags.join(', ')}` : null,
     `Created: ${day(note.createdAt)} · Updated: ${day(note.updatedAt)}`,
     note.isPinned ? 'Pinned: yes' : null,
+    note.templateType === 'workplan' ? `Section status: ${note.workplanStatus === true ? 'on' : 'off'}` : null,
     note.isArchived ? 'Archived: yes' : null,
     note.isReadOnly ? 'Read-only for Claude: yes - the user does not want Claude to change this note' : null,
     note.createdVia === 'mcp' ? 'Created by: Claude' : null,

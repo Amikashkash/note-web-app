@@ -64,6 +64,7 @@ export const toNote = (snapshot: AnySnapshot): Note => {
     isSensitive: asBoolean(data.isSensitive),
     isReadOnly: asBoolean(data.isReadOnly),
     createdVia: data.createdVia === 'mcp' ? 'mcp' : undefined,
+    workplanStatus: data.workplanStatus === true ? true : undefined,
     archivedAt: asOptionalTimestamp(data.archivedAt) ?? undefined,
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
     revision: asNumber(data.revision),

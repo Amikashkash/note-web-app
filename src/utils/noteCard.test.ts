@@ -73,3 +73,17 @@ describe('cardPreview', () => {
     expect(cardPreview(workplan)).toContain('שלב 1');
   });
 });
+
+describe('listProgress: a work plan with section status (v1.44.0)', () => {
+  const plan = JSON.stringify([
+    { id: 'a', header: 'א', content: '', status: 'done' },
+    { id: 'b', header: 'ב', content: '', status: 'active' },
+    { id: 'c', header: 'ג', content: '' },
+  ]);
+
+  it('counts done sections, only when the note has status on', () => {
+    expect(listProgress({ templateType: 'workplan', content: plan, workplanStatus: true })).toEqual({ done: 1, total: 3 });
+    expect(listProgress({ templateType: 'workplan', content: plan })).toBeNull();
+    expect(listProgress({ templateType: 'workplan', content: '[]', workplanStatus: true })).toBeNull();
+  });
+});

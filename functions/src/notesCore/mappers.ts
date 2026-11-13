@@ -57,6 +57,8 @@ export const toNoteRecord = (id: string, data: Data): NoteRecord => {
     // אותו fail-closed: ערך שאינו בוליאני נחשב קריאה בלבד
     isReadOnly: data.isReadOnly === undefined ? false : data.isReadOnly !== false,
     createdVia: data.createdVia === 'mcp' ? 'mcp' : null,
+    // רק `true` ממש מדליק: ערך אחר לא פותח לכלים את `set_workplan_section_status`
+    workplanStatus: data.workplanStatus === true,
     revision: asNumber(data.revision),
     createdAt,
     updatedAt: asIsoDate(data.updatedAt) ?? createdAt,

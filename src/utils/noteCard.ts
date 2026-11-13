@@ -4,11 +4,14 @@
  */
 
 import { getNotePreview } from './notePreview';
-import { parseChecklist, parseShopping } from './templateContent';
+import { parseChecklist, parseShopping, parseWorkPlan } from './templateContent';
+import { sectionProgress } from './workplan';
 
 interface CardSource {
   content: string;
   templateType: string;
+  /** תכנית עבודה עם סטטוס לסעיפים: התג הוא סעיפים שהושלמו */
+  workplanStatus?: boolean;
 }
 
 /** כמה תווים לכל היותר נכנסים לתקציר. שתי שורות בכרטיס ברוחב מלא */
@@ -37,6 +40,11 @@ const listItems = (note: CardSource): { text: string; done: boolean }[] | null =
 
 /** "3/8": כמה בוצעו מתוך כמה. `null` לפתק שאינו רשימה, או לרשימה ריקה */
 export const listProgress = (note: CardSource): { done: number; total: number } | null => {
+  if (note.templateType === 'workplan') {
+    if (!note.workplanStatus) return null;
+    const sections = parseWorkPlan(note.content);
+    return sections.ok && sections.value.length > 0 ? sectionProgress(sections.value) : null;
+  }
   const items = listItems(note)?.filter((item) => item.text.trim() !== '');
   if (!items || items.length === 0) return null;
   return { done: items.filter((item) => item.done).length, total: items.length };

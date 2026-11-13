@@ -102,11 +102,20 @@ export const parseShopping = (value: string): ParseResult<ShoppingItem[]> =>
     checked: item.checked === true,
   }));
 
+const SECTION_STATUSES = new Set<string>(['open', 'active', 'done']);
+
+// השדות של v1.44.0 נכנסים רק כשהם קיימים ותקינים, כדי שסעיף ישן ייצא
+// בדיוק כמו שהיה (בלי `state: ''` שלא נכתב מעולם)
 export const parseWorkPlan = (value: string): ParseResult<WorkPlanSection[]> =>
   mapRows(value, (section, index) => ({
     id: rowId(section, index),
     header: asText(section.header),
     content: asText(section.content),
+    ...(typeof section.state === 'string' && { state: section.state }),
+    ...(SECTION_STATUSES.has(asText(section.status)) && { status: section.status as WorkPlanSection['status'] }),
+    ...(typeof section.updatedAt === 'number' &&
+      Number.isFinite(section.updatedAt) &&
+      section.updatedAt > 0 && { updatedAt: section.updatedAt }),
   }));
 
 // סכום שנשמר כמחרוזת בגרסאות ישנות היה משורשר ליתרה במקום להתחבר אליה
@@ -211,7 +220,9 @@ const contentToLines = (content: string, from: TemplateType): string[] | null =>
     case 'workplan': {
       const sections = parseWorkPlan(content);
       return sections.ok
-        ? sections.value.flatMap((section) => textToLines(`${section.header}\n${section.content}`))
+        ? sections.value.flatMap((section) =>
+            textToLines([section.header, section.state ?? '', section.content].filter(Boolean).join('\n'))
+          )
         : textToLines(content);
     }
     case 'plain':

@@ -82,6 +82,7 @@ const note = (userId: string, categoryId: string, extra: DocumentData = {}) => (
   updatedAt: AT,
   updatedBy: userId,
   revision: 7,
+  workplanStatus: true,
   ...extra,
 });
 
@@ -241,9 +242,10 @@ describe('a work plan from start to finish', () => {
       expect((await auditFor(noteId)).map((entry) => entry.action)).toContain(action);
     }
 
+    // v1.44.0: כל סעיף ש-Claude שינה מקבל `updatedAt`
     expect(await sections(noteId)).toEqual([
-      { id: 's2', header: 'בעלי מקצוע', content: 'לבקש 3 הצעות\nקבלן רביעי המליצו עליו' },
-      expect.objectContaining({ header: 'לוח זמנים', content: 'לסיים עד חנוכה' }),
+      { id: 's2', header: 'בעלי מקצוע', content: 'לבקש 3 הצעות\nקבלן רביעי המליצו עליו', updatedAt: expect.any(Number) },
+      expect.objectContaining({ header: 'לוח זמנים', content: 'לסיים עד חנוכה', updatedAt: expect.any(Number) }),
     ]);
 
     // גרסה לכל עריכה - כל אחת מהן ניתנת לשחזור, לא רק המצב שלפני הראשונה
@@ -257,7 +259,10 @@ describe('a work plan from start to finish', () => {
 
     // audit עם לפני ואחרי של החלק שהשתנה
     const removal = (await auditFor(noteId)).find((entry) => entry.action === 'workplan_section.remove');
-    expect(removal?.changes).toEqual({ before: { id: 's1', header: 'תקציב', content: 'עד 45,000 ש״ח' }, after: null });
+    expect(removal?.changes).toEqual({
+      before: { id: 's1', header: 'תקציב', content: 'עד 45,000 ש״ח', updatedAt: expect.any(Number) },
+      after: null,
+    });
   });
 
   it('add_workplan_section can place the section right after another one', async () => {
@@ -318,6 +323,11 @@ describe('what the new tools refuse', () => {
     ['append_text', { noteId, sectionId: 's1', text: 'x' }],
     ['edit_note_text', { noteId, sectionId: 's1', oldText: 'תקציב', newText: 'x', field: 'header' }],
     ['remove_workplan_section', { noteId, sectionId: 's1' }],
+    // v1.44.0 - אותן הגנות בדיוק
+    ['add_workplan_log_entry', { noteId, sectionId: 's1', text: 'x' }],
+    ['set_workplan_section_state', { noteId, sectionId: 's1', state: 'x' }],
+    ['reorder_workplan_sections', { noteId, sectionIds: ['s2', 's1'] }],
+    ['set_workplan_section_status', { noteId, sectionId: 's1', status: 'done' }],
   ] as const;
 
   const expectAll = async (noteId: string, check: (result: { text: string; isError: boolean }) => void) => {
@@ -358,6 +368,73 @@ describe('what the new tools refuse', () => {
   it("a note another user shared with the user: owner only", async () => {
     const noteId = await seed(note(users.b, C.bOwn, { sharedWith: [users.a] }));
     await expectAll(noteId, (result) => expect(result.text).toContain("only the user's own notes"));
+  });
+});
+
+describe('the work plan as a log (v1.44.0)', () => {
+  const tanks = [
+    { id: 't1', header: 'אקווריום 1', content: '2 זכרים, 5 נקבות\n10/11 העברה אחת', future: 'kept' },
+    { id: 't2', header: 'אקווריום 2', content: '' },
+  ];
+
+  it('log entry, state, status and reorder: each one bumps the revision, is audited, and gets a version as Claude', async () => {
+    const noteId = await seed(note(users.a, C.home, { content: JSON.stringify(tanks) }));
+    const steps: Array<[string, Record<string, unknown>, string]> = [
+      ['add_workplan_log_entry', { sectionId: 't1', text: 'ניקוי מסנן' }, 'workplan_section.log'],
+      ['set_workplan_section_state', { sectionId: 't1', state: '2 זכרים, 4 נקבות' }, 'workplan_section.state'],
+      ['set_workplan_section_status', { sectionId: 't2', status: 'active' }, 'workplan_section.status'],
+      ['reorder_workplan_sections', { sectionIds: ['t2', 't1'] }, 'workplan.reorder'],
+    ];
+    for (const [index, [tool, args, action]] of steps.entries()) {
+      const before = await stored(noteId);
+      const result = await call(clientA, tool, { noteId, ...args });
+      expect({ tool, isError: result.isError, text: result.text }).toEqual({ tool, isError: false, text: expect.stringContaining('history') });
+      const after = await stored(noteId);
+      expect(after.revision).toBe(7 + index + 1);
+      await trigger(noteId, before);
+      expect((await auditFor(noteId)).map((entry) => entry.action)).toContain(action);
+    }
+
+    const [first, second] = await sections(noteId);
+    expect(first).toEqual({ id: 't2', header: 'אקווריום 2', content: '', status: 'active', updatedAt: expect.any(Number) });
+    expect(second).toEqual({
+      id: 't1',
+      header: 'אקווריום 1',
+      content: expect.stringMatching(/^2 זכרים, 5 נקבות\n10\/11 העברה אחת\n\d{1,2}\/\d{1,2} ניקוי מסנן$/),
+      state: '2 זכרים, 4 נקבות',
+      future: 'kept',
+      updatedAt: expect.any(Number),
+    });
+    const versions = await versionsOf(noteId);
+    expect(versions).toHaveLength(steps.length);
+    expect(JSON.parse(versions[0].content as string)).toEqual(tanks);
+
+    // get_note מציג את המצב בנפרד מהיומן, ואת הסטטוס
+    const shown = (await call(clientA, 'get_note', { noteId })).text;
+    expect(shown).toContain('Section status: on');
+    expect(shown).toContain('State and insights:\n2 זכרים, 4 נקבות\nLog:\n2 זכרים, 5 נקבות');
+  });
+
+  it('status is refused while it is off in the note, and nothing changes', async () => {
+    const noteId = await seed(note(users.a, C.home, { content: JSON.stringify(tanks), workplanStatus: false }));
+    const result = await call(clientA, 'set_workplan_section_status', { noteId, sectionId: 't1', status: 'done' });
+    expect(result).toEqual({ isError: true, text: expect.stringContaining('section status is turned off') });
+    expect(await stored(noteId)).toMatchObject({ revision: 7, content: JSON.stringify(tanks) });
+  });
+
+  it('a reorder that would drop a section is refused', async () => {
+    const noteId = await seed(note(users.a, C.home, { content: JSON.stringify(tanks) }));
+    const result = await call(clientA, 'reorder_workplan_sections', { noteId, sectionIds: ['t2'] });
+    expect(result).toEqual({ isError: true, text: expect.stringContaining('exactly once') });
+    expect(await sections(noteId)).toEqual(tanks);
+  });
+
+  it('the same log entry sent twice (a retry) is added once', async () => {
+    const noteId = await seed(note(users.a, C.home, { content: JSON.stringify(tanks) }));
+    await call(clientA, 'add_workplan_log_entry', { noteId, sectionId: 't2', text: 'האכלה' });
+    const again = await call(clientA, 'add_workplan_log_entry', { noteId, sectionId: 't2', text: 'האכלה' });
+    expect(again.text).toContain('already added');
+    expect((await sections(noteId))[1].content).toMatch(/^\d{1,2}\/\d{1,2} האכלה$/);
   });
 });
 

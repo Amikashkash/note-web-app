@@ -345,10 +345,11 @@ describe('the /mcp endpoint', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'notes-4-me' } } });
   });
 
-  it('lists the four read tools and the twelve write tools, each with a description', async () => {
+  it('lists the four read tools and the sixteen write tools, each with a description', async () => {
     const { tools } = await clientA.listTools();
     const writeTools = [
       'add_checklist_items',
+      'add_workplan_log_entry',
       'add_workplan_section',
       'append_text',
       'archive_note',
@@ -357,6 +358,9 @@ describe('the /mcp endpoint', () => {
       'move_note_to_category',
       'remove_checklist_item',
       'remove_workplan_section',
+      'reorder_workplan_sections',
+      'set_workplan_section_state',
+      'set_workplan_section_status',
       'unarchive_note',
       'update_checklist_item',
       'update_checklist_items',
@@ -365,8 +369,11 @@ describe('the /mcp endpoint', () => {
       [...writeTools, 'get_note', 'list_categories', 'list_notes', 'search_notes'].sort()
     );
     for (const tool of tools) {
-      // מחליף או מסיר טקסט - מסומן destructive, כדי שהלקוח יוכל לבקש אישור
-      const destructive = ['edit_note_text', 'remove_workplan_section', 'remove_checklist_item'].includes(tool.name);
+      // מחליף או מסיר טקסט - מסומן destructive, כדי שהלקוח יוכל לבקש אישור. גם
+      // `set_workplan_section_state`: מחליף את כל הטקסט של המצב (v1.44.0)
+      const destructive = ['edit_note_text', 'remove_workplan_section', 'remove_checklist_item', 'set_workplan_section_state'].includes(
+        tool.name
+      );
       expect(tool.annotations).toMatchObject({ readOnlyHint: !writeTools.includes(tool.name), destructiveHint: destructive });
       expect(tool.description?.length).toBeGreaterThan(150);
     }

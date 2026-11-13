@@ -39,6 +39,12 @@ export interface Note {
   isReadOnly: boolean;
   /** `'mcp'` - הפתק נוצר ע"י Claude. נקבע רק בשרת; ה-rules חוסמים כתיבה שלו מהאפליקציה */
   createdVia?: 'mcp';
+  /**
+   * תכנית עבודה: סטטוס לכל סעיף (פתוח / בעבודה / הושלם) ותג התקדמות (v1.44.0).
+   * כבוי כברירת מחדל, לכל פתק. שדה של הפתק ולא של התוכן, כמו `isPinned`: לא
+   * תוכן, לא נכנס להיסטוריה, ולא דורש `revision`.
+   */
+  workplanStatus?: boolean;
   archivedAt?: Timestamp;
   /** מי כתב אחרון. נקבע ע"י שכבת השמירה ונאכף ב-rules; חסר בפתקים ישנים */
   updatedBy?: string;

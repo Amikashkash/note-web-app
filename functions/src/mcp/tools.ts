@@ -38,8 +38,12 @@ import {
   buildChecklistItemsEdit,
   buildMoveEdit,
   buildRemoveChecklistItemEdit,
+  buildLogEntryEdit,
   buildRemoveSectionEdit,
+  buildReorderSectionsEdit,
   buildReplaceEdit,
+  buildSectionStateEdit,
+  buildSectionStatusEdit,
   buildUnarchiveEdit,
   EDIT_LIMITS,
   MAX_BATCH_UPDATES,
@@ -604,7 +608,7 @@ const appendText = defineTool({
     if (input.sectionId === undefined) requireEditConsent(deps);
     else requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
     const at = (deps.now ?? (() => new Date()))();
-    const edit = buildAppendEdit(input.text, input.sectionId);
+    const edit = buildAppendEdit(input.text, input.sectionId, at);
     await spendWriteQuota(deps);
 
     const result = await runEdit(deps, input.noteId, edit, 'append_text', at);
@@ -685,7 +689,7 @@ const editNoteText = defineTool({
   run: async (deps, input) => {
     requireConsent(deps, REWRITE_CONSENT_VERSION, 'replace or remove text');
     const at = (deps.now ?? (() => new Date()))();
-    const edit = buildReplaceEdit(input);
+    const edit = buildReplaceEdit(input, at);
     await spendWriteQuota(deps);
 
     const result = await runEdit(deps, input.noteId, edit, 'edit_note_text', at);
@@ -852,6 +856,123 @@ const moveNoteToCategory = defineTool({
   },
 });
 
+// ---------------------------------------------------------------------------
+// תכנית עבודה כיומן (v1.44.0): רשומה מתוארכת, מצב ותובנות, סדר וסטטוס
+// ---------------------------------------------------------------------------
+
+const WORKPLAN_GUARD =
+  "It works on the user's own notes only, not on notes marked read-only for Claude, and not while the user is typing " +
+  'in that note in the app.';
+
+const addWorkplanLogEntry = defineTool({
+  name: 'add_workplan_log_entry',
+  title: "Add a dated entry to a work plan section's log",
+  description:
+    "Add one dated line at the END of a work plan section's log, like the app's \"+ today's entry\" button: today's date " +
+    '(day/month, as the user writes it) and then the text, for example "13/11 cleaned the filter". Use it when the user ' +
+    'tells you what happened today in one of the sections of their log (for example one of their fish tanks). Existing ' +
+    `text is never changed. Only add what the user asked for, in their language (usually Hebrew). ${READ_FIRST} ` +
+    `${WORKPLAN_GUARD} The same entry sent again within 10 minutes is ignored.`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    sectionId: z.string().min(1).max(128).describe('The section id from get_note ("section id: ...").'),
+    text: z
+      .string()
+      .max(5_000)
+      .describe(`The entry, one line, without the date (it is added), at most ${EDIT_LIMITS.logEntry} characters.`),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
+    const now = at(deps);
+    const edit = buildLogEntryEdit(input, now);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'add_workplan_log_entry', now);
+    const where = `section [section id: ${input.sectionId}] of "${result.note.title}" [id: ${input.noteId}]`;
+    if (result.duplicate) return `This exact entry was already added to ${where} in the last 10 minutes. It was not added again.`;
+    return `Added a dated entry to the log of ${where}. ${RECOVERABLE}`;
+  },
+});
+
+const setWorkplanSectionState = defineTool({
+  name: 'set_workplan_section_state',
+  title: 'Set the "state and insights" of a work plan section',
+  description:
+    'Set the "state and insights" text of one work plan section (shown pinned above its log; for example "2 males, 5 ' +
+    'females"). It REPLACES the whole state text: send the full new text, keeping everything the user did not ask to ' +
+    'change. Only when the user asked to update the state of that section. Empty text clears it. ' +
+    `${READ_FIRST} ${WORKPLAN_GUARD} The previous text stays in the note history.`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    sectionId: z.string().min(1).max(128).describe('The section id from get_note ("section id: ...").'),
+    state: z.string().max(20_000).describe(`The full new state text, at most ${EDIT_LIMITS.sectionState} characters.`),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
+    const now = at(deps);
+    const edit = buildSectionStateEdit(input, now);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'set_workplan_section_state', now);
+    if (!result.changed) return 'Nothing changed: the state is already exactly this text.';
+    return `Updated the state of section [section id: ${input.sectionId}] in "${result.note.title}" [id: ${input.noteId}]. ${RECOVERABLE}`;
+  },
+});
+
+const reorderWorkplanSections = defineTool({
+  name: 'reorder_workplan_sections',
+  title: 'Reorder the sections of a work plan',
+  description:
+    'Put the sections of a work plan in a new order. Give EVERY section id of the note exactly once, in the new order ' +
+    `(nothing is added or removed). Only when the user asked to reorder. ${READ_FIRST} ${WORKPLAN_GUARD}`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    sectionIds: z.array(z.string().min(1).max(128)).min(1).max(500).describe('All the section ids, in the new order.'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
+    const now = at(deps);
+    const edit = buildReorderSectionsEdit(input.sectionIds);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'reorder_workplan_sections', now);
+    if (!result.changed) return 'Nothing changed: the sections are already in this order.';
+    return `Reordered the sections of "${result.note.title}" [id: ${input.noteId}]. ${RECOVERABLE}`;
+  },
+});
+
+const setWorkplanSectionStatus = defineTool({
+  name: 'set_workplan_section_status',
+  title: 'Set the status of a work plan section',
+  description:
+    'Set the status of one work plan section: open, active (in progress) or done. Only in a work plan where the user ' +
+    'turned on section status in the app (get_note shows "Section status: on"); otherwise it is refused and nothing ' +
+    `changes. Only when the user asked. ${READ_FIRST} ${WORKPLAN_GUARD}`,
+  scope: 'notes.write',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  inputSchema: z.object({
+    noteId: z.string().min(1).max(128).describe('The work plan note id.'),
+    sectionId: z.string().min(1).max(128).describe('The section id from get_note ("section id: ...").'),
+    status: z.enum(['open', 'active', 'done']).describe('open, active (in progress) or done.'),
+  }),
+  run: async (deps, input) => {
+    requireConsent(deps, REWRITE_CONSENT_VERSION, 'edit work plans');
+    const now = at(deps);
+    const edit = buildSectionStatusEdit(input, now);
+    await spendWriteQuota(deps);
+
+    const result = await runEdit(deps, input.noteId, edit, 'set_workplan_section_status', now);
+    if (!result.changed) return `Nothing changed: the section is already "${input.status}".`;
+    return `Set section [section id: ${input.sectionId}] in "${result.note.title}" [id: ${input.noteId}] to "${input.status}". ${RECOVERABLE}`;
+  },
+});
+
 export const TOOLS = [
   listCategories,
   listNotes,
@@ -864,6 +985,10 @@ export const TOOLS = [
   addWorkplanSection,
   editNoteText,
   removeWorkplanSection,
+  addWorkplanLogEntry,
+  setWorkplanSectionState,
+  reorderWorkplanSections,
+  setWorkplanSectionStatus,
   addChecklistItems,
   removeChecklistItem,
   archiveNote,

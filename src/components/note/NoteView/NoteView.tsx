@@ -196,6 +196,18 @@ export const NoteView: React.FC<NoteViewProps> = ({
     }
   };
 
+  /**
+   * סטטוס לסעיפים בתכנית עבודה (v1.44.0): שדה של הפתק, כמו הצמדה - לא תוכן,
+   * ולכן לא עובר דרך העורך ולא נכנס להיסטוריה. כל מי שעורך את הפתק יכול.
+   */
+  const handleToggleWorkplanStatus = async (enabled: boolean) => {
+    try {
+      await noteAPI.updateNote(note.id, { workplanStatus: enabled });
+    } catch (error) {
+      window.alert(getErrorMessage(error));
+    }
+  };
+
   const handleMoveToCategory = (newCategoryId: string) => {
     if (!onMoveToCategory || newCategoryId === note.categoryId) return;
 
@@ -266,6 +278,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
             readOnly={frozen}
             onConvertToText={handleConvertToText}
             hints={false}
+            statusEnabled={note.workplanStatus === true}
+            onToggleStatus={handleToggleWorkplanStatus}
           />
         );
       default:
