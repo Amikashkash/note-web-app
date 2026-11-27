@@ -70,6 +70,13 @@ export default tseslint.config(
     },
   },
   {
+    // סקריפטים של פיתוח (למשל הזנת נתוני בדיקה ל-emulator) רצים ב-Node
+    // ומדפיסים ל-console בכוונה
+    files: ['scripts/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': 'off' },
+  },
+  {
     // פונקציות הענן הן חבילת Node נפרדת: אין להן DOM, אין להן את הלוגר
     // של האפליקציה, וסקריפטים חד-פעמיים מדפיסים ל-console בכוונה.
     files: ['functions/**/*.ts'],
