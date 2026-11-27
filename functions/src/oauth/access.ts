@@ -22,7 +22,7 @@
  */
 
 import type { Auth } from 'firebase-admin/auth';
-import { firebaseUser } from './decision';
+import { firebaseUser, verifiedUser } from './decision';
 import { OAuthError, tooManyRequests } from './errors';
 import { isUserAllowed } from './policy';
 import type { AccessConfig, AccessRequestRecord, AccessRequestStatus, OAuthStore } from './store';
@@ -114,7 +114,8 @@ export const requestAccess = async ({
   limits?: readonly RateLimitWindow[];
   notify: (notice: AdminNotice) => Promise<void>;
 }): Promise<AccessStatus> => {
-  const decoded = await firebaseUser(auth, authorization);
+  // אימייל לא מאומת - לא נוצרת בקשה: המנהל היה רואה אימייל שאיש לא אימת
+  const decoded = await verifiedUser(auth, authorization);
   const { uid } = decoded;
   const email = typeof decoded.email === 'string' ? decoded.email : '';
   const name = typeof decoded.name === 'string' && decoded.name.trim() ? decoded.name.trim() : email;
@@ -165,6 +166,8 @@ export interface AccessUser {
   uid: string;
   name: string;
   email: string;
+  /** מ-Firebase Auth, עכשיו (v1.44.2). משתמש שלא נמצא - `false` */
+  emailVerified: boolean;
 }
 
 export interface AdminView {
@@ -186,7 +189,12 @@ const describeUsers = async (auth: Auth, uids: string[]): Promise<Map<string, Ac
   for (let index = 0; index < uids.length; index += 100) {
     const { users } = await auth.getUsers(uids.slice(index, index + 100).map((uid) => ({ uid })));
     for (const user of users) {
-      found.set(user.uid, { uid: user.uid, name: user.displayName ?? user.email ?? '', email: user.email ?? '' });
+      found.set(user.uid, {
+        uid: user.uid,
+        name: user.displayName ?? user.email ?? '',
+        email: user.email ?? '',
+        emailVerified: user.emailVerified === true,
+      });
     }
   }
   return found;
@@ -203,15 +211,17 @@ export const adminView = async ({
 }): Promise<AdminView> => {
   await requireAdmin(store, auth, authorization);
   const [config, pending] = await Promise.all([store.getAccessConfig(), store.listPendingAccessRequests()]);
-  const known = await describeUsers(auth, config.allowedUids);
+  // גם הבקשות: האם האימייל מאומת נקרא מ-Auth עכשיו, לא ממה שנשמר בבקשה
+  const known = await describeUsers(auth, [...new Set([...config.allowedUids, ...pending.map((request) => request.uid)])]);
   return {
     pending: pending.map((request) => ({
       uid: request.uid,
       name: request.name,
       email: request.email,
+      emailVerified: known.get(request.uid)?.emailVerified ?? false,
       requestedAt: new Date(request.requestedAt).toISOString(),
     })),
-    approved: config.allowedUids.map((uid) => known.get(uid) ?? { uid, name: '', email: '' }),
+    approved: config.allowedUids.map((uid) => known.get(uid) ?? { uid, name: '', email: '', emailVerified: false }),
     openToAll: config.openToAll,
   };
 };

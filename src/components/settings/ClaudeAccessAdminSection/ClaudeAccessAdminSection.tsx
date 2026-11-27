@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { unverifiedEmailNote } from '@/utils/mcpConnect';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
 import { useAuthStore } from '@/store/authStore';
@@ -33,6 +34,10 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
 const label = (user: AccessUser) => user.name || user.email || user.uid;
+
+/** אימייל לא מאומת (v1.44.2): המנהל רואה את זה לפני שהוא מאשר */
+const UnverifiedEmail: React.FC<{ note: string | null }> = ({ note }) =>
+  note ? <p className="text-body-sm font-medium text-amber-700 dark:text-amber-300">⚠️ {note}</p> : null;
 
 export const ClaudeAccessAdminSection: React.FC = () => {
   const myUid = useAuthStore((state) => state.user?.uid);
@@ -137,6 +142,7 @@ export const ClaudeAccessAdminSection: React.FC = () => {
                         {request.email}
                       </p>
                       <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">ביקש ב-{formatDate(request.requestedAt)}</p>
+                      <UnverifiedEmail note={unverifiedEmailNote(request, 'pending')} />
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -181,6 +187,7 @@ export const ClaudeAccessAdminSection: React.FC = () => {
                           {user.email}
                         </p>
                       )}
+                      {(user.email || user.name) && <UnverifiedEmail note={unverifiedEmailNote(user, 'approved')} />}
                       {!user.email && !user.name && (
                         <p className="text-body-sm text-ink-3-light dark:text-ink-3-dark">החשבון לא נמצא (אולי נמחק)</p>
                       )}

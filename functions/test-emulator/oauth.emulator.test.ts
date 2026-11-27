@@ -90,7 +90,7 @@ const secret = <T extends string | null | undefined>(value: T): T => {
   return value;
 };
 
-const users = { owner: '', stranger: '', revoked: '', disabled: '', removed: '' };
+const users = { owner: '', stranger: '', revoked: '', disabled: '', removed: '', unverified: '' };
 const PASSWORD = 'correct-horse-battery';
 
 const listen = (app: ReturnType<AppModule['createOAuthApp']>) =>
@@ -109,9 +109,14 @@ beforeAll(async () => {
   ({ logger } = await import('firebase-functions'));
 
   for (const name of Object.keys(users) as (keyof typeof users)[]) {
-    users[name] = (await auth.createUser({ email: `${name}-${RUN}@example.com`, password: PASSWORD, emailVerified: true })).uid;
+    users[name] = (
+      await auth.createUser({ email: `${name}-${RUN}@example.com`, password: PASSWORD, emailVerified: name !== 'unverified' })
+    ).uid;
   }
-  await setAllowlist({ allowedUids: [users.owner, users.revoked, users.disabled, users.removed], openToAll: false });
+  await setAllowlist({
+    allowedUids: [users.owner, users.revoked, users.disabled, users.removed, users.unverified],
+    openToAll: false,
+  });
 
   ({ server, base } = await listen(createOAuthApp({ store, auth, clock: now, rateLimits: GENEROUS })));
   ({ server: strictServer, base: strictBase } = await listen(createOAuthApp({ store, auth, clock: now })));
@@ -648,6 +653,18 @@ describe('consent decision binding', () => {
     const reqId = await pending();
     await expectOAuthError(await describeRequest(null, reqId), 401, 'invalid_token');
     await expectOAuthError(await describeRequest('not-a-token', reqId), 401, 'invalid_token');
+  });
+
+  // v1.44.2: even an allowlisted account, approved before the check existed
+  it('requires a verified email to open the consent page or decide', async () => {
+    const reqId = await pending();
+    const idToken = await signIn('unverified');
+    await expectOAuthError(await describeRequest(idToken, reqId), 403, 'email_not_verified');
+    await expectOAuthError(
+      await postDecision(idToken, { req: reqId, nonce: randomBytes(32).toString('base64url'), approve: true }),
+      403,
+      'email_not_verified'
+    );
   });
 
   it('a request opened by one user cannot be opened or decided by another', async () => {

@@ -46,6 +46,8 @@ const users = {
   revokee: '',
   openRevokee: '',
   nobody: '',
+  /** נרשם באימייל וסיסמה ולא אימת (v1.44.2) */
+  unverified: '',
   ...Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`crowd${index}`, ''])),
 } as Record<string, string>;
 
@@ -82,7 +84,7 @@ beforeAll(async () => {
       await auth.createUser({
         email: `${name}-${RUN}@example.com`,
         password: PASSWORD,
-        emailVerified: true,
+        emailVerified: name !== 'unverified',
         displayName: `שם ${name}`,
       })
     ).uid;
@@ -284,6 +286,15 @@ describe('requesting access', () => {
     expect((await api(null, 'POST', '/oauth/access/request', {})).status).toBe(401);
   });
 
+  it('requires a verified email: no request is stored and no admin is notified', async () => {
+    notices.length = 0;
+    const response = await request('unverified');
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ error: 'email_not_verified' });
+    expect(notices).toEqual([]);
+    expect((await db.doc(`mcpAccessRequests/${users.unverified}`).get()).exists).toBe(false);
+  });
+
   it('is rate limited: request, rejected, and asking again at once is refused (429)', async () => {
     const name = 'rejected';
     expect((await request(name, strictBase)).body).toMatchObject({ request: 'pending' });
@@ -401,9 +412,29 @@ describe('the admin view', () => {
     const view = (await adminList('admin')).body as { approved: { uid: string; name: string; email: string }[]; openToAll: boolean };
     expect(view.openToAll).toBe(false);
     expect(view.approved).toEqual([
-      { uid: users.admin, name: 'שם admin', email: `admin-${RUN}@example.com` },
-      { uid: users.member, name: 'שם member', email: `member-${RUN}@example.com` },
+      { uid: users.admin, name: 'שם admin', email: `admin-${RUN}@example.com`, emailVerified: true },
+      { uid: users.member, name: 'שם member', email: `member-${RUN}@example.com`, emailVerified: true },
     ]);
+  });
+
+  it('shows whether each email is verified, read from Auth now, for approved users and pending requests', async () => {
+    // a request stored before v1.44.2, and an account approved before it
+    await db.doc(`mcpAccessRequests/${users.unverified}`).set({
+      uid: users.unverified, name: 'שם unverified', email: `unverified-${RUN}@example.com`,
+      status: 'pending', requestedAt: Date.now(), decidedAt: null, decidedBy: null,
+    });
+    await db.doc('config/mcp').set({ ...baseConfig(), allowedUids: [...baseConfig().allowedUids, users.unverified] });
+    await request('asker');
+
+    const view = (await adminList('admin')).body as {
+      approved: { uid: string; emailVerified: boolean }[];
+      pending: { uid: string; emailVerified: boolean }[];
+    };
+    expect(view.approved.find((user) => user.uid === users.unverified)?.emailVerified).toBe(false);
+    expect(view.approved.find((user) => user.uid === users.member)?.emailVerified).toBe(true);
+    expect(view.pending.find((entry) => entry.uid === users.unverified)?.emailVerified).toBe(false);
+    expect(view.pending.find((entry) => entry.uid === users.asker)?.emailVerified).toBe(true);
+    await db.doc(`mcpAccessRequests/${users.unverified}`).delete();
   });
 
   it('an admin removed from adminUids loses the admin powers at once', async () => {

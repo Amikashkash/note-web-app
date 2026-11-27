@@ -404,6 +404,20 @@ describe('duplicates', () => {
     expect((await notesIn(C.home)).filter((doc) => doc.get('title') === 'במקביל')).toHaveLength(1);
   });
 
+  // v1.44.2: the repeat must not hand Claude the id or the (since edited) title of a sensitive note
+  it('a first note marked sensitive in the meantime is never returned: a new note is created', async () => {
+    const args = { categoryId: C.home, title: 'סומן רגיש', type: 'text', text: 'x' };
+    const first = idFrom((await call(clientA, 'create_note', args)).text);
+    await db.doc(`notes/${first}`).update({ isSensitive: true, title: 'כותרת שנערכה אחרי הסימון' });
+
+    const again = await call(clientA, 'create_note', args);
+    expect(again.isError).toBe(false);
+    expect(again.text).not.toContain('already created');
+    expect(again.text).not.toContain(first);
+    expect(again.text).not.toContain('כותרת שנערכה');
+    expect(idFrom(again.text)).not.toBe(first);
+  });
+
   it('a different title is a different note', async () => {
     const first = await call(clientA, 'create_note', { categoryId: C.home, title: 'שונה 1', type: 'text', text: 'x' });
     const second = await call(clientA, 'create_note', { categoryId: C.home, title: 'שונה 2', type: 'text', text: 'x' });

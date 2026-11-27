@@ -323,10 +323,12 @@ export class UserScope {
       const existingId = typeof key?.noteId === 'string' ? key.noteId : null;
       const keyExpiresAt = (key?.expiresAt as Timestamp | undefined)?.toMillis() ?? 0;
       if (existingId && keyExpiresAt > now) {
-        // הפתק הקיים חייב עדיין להיות שם, פעיל: אם נמחק או אורכב, יוצרים חדש
+        // הפתק הקיים חייב עדיין להיות שם, פעיל: אם נמחק או אורכב, יוצרים חדש.
+        // ולא רגיש (v1.44.2): פתק שסומן רגיש בינתיים לא חוזר ל-Claude, גם לא
+        // המזהה או הכותרת שלו - כמו כל קריאה אחרת. יוצרים חדש, כמו לפתק שאורכב
         const existing = siblings.docs.find((doc) => doc.id === existingId && doc.get('isArchived') !== true);
-        if (existing) {
-          const record = toNoteRecord(existing.id, existing.data());
+        const record = existing ? toNoteRecord(existing.id, existing.data()) : null;
+        if (record && !record.isSensitive) {
           return { note: toNote(record, 'owner', record.isReadOnly), categoryName: category.name, duplicate: true };
         }
       }

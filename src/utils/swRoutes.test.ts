@@ -11,11 +11,17 @@ describe('service worker navigation denylist', () => {
     '/oauth/decision',
     '/.well-known/oauth-authorization-server',
     '/.well-known/oauth-protected-resource/mcp',
+    // v1.44.2: the consent screen, in any letter case
+    '/connect',
+    '/connect?req=abc',
+    '/connect/?req=abc',
+    '/Connect?req=abc',
+    '/CONNECT',
   ])('%s goes straight to the network', (path) => {
     expect(denied(path)).toBe(true);
   });
 
-  it.each(['/', '/connect?req=abc', '/settings', '/mcp-notes', '/category/oauth'])('%s is still handled', (path) => {
+  it.each(['/', '/settings', '/mcp-notes', '/category/oauth', '/connected', '/category/connect'])('%s is still handled', (path) => {
     expect(denied(path)).toBe(false);
   });
 });

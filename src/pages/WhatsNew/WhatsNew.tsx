@@ -18,6 +18,25 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.44.2',
+    date: 'נובמבר 2026',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'היסטוריית הגרסאות של פתק פתוחה עכשיו רק לבעלים שלו, ולא למי שהפתק משותף איתו',
+      },
+      {
+        type: 'improvement',
+        description:
+          'בקשת גישה ל-Claude ואישור חיבור דורשים כתובת אימייל מאומתת. במסך הניהול של הגישה מסומן מי שהאימייל שלו לא אומת',
+      },
+      {
+        type: 'improvement',
+        description: 'הרשאות השיתוף של פתקים וקטגוריות הוקשחו',
+      },
+    ],
+  },
+  {
     version: '1.44.1',
     date: 'נובמבר 2026',
     changes: [

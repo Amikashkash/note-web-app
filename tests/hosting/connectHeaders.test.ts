@@ -26,7 +26,10 @@ const headersFor = (path: string): Record<string, string> =>
   );
 
 describe('/connect hosting headers', () => {
-  it.each(['/connect', '/connect/'])('%s cannot be framed and is not cached', (path) => {
+  // v1.44.2: in any letter case, as the app's router matches it. A character
+  // class and not `(?i)`: Hosting runs RE2, but the Hosting emulator runs the
+  // pattern as a JavaScript RegExp and crashes on `(?i)`
+  it.each(['/connect', '/connect/', '/Connect', '/CONNECT/'])('%s cannot be framed and is not cached', (path) => {
     const headers = headersFor(path);
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
@@ -35,6 +38,7 @@ describe('/connect hosting headers', () => {
 
   it('the rule does not spill over to other pages', () => {
     expect(headersFor('/connected-apps')).toEqual({});
+    expect(headersFor('/Connected')).toEqual({});
     expect(headersFor('/')).toEqual({});
   });
 });

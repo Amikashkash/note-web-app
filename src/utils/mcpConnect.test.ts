@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { isFramed, parseConnectRequest, problemFrom, requestsWrite, safeRedirect, scopeLabel } from './mcpConnect';
+import {
+  isFramed,
+  parseConnectRequest,
+  problemFrom,
+  requestsWrite,
+  safeRedirect,
+  scopeLabel,
+  unverifiedEmailNote,
+} from './mcpConnect';
 
 describe('safeRedirect', () => {
   const CALLBACK = 'https://claude.ai/api/mcp/auth_callback?code=abc&state=s&iss=x';
@@ -47,6 +55,7 @@ describe('parseConnectRequest', () => {
 describe('problemFrom', () => {
   it.each([
     [403, { error: 'access_denied' }, 'not_allowed'],
+    [403, { error: 'email_not_verified' }, 'email_not_verified'],
     [401, { error: 'login_required' }, 'login_required'],
     [401, { error: 'invalid_token' }, 'login_required'],
     [400, { error: 'invalid_request' }, 'expired'],
@@ -54,6 +63,19 @@ describe('problemFrom', () => {
     [404, null, 'unavailable'],
   ])('%i %j → %s', (status, body, problem) => {
     expect(problemFrom(status, body)).toBe(problem);
+  });
+});
+
+describe('unverifiedEmailNote: what the admin sees next to an unverified email', () => {
+  it('nothing for a verified email', () => {
+    expect(unverifiedEmailNote({ emailVerified: true }, 'pending')).toBeNull();
+    expect(unverifiedEmailNote({ emailVerified: true }, 'approved')).toBeNull();
+  });
+
+  it('a warning for an unverified one, and when the server does not say (fail closed)', () => {
+    expect(unverifiedEmailNote({ emailVerified: false }, 'pending')).toContain('לא אומת');
+    expect(unverifiedEmailNote({ emailVerified: false }, 'approved')).toContain('לא יוכל לחבר');
+    expect(unverifiedEmailNote({}, 'approved')).toContain('לא אומת');
   });
 });
 

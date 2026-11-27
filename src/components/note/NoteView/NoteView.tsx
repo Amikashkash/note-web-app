@@ -514,7 +514,8 @@ export const NoteView: React.FC<NoteViewProps> = ({
             {isOwner && onMoveToCategory && categories.length > 1 && (
               <FooterAction icon={FolderInput} label="העבר לקטגוריה" onClick={() => setShowMoveMenu((previous) => !previous)} />
             )}
-            <FooterAction icon={History} label="היסטוריה" onClick={handleOpenHistory} />
+            {/* ההיסטוריה - לבעלים בלבד (v1.44.2): גרסאות מלפני השיתוף לא נחשפות לשותף */}
+            {isOwner && <FooterAction icon={History} label="היסטוריה" onClick={handleOpenHistory} />}
             {isOwner
               ? onDelete && <FooterAction icon={Archive} label="העבר לארכיון" onClick={handleDelete} />
               : <FooterAction icon={LogOut} label="הסר אותי" onClick={handleLeave} />}
