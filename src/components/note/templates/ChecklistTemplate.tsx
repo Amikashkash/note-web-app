@@ -36,8 +36,6 @@ import {
   GripVertical,
   Repeat,
   Trash2,
-  X,
-  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { useNotificationOptIn } from '@/hooks/useNotificationOptIn';
@@ -54,6 +52,8 @@ import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
 import { withFirstRow } from '@/utils/firstRow';
 import { moveTask, sortTasksByPriority } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
+import { DuePicker } from './DuePicker';
+import { controlsOnOwnLine } from '@/utils/taskLayout';
 
 export type { ChecklistItem, RepeatRule };
 
@@ -95,63 +95,6 @@ interface ChecklistTemplateProps {
   /** המרת הפתק לטקסט חופשי, כשהתוכן לא תואם לתבנית */
   onConvertToText?: () => void;
 }
-
-interface DuePickerProps {
-  inputId: string;
-  type: 'date' | 'time';
-  value: string;
-  Icon: LucideIcon;
-  colorClass: string;
-  title: string;
-  onChange: (value: string) => void;
-  onClear: () => void;
-}
-
-/**
- * בורר תאריך/שעה: הקלט עצמו שקוף ופרוס מעל האייקון, כדי שלחיצה על
- * האייקון תפתח את בורר המערכת. אותו מבנה שימש פעמיים - לתאריך ולשעה.
- */
-const DuePicker: React.FC<DuePickerProps> = ({
-  inputId,
-  type,
-  value,
-  Icon,
-  colorClass,
-  title,
-  onChange,
-  onClear,
-}) => (
-  <div className="relative flex-shrink-0 flex items-center gap-1">
-    <input
-      id={inputId}
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="absolute left-0 top-0 w-8 h-8 opacity-0 cursor-pointer"
-      style={{ zIndex: 10 }}
-    />
-    <label
-      htmlFor={inputId}
-      className={`cursor-pointer pointer-events-none ${colorClass}`}
-      title={title}
-    >
-      <Icon size={20} strokeWidth={1.75} />
-    </label>
-    {value && (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClear();
-        }}
-        className="text-ink-3-light dark:text-ink-3-dark hover:text-danger relative z-20"
-        title={type === 'date' ? 'הסר תאריך' : 'הסר שעה'}
-      >
-        <X size={14} strokeWidth={2} />
-      </button>
-    )}
-  </div>
-);
 
 interface SortableRowProps {
   id: string;
@@ -200,12 +143,6 @@ const SortableRow: React.FC<SortableRowProps> = ({ id, disabled, className, chil
     </div>
   );
 };
-
-/**
- * מעל האורך הזה הכפתורים של המשימה יורדים לשורה משלהם (v1.43.1). בערך 6-7
- * מילים: מה שנכנס לשתי שורות ליד הכפתורים ברוחב של טלפון.
- */
-const LONG_TASK_CHARS = 40;
 
 /** הודעות לקורא מסך, בעברית (ברירת המחדל של הספרייה באנגלית) */
 const DRAG_ACCESSIBILITY = {
@@ -452,7 +389,7 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
                   כ-100px והוא נשבר לעשרות שורות. משימה קצרה נשארת בשורה אחת, כמו קודם */}
               <div
                 className={`flex items-center gap-3 ${
-                  item.text.length > LONG_TASK_CHARS ? 'basis-full justify-end' : 'flex-shrink-0'
+                  controlsOnOwnLine(item) ? 'basis-full justify-end' : 'flex-shrink-0'
                 }`}
               >
               {/* תאריך */}
