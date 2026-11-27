@@ -50,6 +50,7 @@ import {
 import type { ChecklistItem, RepeatRule, TaskPriority } from '@/types/template';
 import { openTasksFirst, parseChecklist } from '@/utils/templateContent';
 import { withFirstRow } from '@/utils/firstRow';
+import { keepUnknownFields } from '@/utils/keepUnknownFields';
 import { moveTask, sortTasksByPriority } from '@/utils/checklistOrder';
 import { UnparseableContent } from './UnparseableContent';
 import { DuePicker } from './DuePicker';
@@ -219,7 +220,8 @@ export const ChecklistTemplate: React.FC<ChecklistTemplateProps> = ({
     }
   });
 
-  const commit = (updated: ChecklistItem[]) => onChange(JSON.stringify(updated));
+  // שדות שהגרסה הזו לא מכירה נשארים בשמירה (v1.44.2), ראו `keepUnknownFields.ts`
+  const commit = (updated: ChecklistItem[]) => onChange(keepUnknownFields(value, updated, parseChecklist));
 
   /**
    * עדכון משימה בודדת. נקודת המעבר היחידה לשינוי פריט - קריאה אחת

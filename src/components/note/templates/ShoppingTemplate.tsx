@@ -17,6 +17,7 @@ import { normalizeProductName } from '@/services/api/productMatching';
 
 import type { ShoppingItem } from '@/types/template';
 import { parseShopping } from '@/utils/templateContent';
+import { keepUnknownFields } from '@/utils/keepUnknownFields';
 import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea/AutoGrowTextarea';
 import { UnparseableContent } from './UnparseableContent';
 
@@ -51,7 +52,8 @@ export const ShoppingTemplate: React.FC<ShoppingTemplateProps> = ({
   const existingNames = useMemo(() => items.map((item) => item.name), [items]);
   const { suggestions, remember } = useProductSuggestions(draft, existingNames);
 
-  const commit = (updated: ShoppingItem[]) => onChange(JSON.stringify(updated));
+  // שדות שהגרסה הזו לא מכירה נשארים בשמירה (v1.44.2), ראו `keepUnknownFields.ts`
+  const commit = (updated: ShoppingItem[]) => onChange(keepUnknownFields(value, updated, parseShopping));
 
   /** קריאה אחת לאירוע, כדי ששני עדכונים לא יתבססו על מצב שהתיישן */
   const updateItem = (id: string, patch: Partial<ShoppingItem>) => {
