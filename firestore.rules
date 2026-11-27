@@ -45,7 +45,21 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['sharedWith', 'updatedAt', 'updatedBy', 'clientVersion'])
         && request.resource.data.get('sharedWith', []).toSet()
-          == sharedUsers(resource.data).toSet().difference([request.auth.uid].toSet());
+          == sharedUsers(resource.data).toSet().difference([request.auth.uid].toSet())
+        // השוואת קבוצות מתעלמת מכפילויות: בלי זה אפשר היה "לצאת" עם מערך
+        // ארוך מהמקורי (אותו מזהה שוב ושוב). יציאה רק מקצרת אותו
+        && request.resource.data.get('sharedWith', []).size() < sharedUsers(resource.data).size()
+        // מי שכתב: אם השדה נשלח, הוא היוצא עצמו (בפתק `writerStamp` כבר מחייב את זה)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy'])
+          || request.resource.data.updatedBy == request.auth.uid);
+    }
+
+    // הבעלים לא מעביר פריט לחשבון אחר (R-3): `userId` לא משתנה בעדכון,
+    // גם לא ע"י הבעלים. העברה הייתה מכניסה פתק או קטגוריה לחשבון של מישהו
+    // אחר, כאילו הם שלו
+    function isOwnerKeepingOwnership() {
+      return isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId;
     }
 
     match /categories/{categoryId} {
@@ -57,7 +71,7 @@ service cloud.firestore {
       // `isSensitive` (§12 בסקירה): רק הבעלים מסמן או מבטל. אחרת שותף
       // יכול היה לחשוף ל-Claude של כולם קטגוריה שהבעלים הסתיר.
       // `isReadOnly` (קריאה בלבד ל-Claude) - אותו כלל.
-      allow update: if isOwner(resource.data.userId)
+      allow update: if isOwnerKeepingOwnership()
         || (isSharedWithMe(resource.data) && ownershipUnchanged()
           && ownerOnlyFieldsUnchanged(['isSensitive', 'isReadOnly']))
         || isLeavingShare();
@@ -144,7 +158,7 @@ service cloud.firestore {
         && revisionChecked()
         && baseChecked()
         && createdViaUnchanged()
-        && (isOwner(resource.data.userId)
+        && (isOwnerKeepingOwnership()
           || (isSharedWithMe(resource.data) && ownershipUnchanged()
             && ownerOnlyFieldsUnchanged(['isSensitive', 'categoryId', 'isReadOnly']))
           || isLeavingShare());
@@ -152,11 +166,11 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
 
       // היסטוריית גרסאות. נכתבת אך ורק ע"י הטריגר בענן (Admin SDK), ולכן
-      // אין כאן הרשאת כתיבה כלל. קריאה - לכל מי שיכול לקרוא את הפתק עצמו,
-      // לפי המצב הנוכחי של הפתק: מי שהוסר מהשיתוף מאבד גם את ההיסטוריה.
-      // פתק שנמחק - `get` נכשל והקריאה נדחית.
+      // אין כאן הרשאת כתיבה כלל. קריאה - לבעלים של הפתק בלבד (v1.44.2):
+      // ההיסטוריה כוללת גרסאות מלפני השיתוף, ותוכן שהבעלים מחק לפני ששיתף
+      // לא אמור להגיע לשותף. פתק שנמחק - `get` נכשל והקריאה נדחית.
       match /versions/{versionId} {
-        allow read: if canReadNote(get(/databases/$(database)/documents/notes/$(noteId)).data);
+        allow read: if isOwner(get(/databases/$(database)/documents/notes/$(noteId)).data.userId);
         allow write: if false;
       }
 
