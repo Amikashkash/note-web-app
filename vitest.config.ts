@@ -20,6 +20,7 @@ export default defineConfig({
     environment: 'node',
     // `tests/mirrors`: המראות של functions/ מול המקור, ראה הקובץ שם
     // `tests/hosting`: בדיקות של `firebase.json`
-    include: ['src/**/*.test.ts', 'tests/mirrors/**/*.test.ts', 'tests/hosting/**/*.test.ts'],
+    // `tests/fixtures`: נתוני הבדיקה הריאליסטיים ושומר ה-emulator של סקריפט ההזנה
+    include: ['src/**/*.test.ts', 'tests/mirrors/**/*.test.ts', 'tests/hosting/**/*.test.ts', 'tests/fixtures/**/*.test.ts'],
   },
 });
