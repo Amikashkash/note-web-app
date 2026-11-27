@@ -23,6 +23,8 @@ export type ConnectProblem =
   | 'not_allowed'
   /** צריך להתחבר מחדש (התחברות ישנה מיממה, או token לא תקף) */
   | 'login_required'
+  /** החשבון נכנס באימייל וסיסמה ולא אימת את האימייל (v1.44.2) */
+  | 'email_not_verified'
   /** השרת לא זמין או תשובה לא צפויה */
   | 'unavailable';
 
@@ -51,10 +53,26 @@ export const parseConnectRequest = (value: unknown): ConnectRequest | null => {
 /** תשובת שגיאה מהשרת (פורמט OAuth) למצב שמוצג */
 export const problemFrom = (status: number, body: unknown): ConnectProblem => {
   const error = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
+  if (status === 403 && error === 'email_not_verified') return 'email_not_verified';
   if (status === 403 && error === 'access_denied') return 'not_allowed';
   if (status === 401) return 'login_required';
   if (status === 400 && error === 'invalid_request') return 'expired';
   return 'unavailable';
+};
+
+/** ההודעה למשתמש שהאימייל שלו לא אומת. אחרי האימות צריך התחברות מחדש, כדי שה-token יידע */
+export const EMAIL_NOT_VERIFIED_TEXT =
+  'החיבור ל-Claude דורש כתובת אימייל מאומתת. פתחו את הקישור ששלחנו אליכם במייל כשנרשמתם, ואז התחברו מחדש.';
+
+/**
+ * מה המנהל רואה ליד משתמש שהאימייל שלו לא מאומת, או `null` כשהוא מאומת.
+ * בקשה כזו יכולה להגיע רק מלפני 1.44.2; מורשה כזה לא יכול לחבר את Claude עד שיאמת.
+ */
+export const unverifiedEmailNote = (user: { emailVerified?: boolean }, kind: 'pending' | 'approved'): string | null => {
+  if (user.emailVerified === true) return null;
+  return kind === 'pending'
+    ? 'האימייל לא אומת: ייתכן שהוא לא של מי שביקש'
+    : 'האימייל לא אומת: לא יוכל לחבר את Claude עד שיאמת';
 };
 
 /**

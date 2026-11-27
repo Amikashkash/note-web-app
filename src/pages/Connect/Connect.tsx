@@ -20,7 +20,14 @@ import { db } from '@/services/firebase/config';
 import { localChangesSettle } from '@/services/firebase/localData';
 import { useAuthStore } from '@/store/authStore';
 import { loadConnectRequest, sendConnectDecision } from '@/services/api/mcpConnect';
-import { isFramed, requestsWrite, scopeLabel, type ConnectProblem, type ConnectRequest } from '@/utils/mcpConnect';
+import {
+  EMAIL_NOT_VERIFIED_TEXT,
+  isFramed,
+  requestsWrite,
+  scopeLabel,
+  type ConnectProblem,
+  type ConnectRequest,
+} from '@/utils/mcpConnect';
 import { loginRedirectState } from '@/utils/returnTo';
 import { AccessRequestPanel } from './AccessRequestPanel';
 
@@ -44,6 +51,10 @@ const PROBLEMS: Record<ConnectProblem, { title: string; text: string }> = {
   login_required: {
     title: 'צריך להתחבר מחדש',
     text: 'לפני שמאשרים גישה לפתקים, יש להתחבר שוב לחשבון.',
+  },
+  email_not_verified: {
+    title: 'צריך לאמת את האימייל',
+    text: EMAIL_NOT_VERIFIED_TEXT,
   },
   unavailable: {
     title: 'לא ניתן להשלים את החיבור כרגע',
@@ -128,7 +139,8 @@ export const Connect: React.FC = () => {
         ) : (
           <p className="text-gray-600 dark:text-gray-300">{text}</p>
         )}
-        {state.problem === 'login_required' ? (
+        {/* אחרי אימות האימייל, רק התחברות מחדש מביאה token שיודע שהוא מאומת */}
+        {state.problem === 'login_required' || state.problem === 'email_not_verified' ? (
           <Button fullWidth onClick={signInAgain}>
             התחברות מחדש
           </Button>

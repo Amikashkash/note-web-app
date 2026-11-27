@@ -23,7 +23,9 @@ export type OAuthErrorCode =
   | 'invalid_client_metadata'
   | 'invalid_token'
   | 'insufficient_scope'
-  | 'login_required';
+  | 'login_required'
+  /** האימייל של החשבון לא אומת: לא מבקשים גישה ולא מאשרים חיבור (v1.44.2). לא קוד OAuth תקני - רק למסכים שלנו */
+  | 'email_not_verified';
 
 export class OAuthError extends Error {
   readonly error: OAuthErrorCode;
@@ -46,6 +48,10 @@ export class OAuthError extends Error {
 
 /** אותה שגיאה לכל כשל של code או refresh token - אין רמז מה בדיוק נכשל */
 export const invalidGrant = () => new OAuthError('invalid_grant', 'The grant is invalid, expired or revoked');
+
+/** החשבון נכנס באימייל וסיסמה ולא אימת את האימייל */
+export const emailNotVerified = () =>
+  new OAuthError('email_not_verified', 'Verify your email address first', 403);
 
 export const tooManyRequests = (retryAfterMs: number) =>
   new OAuthError('temporarily_unavailable', 'Too many requests', 429, Math.max(1, Math.ceil(retryAfterMs / 1000)));

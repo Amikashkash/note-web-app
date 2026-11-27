@@ -23,7 +23,7 @@
 
 import type { Auth } from 'firebase-admin/auth';
 import { CONSENT_VERSION, ISSUER, LIFETIMES } from './config';
-import { OAuthError } from './errors';
+import { emailNotVerified, OAuthError } from './errors';
 import { isUserAllowed } from './policy';
 import type { OAuthStore, RequestRecord } from './store';
 import { constantTimeEqual, isSecretShaped, randomSecret, sha256Hex } from './tokens';
@@ -56,9 +56,21 @@ export const firebaseUser = async (auth: Auth, authorization: unknown) => {
   }
 };
 
-/** כמו `firebaseUser`, ובנוסף: התחברות ישנה מיממה מחייבת התחברות מחדש (`login_required`) לפני הסכמה */
-const signedInUser = async (auth: Auth, authorization: unknown, now: number): Promise<string> => {
+/**
+ * כמו `firebaseUser`, ובנוסף: האימייל מאומת (v1.44.2). בהרשמה באימייל
+ * וסיסמה ה-token תקף עוד לפני האימות, והאימייל בו הוא רק מה שהוקלד. מי
+ * שמבקש גישה או מאשר חיבור - רק עם אימייל מאומת, כמו בחיפוש לשיתוף
+ * (`userLookup.ts`). התחברות עם Google מאומתת תמיד.
+ */
+export const verifiedUser = async (auth: Auth, authorization: unknown) => {
   const decoded = await firebaseUser(auth, authorization);
+  if (decoded.email_verified !== true) throw emailNotVerified();
+  return decoded;
+};
+
+/** כמו `verifiedUser`, ובנוסף: התחברות ישנה מיממה מחייבת התחברות מחדש (`login_required`) לפני הסכמה */
+const signedInUser = async (auth: Auth, authorization: unknown, now: number): Promise<string> => {
+  const decoded = await verifiedUser(auth, authorization);
   const authTime = typeof decoded.auth_time === 'number' ? decoded.auth_time * 1000 : 0;
   if (now - authTime > LIFETIMES.authTime) {
     throw new OAuthError('login_required', 'Please sign in again to connect', 401);

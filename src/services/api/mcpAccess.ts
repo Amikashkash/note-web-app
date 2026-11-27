@@ -9,6 +9,7 @@
 
 import { auth } from '@/services/firebase/config';
 import { logger } from '@/utils/logger';
+import { EMAIL_NOT_VERIFIED_TEXT } from '@/utils/mcpConnect';
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
 
@@ -22,6 +23,8 @@ export interface AccessUser {
   uid: string;
   name: string;
   email: string;
+  /** מ-Firebase Auth (v1.44.2). שרת ישן לא שולח אותו */
+  emailVerified?: boolean;
 }
 
 export interface AdminView {
@@ -73,6 +76,10 @@ const call = async <T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
 
   if (!response.ok) {
     logger.error('Access API failed with status', response.status);
+    const error = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    if (response.status === 403 && error === 'email_not_verified') {
+      throw new AccessApiError(response.status, EMAIL_NOT_VERIFIED_TEXT);
+    }
     throw new AccessApiError(response.status, MESSAGES[response.status] ?? 'משהו השתבש. נסו שוב בעוד כמה דקות.');
   }
   return (await response.json()) as T;
